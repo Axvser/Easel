@@ -21,11 +21,12 @@ name: publish
 #   halfway can therefore be retried without repacking what already landed.
 #
 # Release order:
-#   Easel.Generator -> Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The generator is
-#   pushed first and the job polls flatcontainer until NuGet serves it; only then is the runtime
-#   packed and pushed, and the job again waits until that version is downloadable. The runtime
-#   does not carry a package dependency on the generator (consumers add both), so this ordering is
-#   what keeps the runtime from being discoverable before the compiler it was built against.
+#   Easel.Generator -> Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The pre-publish
+#   test job builds in Debug against the local generator project. The publish job restores,
+#   Release-builds, packs and pushes the generator, polls flatcontainer until NuGet serves it, and
+#   only then restores, Release-builds and tests the runtime before packing and pushing it. The
+#   runtime does not carry a package dependency on the generator (consumers add both); the order
+#   keeps the runtime from being discoverable before the compiler it was built against.
 #
 # Target frameworks:
 #   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
@@ -173,28 +174,18 @@ jobs:
             5.0.x
             3.1.x
 
-      # The gallery demo is deliberately not built: it consumes VeloxDev.Core from NuGet, and CI
-      # has no VeloxDev checkout, so restoring the solution fails until 12.0.0 is published.
+      # Source-level gate. Debug resolves the generator through its ProjectReference, so this can
+      # run before the generator is published. The Release graph resolves the published generator
+      # and is restored, built and tested in the publish job once NuGet serves it.
+      # The gallery demo is not built either: it needs VeloxDev.Core 12.0.0 from NuGet.
       - name: Restore
-        run: |
-          dotnet restore Src/Easel/Easel.csproj
-          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel" }
-          dotnet restore Src/Generators/Easel.Generator/Easel.Generator.csproj
-          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Generator" }
-          dotnet restore Src/Test/Unit/Easel.Test/Easel.Test.csproj
-          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Test" }
+        run: dotnet restore Src/Test/Unit/Easel.Test/Easel.Test.csproj
 
       - name: Build
-        run: |
-          dotnet build Src/Easel/Easel.csproj -c Release --no-restore
-          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel" }
-          dotnet build Src/Generators/Easel.Generator/Easel.Generator.csproj -c Release --no-restore
-          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Generator" }
-          dotnet build Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release --no-restore
-          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Test" }
+        run: dotnet build Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Debug --no-restore
 
       - name: Test
-        run: dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release --no-build --logger "console;verbosity=normal"
+        run: dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Debug --no-build --logger "console;verbosity=normal"
 
   publish:
     needs: [version, test]
@@ -228,6 +219,9 @@ jobs:
           VERSION: ${{ needs.version.outputs.generator_version }}
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
+          # The generator is restored and built on its own; the runtime does not enter this step.
+          dotnet restore "Src/Generators/Easel.Generator/Easel.Generator.csproj" -p:Configuration=Release
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Generator" }
           # Build first with pack-on-build disabled: the generator packs a bin/... DLL through a
           # custom None item, and a direct `dotnet pack` can evaluate it before that DLL exists.
           dotnet build "Src/Generators/Easel.Generator/Easel.Generator.csproj" `
@@ -305,6 +299,20 @@ jobs:
               $delay = 60
             }
           }
+
+      - name: Restore, build and test the runtime in Release
+        # The generator is downloadable now; only at this point does the runtime's Release graph run.
+        if: needs.version.outputs.easel_missing == 'true'
+        shell: pwsh
+        run: |
+          dotnet restore "Src/Easel/Easel.csproj" -p:Configuration=Release
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel (Release)" }
+          dotnet restore "Src/Test/Unit/Easel.Test/Easel.Test.csproj" -p:Configuration=Release
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Test (Release)" }
+          dotnet build "Src/Test/Unit/Easel.Test/Easel.Test.csproj" -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Test (Release)" }
+          dotnet test "Src/Test/Unit/Easel.Test/Easel.Test.csproj" -c Release --no-build --logger "console;verbosity=normal"
+          if ($LASTEXITCODE -ne 0) { throw "tests failed: Easel (Release)" }
 
       - name: Pack the runtime
         if: needs.version.outputs.easel_missing == 'true'
