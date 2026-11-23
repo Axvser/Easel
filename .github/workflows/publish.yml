@@ -166,18 +166,32 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           # The runtime multi-targets net461/net5.0/netcoreapp3.0/net8.0; the older SDKs supply
-          # their Windows Desktop targeting packs. The test project and demo run on .NET 10.
+          # their Windows Desktop targeting packs. The test project runs on .NET 10.
           dotnet-version: |
             10.0.x
             8.0.x
             5.0.x
             3.1.x
 
+      # The gallery demo is deliberately not built: it consumes VeloxDev.Core from NuGet, and CI
+      # has no VeloxDev checkout, so restoring the solution fails until 12.0.0 is published.
       - name: Restore
-        run: dotnet restore Easel.slnx
+        run: |
+          dotnet restore Src/Easel/Easel.csproj
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel" }
+          dotnet restore Src/Generators/Easel.Generator/Easel.Generator.csproj
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Generator" }
+          dotnet restore Src/Test/Unit/Easel.Test/Easel.Test.csproj
+          if ($LASTEXITCODE -ne 0) { throw "restore failed: Easel.Test" }
 
       - name: Build
-        run: dotnet build Easel.slnx -c Release --no-restore
+        run: |
+          dotnet build Src/Easel/Easel.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel" }
+          dotnet build Src/Generators/Easel.Generator/Easel.Generator.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Generator" }
+          dotnet build Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Test" }
 
       - name: Test
         run: dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release --no-build --logger "console;verbosity=normal"
