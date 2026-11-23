@@ -1,0 +1,20 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.SliderCard"
+    Spacing="10">
+
+  <StackPanel Orientation="Horizontal" Spacing="12">
+    <Slider x:Name="slider"
+            Width="280"
+            Minimum="0"
+            Maximum="100"
+            Value="40" />
+    <TextBlock x:Name="readout"
+               Width="48"
+               Text="40"
+               Foreground="{StaticResource Accent}" />
+  </StackPanel>
+
+</local:ThemedStackPanel>

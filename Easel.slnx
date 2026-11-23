@@ -1,0 +1,25 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Runtime/">
+    <Project Path="Src/Easel/Easel.csproj" />
+  </Folder>
+  <Folder Name="/Generators/">
+    <Project Path="Src/Generators/Easel.Generator/Easel.Generator.csproj" />
+  </Folder>
+  <Folder Name="/Test/Unit/">
+    <Project Path="Src/Test/Unit/Easel.Test/Easel.Test.csproj" />
+  </Folder>
+  <Folder Name="/Examples/">
+    <Project Path="Examples/XamlGallery/Demo/Demo.csproj" />
+  </Folder>
+  <Folder Name="/Repository/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="LICENSE.txt" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

@@ -1,0 +1,120 @@
+# Controls catalogue
+
+Every control derives from `VisualElement`; its properties are dependency properties, so styles, triggers,
+bindings, resources and animations apply uniformly. No control creates a child window (the two explicit native
+islands are described in [runtime.md](runtime.md)).
+
+Shared visual-element properties (`Width`, `Height`, `Margin`, `Padding`, `Background`, `BorderBrush`,
+`BorderThickness`, `CornerRadius`, `Visibility`, `IsEnabled`, alignment, `Opacity`, `Transform`, `Clip`,
+`Effect`, typography, `DataContext`) are listed in [runtime.md](runtime.md#visual-element-layout-contract).
+This page lists each control's own properties and behaviour.
+
+## Layout and containers
+
+| Control | Key members | Behaviour |
+| --- | --- | --- |
+| `Border` | `Child`, `Padding`, `CornerRadius`, `BorderBrush`, `BorderThickness`, `Background` | Single child, arranged inside padding/border. `Add(child)` sets `Child`. Border chrome is self-drawn. |
+| `ContentControl` | `Content` (`object?`), `ContentTemplate`, `ContentTemplateSelector`, `ContentStringFormat`, `Template` | Content may be a visual or data; a `ContentTemplate` turns data into a visual. |
+| `ContentPresenter` | `Content`, `ContentTemplate`, `ContentTemplateSelector`, `ContentStringFormat` | Template part that shows the templated parent's content. |
+| `UserControl` | `Content` | A `ContentControl` intended as a view root; `Add(child)` sets `Content`. |
+| `StackPanel` | `Orientation`, `Spacing` | Horizontal/vertical stack with an explicit gap. |
+| `DockPanel` | `LastChildFill`, attached `Dock` (`Left/Right/Top/Bottom/None`) | Docks in child order; the last visible child fills when `LastChildFill`. |
+| `WrapPanel` | `Orientation`, `ItemWidth`, `ItemHeight`, `Spacing` | Wraps items into lines; fixed item width/height when set. |
+| `Grid` | `RowDefinitions`, `ColumnDefinitions`, attached `Row`, `Column`, `RowSpan`, `ColumnSpan` | Pixel/`Auto`/star tracks. A grid with no definitions is one star row/column. |
+| `Canvas` | attached `Left`, `Top`, `Right`, `Bottom` | Absolute placement; does not measure content. |
+| `UniformGrid` | `Rows`, `Columns` | Equal cells; columns define the wrap. |
+| `Viewbox` | `Child`, `Stretch` | Scales one child with a visual transform. |
+| `Decorator` | `Child` | Single-child non-panel base. |
+| `ScrollViewer` | `Content`, `HorizontalScrollBarVisibility`, `VerticalScrollBarVisibility`, `CanContentScroll`, `IsScrollInputEnabled`, `HorizontalOffset`, `VerticalOffset`, `ScrollChanged`, `ScrollOffsetRequested` | Scrolls one content; default template uses a `ScrollContentPresenter` plus Auto-track scroll bars. |
+| `ScrollBar` | `Orientation`, `Minimum`, `Maximum`, `Value`, `ViewportSize`, `SmallChange`, `LargeChange`, `Template`, `ReserveCornerSize`, `ValueChanged`, `Scroll` | Template parts `PART_Track`, `PART_Thumb`, repeat buttons; supports `ScrollBarScrollEventArgs`. Usually used inside a `ScrollViewer`. |
+| `ScrollContentPresenter` | `HorizontalOffset`, `VerticalOffset`, `ExtentWidth`, `ExtentHeight`, `ViewportWidth`, `ViewportHeight`, `IsExternalScroll` | Hosts scroll content; implements `IScrollInfo`; external-camera mode reports the range without moving content. |
+| `GridSplitter` | `Target`, `Orientation` | Drags the target's `Width`/`Height`. Direction follows the target's side of the sash; auto-sized panes start from their arranged size. Cursor is `SizeWE`/`SizeNS`. |
+| `GroupBox` | `Header`, `Child` | Titled frame with one child. |
+| `Expander` | `Header`, `IsExpanded`, `Content` | Header toggles one content element; collapsed content is not measured. |
+| `TabControl` | `Items` (`IList<TabItem>`), `SelectedIndex`, `SelectionChanged` | One page at a time, pointer/arrow switching. Call `Refresh()` after mutating `Items` if the selected page must be rebuilt immediately. |
+| `TabItem` | `Header`, `Content` | One tab page. |
+| `VisualPresenter` | `Content` (`Visual?`) | Gives a lightweight `ContainerVisual`/`ShapeVisual`/`TextVisual` tree a slot; no layout pass inside. |
+| `NativeControlHost` | `Child` (`System.Windows.Forms.Control?`) | The explicit HWND island. The child floats above the visual tree and cannot be transformed/clipped/blended. |
+| `DropZone` | `Title`, `Detail`, `IsHot`, `Dropped` | Dashed drop surface; accepts files, text and Easel row payloads and raises one `Dropped` event. |
+
+## Text and images
+
+| Control | Key members | Notes |
+| --- | --- | --- |
+| `TextBlock` | `Text`, `Font`, `Foreground` (Brush-backed), `Wrap`, `TextAlignment` | Single line by default; `Wrap` measures wrapped height. `Foreground` accepts a Brush, including gradients. |
+| `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, selection (`Start`, `Length`, `Text`), `CaretIndex`, `Anchor` | Self-drawn editing. While focused it uses a private native editor for IME/accessibility; `UseNativeEditor=false` keeps everything visual. |
+| `TextBoxContentHost` | — | The `PART_ContentHost` for a custom `ControlTemplate` on `TextBox`. |
+| `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
+| `Image` | `Source` (`System.Drawing.Image?`), `Stretch` | Draws a bitmap in the tree. `BitmapImage`/`DrawingImage` also implement `ImageSource` for brushes/hosts. |
+
+## Selection and range
+
+| Control | Key members | Notes |
+| --- | --- | --- |
+| `Button` | `Text`, `Font`, `Foreground`, `Command`, `CommandParameter`, `Click` | Activates by pointer, Space/Enter; executes `Command`. |
+| `RepeatButton` | as `Button`, repeats while held | Delay/interval is built into the control. |
+| `ToggleButton` | `IsChecked` (`bool`), `Command`, `Checked` | Checked pipe shared by all toggles. |
+| `CheckBox` | `IsChecked` (`bool?`), `Command`, `Checked` | Writes `true`/`false`; a `null` state is not produced by input. |
+| `RadioButton` | `IsChecked` (`bool?`), `GroupName`, `Command`, `Checked` | Group is scoped by `GroupName`; activating one clears its group siblings. |
+| `Slider` | `Minimum`, `Maximum`, `Value`, `ValueChanged` | Pointer drag and arrow keys; bounded. |
+| `ProgressBar` | `Minimum`, `Maximum`, `Value` | Track and fill; bind `Value` from a slider/model. |
+| `ScrollBar` | see layout table | Range control with a template and scroll events. |
+
+## Items and data
+
+| Control | Key members | Notes |
+| --- | --- | --- |
+| `ItemsControl` | `ItemsSource`, `ItemFactory`, `DisplayMemberPath`, `ItemTemplate`, `ItemTemplateSelector`, `ItemsPanel`, attached `ItemsHost`, `ItemsRebuilt` | Base for list-like controls. `Items` are visual children unless a template/factory provides them. `RefreshItems()` rebuilds. |
+| `ListBox` | all `ItemsControl` members + `SelectedIndex`, `SelectedItem`, `SelectionChanged` | Selected row uses the theme selection brush. |
+| `VirtualList` | `ItemsSource`, `ItemHeight`, `DisplayMemberPath`, `ItemTemplate`, `SelectedIndex`, `SelectedItem`, `SelectionChanged` | Realizes only visible rows inside a `ScrollViewer`; `ItemHeight` is fixed. |
+| `TreeView` | `Items` (`ObservableCollection<TreeViewItem>`), `SelectedItem`, `Indent`, `Font`, `SelectionChanged` | **No `ItemsSource`/hierarchical template**: build `TreeViewItem`s in code or XAML children. `Reveal(item)` expands ancestors and selects. |
+| `TreeViewItem` | `Header`, `IsExpanded`, `IsSelected`, `Items`, `ParentItem`, `Depth`, `Font`, `Foreground` | Rows are real visual items; the tree owns their realization. |
+| `ComboBox` | `Items`/`ItemsSource`, `SelectedIndex`, `SelectedItem`, `DisplayMemberPath`, `IsEditable`, `Text`, `IsDropDownOpen`, `MaxDropDownHeight`, `Placeholder`, `Foreground`, `SelectionChanged` | Drop-down opens in the surface overlay (not clipped by ancestors). `IsEditable` uses the text field. |
+| `Calendar` | `SelectedDate` (`DateTime?`), `DisplayMonth`, `FirstDayOfWeek`, `Foreground`, `SelectedDateChanged` | Month grid; only the selected day gets the accent fill. |
+| `DatePicker` | `SelectedDate`, `Format`, `Placeholder`, `Foreground`, `IsDropDownOpen`, `SelectedDateChanged` | A date field whose `Calendar` opens in the overlay. |
+| `CollectionView` | sort/filter/group, current item | `ItemsSource` may be an `IEnumerable`; a `CollectionView` or `CollectionViewSource` drives sorting/filtering/grouping. |
+| `DataGrid` | `ItemsSource`, `Columns`, `RowHeight`, `HeaderHeight`, `RowNumberWidth`, `ShowRowNumbers`, `ShowGridLines`, `AlternateRows`, `SelectedIndex`/`SelectedItem`, `SortColumnIndex`/`SortDirection`, `SortBy`, `DragStarting`, `Dropped`, `GetRow`, `IndexOf` | Row-virtualized 2-D table. Header clicks sort asc → desc → source order; the header edge resizes a column; `AllowDrop` is on by default. |
+| `DataGridColumn` | `Header`, `BindingPath`, `Width`, `MinWidth`, `MaxWidth`, `StringFormat`, `TextAlignment`, `Kind`, `Foreground`, `IsSortable`, `TextSelector`, `ColorSelector`, `ProgressSelector` | Plain column object, not a visual. `Width <= 0` or `NaN` shares the remaining room; `Kind` is `Text`, `Badge`, `Check` or `Progress`. |
+
+## Menus, popups and overlays
+
+| Control | Key members | Notes |
+| --- | --- | --- |
+| `VisualMenu` | `Items` (`IList<VisualMenuItem>`), `Foreground`, `Click`, `Template` | Menu bar; top-level items open drop-downs in the overlay. |
+| `VisualMenuItem` | `Header`, `InputGestureText`, `IsEnabled`, `IsChecked`, `IsSeparator`, `Command` (`Action?`), `CommandPath`, `Items` | Data item, not a visual child. Use `IsSeparator` for rules. |
+| `VisualMenuItemContainer` | `Item`, `IsHighlighted`, `IsPressed`, `IsTopLevel`, `Foreground` | Realized row/template part. |
+| `VisualContextMenu` | inherits `VisualPopup`; `OpenAt(target, surfacePoint)`, `Items` | Detached menu opened at a surface point. |
+| `VisualPopup` | `IsOpen`, `Child`, `PlacementTarget`, `Placement` (`VisualPlacement`), `HorizontalOffset`, `VerticalOffset`, `StaysOpen`, `MatchTargetWidth`, `Opened`, `Closed` | Hosted in the overlay above the root tree; not clipped by ancestor scroll viewers. `PlacementTarget` is set in code (no `ElementName` requirement). |
+
+## Shapes
+
+`Rectangle`, `Ellipse`, `Line`, `Polygon`, `Polyline`, `Path` (`ShapeElement`):
+
+| Property | Meaning |
+| --- | --- |
+| `Fill` | `Brush?`; gradient/image brushes allowed. |
+| `Stroke` | `Brush?`; stroke brush. |
+| `StrokeThickness` | `float`. |
+| `X1`, `Y1`, `X2`, `Y2` | `Line` endpoints. |
+| `Points` | `PointF[]` for `Polygon`/`Polyline` (`"0,0 10,0 10,10"`). |
+| `Data` | SVG path data for `Path`. |
+
+Shapes are controls here (not the lightweight `ShapeVisual`); use them for a handful of interactive/visible
+shapes, and `VisualPresenter`/`Visual` for large decorative batches.
+
+## Control defaults and state
+
+All default chrome is painted from `Theme.Current` (see [themes.md](themes.md)). Do not hard-code colors in an
+app that should follow the palette. Controls expose hover/pressed/selected/focused state as DPs or template
+triggers; `ButtonBase` exposes `IsPointerOver`/`IsPressed`, `ToggleButtonBase` `IsChecked`, list/tree items
+selected state.
+
+## Code-behind notes
+
+- `TreeView`, `Calendar`/`DatePicker` initial dates, `ComboBox` items, `DataGridColumn` selectors
+  (`TextSelector`/`ColorSelector`/`ProgressSelector`) and `NativeControlHost.Child` need code-behind after
+  `InitializeComponent`. `DataGrid` columns themselves are declarative (`<DataGrid.Columns>…`).
+- `VisualPopup` placement target is a code reference; set it in the click handler.
+- `TabControl.Refresh()` rebuilds the selected page after mutating `Items`.
+- `RichTextBox` content is set with `SetPlainText`/`Select`/formatting methods.
+- Do not add WinForms controls except through `NativeControlHost`.

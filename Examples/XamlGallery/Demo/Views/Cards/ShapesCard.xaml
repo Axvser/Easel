@@ -1,0 +1,31 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.ShapesCard"
+    Spacing="12">
+
+  <TextBlock Text="Rectangle, ellipse, polygon, path and line, each painted inside its arranged rectangle."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <StackPanel Orientation="Horizontal" Spacing="14">
+    <Rectangle Width="60" Height="60" CornerRadius="10" Fill="{StaticResource Accent}" />
+    <Ellipse Width="60" Height="60" Fill="{StaticResource Selection}" />
+    <Polygon Width="60" Height="60" Points="0,60 30,0 60,60" Fill="{StaticResource Focus}" />
+    <Path Width="60"
+          Height="60"
+          Data="M8,52 A28,28 0 0 1 52,52 M8,52 L8,20 M52,52 L52,20"
+          Stroke="{StaticResource Text}"
+          StrokeThickness="2" />
+    <Line Width="60"
+          Height="60"
+          X1="4"
+          Y1="54"
+          X2="56"
+          Y2="6"
+          Stroke="{StaticResource Muted}"
+          StrokeThickness="2" />
+  </StackPanel>
+
+</local:ThemedStackPanel>

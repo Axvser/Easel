@@ -1,0 +1,139 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.DataGridCard"
+    Width="760"
+    Spacing="12">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="3">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Operations ledger"
+                   Foreground="{StaticResource Text}"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+        <Border Background="{StaticResource AuroraGradient}"
+                CornerRadius="8"
+                Padding="8,3"
+                VerticalAlignment="Center">
+          <TextBlock Text="NATIVE DATA GRID"
+                     Foreground="{StaticResource AccentText}"
+                     FontSize="8" />
+        </Border>
+      </StackPanel>
+      <TextBlock Text="2,048 rows · 7 columns · headers sort · rows drag out · files drop in"
+                 Foreground="{StaticResource Muted}"
+                 FontSize="10" />
+    </StackPanel>
+
+    <StackPanel Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="6"
+                VerticalAlignment="Center">
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="8,4">
+        <TextBlock Text="VIRTUALIZED"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="8" />
+      </Border>
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="8,4">
+        <TextBlock Text="DRAG IN / OUT"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="8" />
+      </Border>
+    </StackPanel>
+  </Grid>
+
+  <DataGrid x:Name="grid"
+            Height="404"
+            ItemsSource="{Binding TableRows}"
+            RowHeight="32"
+            ShowRowNumbers="True"
+            RowNumberWidth="36"
+            SelectionChanged="OnSelectionChanged"
+            DragStarting="OnDragStarting"
+            Dropped="OnDropped">
+    <DataGrid.Columns>
+      <DataGridColumn Header="Project" BindingPath="Name" Width="0" MinWidth="140" />
+      <DataGridColumn Header="Owner" BindingPath="Owner" Width="124" />
+      <DataGridColumn Header="Team" BindingPath="Department" Width="74" />
+      <DataGridColumn Header="Value" BindingPath="Value" Width="78" TextAlignment="Right" StringFormat="N0" />
+      <DataGridColumn Header="Status" BindingPath="Status" Width="92" Kind="Badge" />
+      <DataGridColumn Header="Progress" BindingPath="Progress" Width="104" Kind="Progress" StringFormat="0'%'" />
+      <DataGridColumn Header="Live" BindingPath="Enabled" Width="50" Kind="Check" TextAlignment="Center" />
+    </DataGrid.Columns>
+  </DataGrid>
+
+  <Grid Height="58">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0" Background="{StaticResource SurfaceAlt}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Padding="12,7" Margin="0,0,8,0">
+      <StackPanel Spacing="1">
+        <TextBlock Text="ROWS" Foreground="{StaticResource Muted}" FontSize="8" />
+        <TextBlock x:Name="RowsStat" Text="—" Foreground="{StaticResource Text}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Column="1" Background="{StaticResource SurfaceAlt}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Padding="12,7" Margin="0,0,8,0">
+      <StackPanel Spacing="1">
+        <TextBlock Text="SELECTED" Foreground="{StaticResource Muted}" FontSize="8" />
+        <TextBlock x:Name="SelectedStat" Text="—" Foreground="{StaticResource Text}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Column="2" Background="{StaticResource SurfaceAlt}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Padding="12,7">
+      <StackPanel Spacing="1">
+        <TextBlock Text="LAST ACTION" Foreground="{StaticResource Muted}" FontSize="8" />
+        <TextBlock x:Name="ActionStat" Text="Ready" Foreground="{StaticResource Text}" FontSize="11" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+  </Grid>
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="214" />
+    </Grid.ColumnDefinitions>
+
+    <DropZone x:Name="zone"
+              Grid.Column="0"
+              Height="108"
+              Title="Drop a file or a row"
+              Detail="CSV or text from Explorer, or a row from another grid"
+              Dropped="OnZoneDropped" />
+
+    <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="5">
+      <TextBlock Text="WHAT TO TRY" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+      <TextBlock Text="· Click Project, Status or Progress to sort; click again to reverse."
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9"
+                 Wrap="True" />
+      <TextBlock Text="· Drag a row onto the dashed pad, or out to Explorer as CSV."
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9"
+                 Wrap="True" />
+      <TextBlock Text="· Drop a text file onto the grid to append rows."
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9"
+                 Wrap="True" />
+    </StackPanel>
+  </Grid>
+
+</local:ThemedStackPanel>

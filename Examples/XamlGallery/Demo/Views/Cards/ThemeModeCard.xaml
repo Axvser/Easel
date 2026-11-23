@@ -1,0 +1,17 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ThemeModeCard"
+    Spacing="10">
+
+  <TextBlock x:Name="modeLabel" Foreground="{StaticResource Text}" />
+
+  <Button Text="Switch palette" Height="32" Click="OnSwitchPaletteClick" />
+
+  <TextBlock Text="The gallery rebuilds its visual root so every control reads the new Theme.Current values."
+             Width="360"
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+</local:ThemedStackPanel>

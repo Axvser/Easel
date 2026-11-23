@@ -1,0 +1,15 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativeHostCard"
+    Spacing="8">
+
+  <TextBlock Text="WinForms controls are not bridged; the host keeps one rectangle above the visual tree."
+             Width="360"
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <NativeControlHost x:Name="host" Width="190" Height="32" />
+
+</local:ThemedStackPanel>

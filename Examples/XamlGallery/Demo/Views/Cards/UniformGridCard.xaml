@@ -1,0 +1,37 @@
+<local:ThemedUserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.UniformGridCard">
+
+  <local:ThemedUserControl.Resources>
+    <Style x:Key="TileText" TargetType="TextBlock">
+      <Style.Setters>
+        <Setter Property="Foreground" Value="{StaticResource AccentText}" />
+        <Setter Property="TextAlignment" Value="Center" />
+      </Style.Setters>
+    </Style>
+  </local:ThemedUserControl.Resources>
+
+  <UniformGrid Columns="3" Width="420" Height="150">
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 1" />
+    </Border>
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 2" />
+    </Border>
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 3" />
+    </Border>
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 4" />
+    </Border>
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 5" />
+    </Border>
+    <Border Width="90" Height="54" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+      <TextBlock Style="{StaticResource TileText}" Text="Cell 6" />
+    </Border>
+  </UniformGrid>
+
+</local:ThemedUserControl>

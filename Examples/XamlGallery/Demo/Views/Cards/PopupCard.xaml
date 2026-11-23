@@ -1,0 +1,12 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.PopupCard"
+    Spacing="10">
+
+  <Button x:Name="showButton" Text="Show popup" Height="32" Click="OnShowPopupClick" />
+
+  <TextBlock x:Name="popupStatus" Text="Popup closed" Foreground="{StaticResource Muted}" />
+
+</local:ThemedStackPanel>

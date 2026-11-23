@@ -1,0 +1,32 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ControlTemplateCard"
+    Spacing="10">
+
+  <StackPanel.Resources>
+    <ControlTemplate x:Key="FrameTemplate" TargetType="ContentControl">
+      <Border x:Name="PART_Frame"
+              Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="12">
+        <StackPanel Spacing="6">
+          <TextBlock Text="ControlTemplate · PART_Frame"
+                     Foreground="{StaticResource Accent}"
+                     FontSize="10.5" />
+          <ContentPresenter />
+        </StackPanel>
+      </Border>
+    </ControlTemplate>
+  </StackPanel.Resources>
+
+  <ContentControl Width="380" Template="{StaticResource FrameTemplate}">
+    <TextBlock Text="The content is shown by the template's ContentPresenter."
+               Foreground="{StaticResource Text}"
+               Wrap="True" />
+  </ContentControl>
+
+</local:ThemedStackPanel>

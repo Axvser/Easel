@@ -1,0 +1,23 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.OpacityClipCard"
+    Spacing="8">
+
+  <TextBlock Width="360"
+             Text="The border below uses Visual.Opacity; the child stays inside the clip."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <Border x:Name="clipBorder"
+          Width="240"
+          Height="80"
+          Background="{StaticResource Accent}"
+          CornerRadius="8"
+          Opacity="0.5"
+          HorizontalAlignment="Left">
+    <TextBlock Text="50% opacity" Foreground="{StaticResource AccentText}" />
+  </Border>
+
+</local:ThemedStackPanel>

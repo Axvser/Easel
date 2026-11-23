@@ -1,0 +1,383 @@
+name: publish
+
+# Builds and tests Easel on every push and pull request. On a manual dispatch — or a push to main
+# when the repository variable AUTO_PUBLISH is "true" — it releases the packages through NuGet
+# Trusted Publishing (GitHub OIDC). No long-lived NuGet key is stored in this repository or in
+# GitHub secrets.
+#
+# The nuget.org Trusted Publishing policy must match:
+#   Package Owner   Axvser
+#   CI/CD Provider  GitHub Actions
+#   Repo Owner      Axvser
+#   Repository      Easel
+#   Workflow File   publish.yml
+#   Environment     (blank)
+#   Glob Patterns   Easel*
+#
+# Versioning:
+#   Every package is published at the <Version> written in its own csproj. The workflow checks one
+#   thing: whether that exact version is already on NuGet. A package whose version is not there is
+#   packed and pushed; a package whose version is already there is skipped. A run that failed
+#   halfway can therefore be retried without repacking what already landed.
+#
+# Release order:
+#   Easel.Generator -> Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The generator is
+#   pushed first and the job polls flatcontainer until NuGet serves it; only then is the runtime
+#   packed and pushed, and the job again waits until that version is downloadable. The runtime
+#   does not carry a package dependency on the generator (consumers add both), so this ordering is
+#   what keeps the runtime from being discoverable before the compiler it was built against.
+#
+# Target frameworks:
+#   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
+#   test and publish jobs install the older SDKs for their Windows Desktop reference packs.
+#   scripts/pack-local.ps1 deliberately builds net8.0-windows only; CI is the only place that
+#   proves the other three are in the package, and the runtime pack is checked before the push.
+#
+# Trigger:
+#   - push to main when package sources change. Each package's own <Version> is read, and only the
+#     packages NuGet is still missing for that version are packed and pushed. When nothing is
+#     missing the release job is skipped; bump a <Version> to publish.
+#   - pull_request: run the build and test job only. The version and publish jobs stay out of PRs.
+#   - manual workflow_dispatch; the default run publishes only the missing packages. `force`
+#     treats every package as missing and re-runs the whole pipeline (duplicates are skipped with
+#     --skip-duplicate).
+#
+# Auto vs manual:
+#   The push trigger is only acted on when the repository variable AUTO_PUBLISH is set to "true"
+#   (Settings -> Secrets and variables -> Actions -> Variables). Unset or "false" makes pushes
+#   test-only; use workflow_dispatch or `gh workflow run` to release.
+#
+# Patch cleanup:
+#   After a package is pushed, if its version is X1.X2.X3 with X3 > 0, the workflow unlists that
+#   package's older X1.X2.<i> (i < X3), so only the highest patch of its own line stays listed.
+#   A major/minor change does not touch older lines, and a package that was not pushed this run is
+#   left alone. The NuGet policy must include the "Unlist or relist package versions" scope.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Src/**'
+      - 'Examples/**'
+      - 'Assets/**'
+      - 'Easel.slnx'
+      - 'README.md'
+      - '.github/workflows/publish.yml'
+  pull_request:
+    paths:
+      - 'Src/**'
+      - 'Examples/**'
+      - 'Assets/**'
+      - 'Easel.slnx'
+      - 'README.md'
+      - '.github/workflows/publish.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run even when these versions already exist on NuGet'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  # PR runs supersede each other; releases stay serialized and are never cancelled midway.
+  group: easel-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  version:
+    # Manual runs always proceed. Push runs only proceed when the repository variable
+    # AUTO_PUBLISH is "true"; PR runs only exercise the build and test job.
+    if: github.event_name != 'pull_request' && (github.event_name == 'workflow_dispatch' || vars.AUTO_PUBLISH == 'true')
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.read.outputs.publish }}
+      generator_missing: ${{ steps.read.outputs.generator_missing }}
+      generator_version: ${{ steps.read.outputs.generator_version }}
+      easel_missing: ${{ steps.read.outputs.easel_missing }}
+      easel_version: ${{ steps.read.outputs.easel_version }}
+      missing: ${{ steps.read.outputs.missing }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read every package's own version and find what NuGet is missing
+        id: read
+        shell: pwsh
+        run: |
+          $projects = @(
+            @{ Id = "Easel.Generator"; Kind = "generator"; Path = "Src/Generators/Easel.Generator/Easel.Generator.csproj" },
+            @{ Id = "Easel"; Kind = "runtime"; Path = "Src/Easel/Easel.csproj" }
+          )
+
+          foreach ($project in $projects) {
+            if (-not (Test-Path $project.Path)) { throw "missing $($project.Path)" }
+            $match = [regex]::Match((Get-Content $project.Path -Raw), '<Version>([^<]+)</Version>')
+            if (-not $match.Success) { throw "no <Version> in $($project.Path)" }
+            $project.Version = $match.Groups[1].Value
+          }
+
+          # force keeps the old meaning: pretend nothing is published and run the whole pipeline
+          # (duplicates are skipped at push time).
+          $force = "${{ inputs.force }}" -eq "true"
+          $missing = @()
+          foreach ($project in $projects) {
+            $exists = $false
+            if (-not $force) {
+              $id = $project.Id.ToLowerInvariant()
+              $url = "https://api.nuget.org/v3-flatcontainer/$id/$($project.Version)/$id.$($project.Version).nupkg"
+              try { Invoke-WebRequest $url -Method Head -UseBasicParsing -TimeoutSec 30 | Out-Null; $exists = $true } catch { }
+            }
+            if ($exists) {
+              Write-Host "$($project.Id) $($project.Version) is already on NuGet"
+            } else {
+              Write-Host "$($project.Id) $($project.Version) is missing"
+              $missing += $project
+            }
+          }
+
+          function To-Bool([bool]$value) { if ($value) { "true" } else { "false" } }
+          function Is-Missing([string]$kind) { return @($missing | Where-Object { $_.Kind -eq $kind }).Count -gt 0 }
+          function Get-Version([string]$kind) {
+            return ($projects | Where-Object { $_.Kind -eq $kind } | Select-Object -First 1).Version
+          }
+
+          $missingJson = ConvertTo-Json -Compress -InputObject @(
+            $missing | ForEach-Object { [ordered]@{ id = $_.Id; version = $_.Version } }
+          )
+
+          "publish=$(To-Bool ($missing.Count -gt 0))" >> $env:GITHUB_OUTPUT
+          "generator_missing=$(To-Bool (Is-Missing 'generator'))" >> $env:GITHUB_OUTPUT
+          "generator_version=$(Get-Version 'generator')" >> $env:GITHUB_OUTPUT
+          "easel_missing=$(To-Bool (Is-Missing 'runtime'))" >> $env:GITHUB_OUTPUT
+          "easel_version=$(Get-Version 'runtime')" >> $env:GITHUB_OUTPUT
+          "missing=$missingJson" >> $env:GITHUB_OUTPUT
+
+  test:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          # The runtime multi-targets net461/net5.0/netcoreapp3.0/net8.0; the older SDKs supply
+          # their Windows Desktop targeting packs. The test project and demo run on .NET 10.
+          dotnet-version: |
+            10.0.x
+            8.0.x
+            5.0.x
+            3.1.x
+
+      - name: Restore
+        run: dotnet restore Easel.slnx
+
+      - name: Build
+        run: dotnet build Easel.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+  publish:
+    needs: [version, test]
+    # The release runs only when the version stage found something missing and every test passed.
+    # always() keeps skipped PR/no-op runs from entering the publish stages.
+    if: |
+      always() && !cancelled() &&
+      needs.version.result == 'success' &&
+      needs.version.outputs.publish == 'true' &&
+      needs.test.result == 'success'
+    runs-on: windows-latest
+    # The NuGet waits are unbounded by design; this is the only backstop left. Ingestion can take
+    # tens of minutes, so 90 would cut a slow release short.
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          # Same SDK set as the test job: the pack must carry all four runtime target frameworks.
+          dotnet-version: |
+            10.0.x
+            8.0.x
+            5.0.x
+            3.1.x
+
+      - name: Build and pack the generator
+        if: needs.version.outputs.generator_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.generator_version }}
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          # Build first with pack-on-build disabled: the generator packs a bin/... DLL through a
+          # custom None item, and a direct `dotnet pack` can evaluate it before that DLL exists.
+          dotnet build "Src/Generators/Easel.Generator/Easel.Generator.csproj" `
+            -c Release `
+            -p:GeneratePackageOnBuild=false
+          if ($LASTEXITCODE -ne 0) { throw "build failed: Easel.Generator" }
+          dotnet pack "Src/Generators/Easel.Generator/Easel.Generator.csproj" `
+            -c Release -o artifacts --no-build
+          if ($LASTEXITCODE -ne 0) { throw "pack failed: Easel.Generator" }
+
+          # IncludeBuildOutput=false leaves that custom None as the only carrier of the analyzer;
+          # an empty analyzers folder would publish a generator that does nothing.
+          $file = Join-Path "artifacts" "Easel.Generator.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($file)
+          $entries = @($zip.Entries | ForEach-Object FullName)
+          $zip.Dispose()
+          if ($entries -notcontains "analyzers/dotnet/cs/Easel.Generator.dll") {
+            throw "Easel.Generator nupkg lost analyzers/dotnet/cs/Easel.Generator.dll; refusing to publish it."
+          }
+
+      - name: NuGet login (OIDC -> temporary key)
+        id: login
+        if: needs.version.outputs.generator_missing == 'true'
+        uses: NuGet/login@v1
+        with:
+          user: Axvser
+
+      - name: Push the generator and wait until NuGet can serve it
+        # The runtime is packed only after the generator is downloadable, so the pair reaches NuGet
+        # in dependency order.
+        if: needs.version.outputs.generator_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.generator_version }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          $file = Join-Path "artifacts" "Easel.Generator.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          dotnet nuget push $file --api-key $env:NUGET_API_KEY `
+            --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { throw "push failed: Easel.Generator" }
+
+          $url = "https://api.nuget.org/v3-flatcontainer/easel.generator/${env:VERSION}/easel.generator.${env:VERSION}.nupkg"
+          # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
+          $delay = 300
+          while ($true) {
+            try {
+              Invoke-WebRequest $url -Method Head -UseBasicParsing -TimeoutSec 30 | Out-Null
+              return
+            } catch {
+              Start-Sleep -Seconds $delay
+              $delay = 60
+            }
+          }
+
+      - name: Wait for the generator on NuGet before the runtime
+        # A generator pushed by this run was already waited for above; this covers one that was
+        # already on NuGet when the version stage ran.
+        if: needs.version.outputs.easel_missing == 'true' && needs.version.outputs.generator_missing != 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.generator_version }}
+        run: |
+          $url = "https://api.nuget.org/v3-flatcontainer/easel.generator/${env:VERSION}/easel.generator.${env:VERSION}.nupkg"
+          # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
+          $delay = 300
+          while ($true) {
+            try {
+              Invoke-WebRequest $url -Method Head -UseBasicParsing -TimeoutSec 30 | Out-Null
+              return
+            } catch {
+              Start-Sleep -Seconds $delay
+              $delay = 60
+            }
+          }
+
+      - name: Pack the runtime
+        if: needs.version.outputs.easel_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.easel_version }}
+        run: |
+          # GeneratePackageOnBuild=true strips Build out of GenerateNuspecDependsOn, so a plain
+          # `dotnet pack` would restore and then pack a DLL that was never built (NU5026). Turning
+          # it off for this invocation lets pack build every target framework first.
+          dotnet pack "Src/Easel/Easel.csproj" -c Release -o artifacts -p:GeneratePackageOnBuild=false
+          if ($LASTEXITCODE -ne 0) { throw "pack failed: Easel" }
+
+          # scripts/pack-local.ps1 builds net8.0-windows only. This is the one place where the
+          # older target frameworks are proven to be in the package before it is published.
+          $file = Join-Path "artifacts" "Easel.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($file)
+          $entries = @($zip.Entries | ForEach-Object FullName)
+          $zip.Dispose()
+          foreach ($tfm in @("net461", "net5.0-windows", "netcoreapp3.0", "net8.0-windows")) {
+            if (-not ($entries | Where-Object { $_ -like "lib/$tfm*/*.dll" })) {
+              throw "Easel nupkg has no lib/$tfm* assembly; refusing to publish it."
+            }
+          }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: easel-${{ github.run_number }}
+          path: artifacts/*.nupkg
+          # A re-run keeps the previous attempt's artifact; without this the upload fails on the name.
+          overwrite: true
+
+      - name: NuGet login (fresh key for the runtime push and the cleanup)
+        id: login2
+        uses: NuGet/login@v1
+        with:
+          user: Axvser
+
+      - name: Push the runtime and wait until NuGet can serve it
+        if: needs.version.outputs.easel_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.easel_version }}
+          NUGET_API_KEY: ${{ steps.login2.outputs.NUGET_API_KEY }}
+        run: |
+          $file = Join-Path "artifacts" "Easel.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          dotnet nuget push $file --api-key $env:NUGET_API_KEY `
+            --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { throw "push failed: Easel" }
+
+          $url = "https://api.nuget.org/v3-flatcontainer/easel/${env:VERSION}/easel.${env:VERSION}.nupkg"
+          # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
+          $delay = 300
+          while ($true) {
+            try {
+              Invoke-WebRequest $url -Method Head -UseBasicParsing -TimeoutSec 30 | Out-Null
+              return
+            } catch {
+              Start-Sleep -Seconds $delay
+              $delay = 60
+            }
+          }
+
+      - name: Unlist older patches of each pushed package's own line
+        shell: pwsh
+        env:
+          MISSING: ${{ needs.version.outputs.missing }}
+          NUGET_API_KEY: ${{ steps.login2.outputs.NUGET_API_KEY }}
+        run: |
+          # Only the packages pushed in this run are cleaned up, each on its own X1.X2 line.
+          $missing = @("$env:MISSING" | ConvertFrom-Json)
+          foreach ($entry in $missing) {
+            if ($entry.version -notmatch '^(\d+)\.(\d+)\.(\d+)$') { continue }
+            $major = [int]$Matches[1]
+            $minor = [int]$Matches[2]
+            $patch = [int]$Matches[3]
+            if ($patch -le 0) { continue }
+            for ($i = 0; $i -lt $patch; $i++) {
+              $old = "$major.$minor.$i"
+              Write-Host "Unlisting $($entry.id) $old"
+              dotnet nuget delete $entry.id $old --api-key $env:NUGET_API_KEY `
+                --source https://api.nuget.org/v3/index.json --non-interactive
+              if ($LASTEXITCODE -ne 0) {
+                Write-Host "  (not found or already unlisted; continuing)"
+              }
+            }
+          }

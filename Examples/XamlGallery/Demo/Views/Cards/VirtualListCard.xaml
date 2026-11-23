@@ -1,0 +1,66 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.VirtualListCard"
+    Width="620"
+    Spacing="8">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock Text="Virtual rows"
+                 Foreground="{StaticResource Text}"
+                 FontSize="18"
+                 FontWeight="SemiBold" />
+      <TextBlock Text="Five thousand rows · only the visible window is realized"
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9" />
+    </StackPanel>
+
+    <Border Grid.Column="1"
+            Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8,4"
+            VerticalAlignment="Center">
+      <TextBlock Text="5,000 ROWS" Foreground="{StaticResource Muted}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <ScrollViewer x:Name="viewer" Height="360" ScrollChanged="OnScrollChanged">
+    <VirtualList x:Name="list"
+                 ItemsSource="{Binding VirtualRows}"
+                 ItemHeight="30"
+                 DisplayMemberPath="Name" />
+  </ScrollViewer>
+
+  <Grid Height="30">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+    <TextBlock x:Name="status"
+               Grid.Column="0"
+               Text="Scroll to realize rows"
+               Foreground="{StaticResource Muted}"
+               FontSize="9"
+               VerticalAlignment="Center" />
+    <TextBlock Grid.Column="1"
+               Text="fixed row height · vertical only"
+               Foreground="{StaticResource Muted}"
+               FontSize="9"
+               VerticalAlignment="Center" />
+  </Grid>
+
+  <TextBlock Text="Scroll the list: the panel reports the full extent to the ScrollViewer but rebuilds only the rows that intersect the viewport."
+             Foreground="{StaticResource Muted}"
+             FontSize="9"
+             Wrap="True" />
+
+</local:ThemedStackPanel>

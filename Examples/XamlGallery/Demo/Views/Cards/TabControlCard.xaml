@@ -1,0 +1,16 @@
+<local:ThemedUserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TabControlCard">
+
+  <TabControl x:Name="tabs" Width="420" Height="170" SelectedIndex="0">
+    <TabItem Header="Layout">
+      <TextBlock Text="Layout page" Foreground="{StaticResource Text}" />
+    </TabItem>
+    <TabItem Header="Data">
+      <ListBox x:Name="tabList" Height="110" />
+    </TabItem>
+  </TabControl>
+
+</local:ThemedUserControl>

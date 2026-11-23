@@ -1,0 +1,36 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.DockPanelCard"
+    Width="420"
+    Height="160">
+
+  <local:ThemedDockPanel.Resources>
+    <Style x:Key="Tile" TargetType="Border">
+      <Style.Setters>
+        <Setter Property="Width" Value="90" />
+        <Setter Property="Height" Value="54" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8" />
+      </Style.Setters>
+    </Style>
+    <Style x:Key="TileText" TargetType="TextBlock">
+      <Style.Setters>
+        <Setter Property="Foreground" Value="{StaticResource AccentText}" />
+        <Setter Property="TextAlignment" Value="Center" />
+      </Style.Setters>
+    </Style>
+  </local:ThemedDockPanel.Resources>
+
+  <Border DockPanel.Dock="Top" Style="{StaticResource Tile}" Background="{StaticResource Accent}">
+    <TextBlock Style="{StaticResource TileText}" Text="Top" />
+  </Border>
+  <Border DockPanel.Dock="Left" Style="{StaticResource Tile}" Background="{StaticResource Focus}">
+    <TextBlock Style="{StaticResource TileText}" Text="Left" />
+  </Border>
+  <Border Background="{StaticResource SurfaceAlt}">
+    <TextBlock Text="Fill" Foreground="{StaticResource Text}" />
+  </Border>
+
+</local:ThemedDockPanel>

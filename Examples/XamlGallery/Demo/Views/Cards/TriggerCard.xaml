@@ -1,0 +1,30 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TriggerCard"
+    Spacing="10">
+
+  <StackPanel.Resources>
+    <Style x:Key="TriggerButton" TargetType="Button">
+      <Style.Setters>
+        <Setter Property="Foreground" Value="{StaticResource AccentText}" />
+      </Style.Setters>
+      <Style.Triggers>
+        <Trigger Property="IsEnabled" Value="False">
+          <Trigger.Setters>
+            <Setter Property="Background" Value="{StaticResource Disabled}" />
+          </Trigger.Setters>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </StackPanel.Resources>
+
+  <Button x:Name="triggerButton"
+          Text="Trigger moves with IsEnabled"
+          Height="32"
+          Style="{StaticResource TriggerButton}" />
+
+  <CheckBox x:Name="enableSwitch" IsChecked="True" />
+
+</local:ThemedStackPanel>

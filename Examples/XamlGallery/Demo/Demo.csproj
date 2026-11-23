@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- The media pages use WPF MediaPlayer/MediaElement; the Easel XAML files are AdditionalFiles, not WPF
+         Page items, so the WPF default XAML items are disabled. -->
+    <UseWPF>true</UseWPF>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <RootNamespace>Demo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Media\*.mp3" />
+    <EmbeddedResource Include="Assets\Media\*.mp4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The XAML views take their base types from Easel; the implicit WinForms
+         namespace would make Control/UserControl/Panel ambiguous in those files. Every other file
+         imports it explicitly. -->
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The demo consumes the source projects by default. Pass -p:UseEaselPackage=true after
+         scripts/pack-local.ps1 to consume the packed Easel/Easel.Generator packages instead. -->
+    <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj"
+                      Condition="'$(UseEaselPackage)' != 'true'" />
+    <PackageReference Include="Easel" Version="$(EaselPackageVersion)"
+                      Condition="'$(UseEaselPackage)' == 'true'" />
+    <ProjectReference Include="..\..\..\Src\Generators\Easel.Generator\Easel.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(UseEaselPackage)' != 'true'" />
+    <PackageReference Include="Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
+                      Condition="'$(UseEaselPackage)' == 'true'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The gallery demo is allowed to use VeloxDev.Core's [VeloxProperty]/[VeloxCommand] generator and
+         VeloxCommand; the Easel runtime and its generator stay independent of VeloxDev. Directory.Build.props
+         resolves the VeloxDev checkout for both the sibling and the submodule layout; otherwise the published
+         12.0.0 packages are used. -->
+    <ProjectReference Include="$(VeloxDevCoreProject)"
+                      Condition="'$(VeloxDevCoreProject)' != ''" />
+    <ProjectReference Include="$(VeloxDevCoreGeneratorProject)"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(VeloxDevCoreGeneratorProject)' != ''" />
+    <PackageReference Include="VeloxDev.Core" Version="12.0.0"
+                      Condition="'$(VeloxDevCoreProject)' == ''" />
+    <PackageReference Include="VeloxDev.Core.Generator" Version="12.0.0"
+                      Condition="'$(VeloxDevCoreGeneratorProject)' == ''" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="**/*.xaml" />
+  </ItemGroup>
+</Project>

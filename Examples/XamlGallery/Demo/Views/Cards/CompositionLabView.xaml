@@ -1,0 +1,88 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.CompositionLabView"
+    Spacing="12">
+
+  <StackPanel Spacing="3">
+    <TextBlock Text="Composition lab" Foreground="{StaticResource Text}" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Text="A retained Visual tree hosted inside the control tree: group opacity, a drop shadow, a bitmap cache, and an opacity mask on a normal element."
+               Foreground="{StaticResource Muted}"
+               FontSize="10"
+               Wrap="True"
+               Width="540" />
+  </StackPanel>
+
+  <Grid Width="540" Height="280">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="220" />
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0"
+            Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="12"
+            ClipToBounds="True"
+            Padding="10"
+            Margin="0,0,12,0">
+      <VisualPresenter x:Name="visualHost" Height="258" ClipToBounds="True" />
+    </Border>
+
+    <Border Grid.Column="1"
+            Background="{StaticResource Surface}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="16">
+      <StackPanel Spacing="12" VerticalAlignment="Center">
+        <StackPanel Spacing="4">
+          <Grid>
+            <TextBlock Text="Group opacity" Foreground="{StaticResource Text}" FontSize="10" />
+            <TextBlock x:Name="opacityReadout" Text="88%" Foreground="{StaticResource Accent}" FontSize="10" HorizontalAlignment="Right" />
+          </Grid>
+          <Slider x:Name="opacitySlider" Minimum="10" Maximum="100" Value="88" ValueChanged="OnOpacityChanged" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+          <TextBlock Text="Layer rotation" Foreground="{StaticResource Text}" FontSize="10" />
+          <Slider x:Name="angleSlider" Minimum="-45" Maximum="45" Value="-10" ValueChanged="OnAngleChanged" />
+        </StackPanel>
+        <TextBlock Text="The presenter hosts ContainerVisual → ShapeVisual / TextVisual. The sliders write Visual.Opacity and Visual.Transform, then invalidate."
+                   Foreground="{StaticResource Muted}"
+                   FontSize="9"
+                   Wrap="True" />
+      </StackPanel>
+    </Border>
+  </Grid>
+
+  <Grid Width="540" Height="110">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0"
+            Background="{StaticResource AuroraGradient}"
+            CornerRadius="12"
+            OpacityMask="{StaticResource FadeMask}"
+            Margin="0,0,12,0" />
+
+    <Border Grid.Column="1"
+            Background="{StaticResource Surface}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="14">
+      <StackPanel Spacing="5" VerticalAlignment="Center">
+        <TextBlock Text="OpacityMask + group opacity" Foreground="{StaticResource Text}" FontSize="11" FontWeight="SemiBold" />
+        <TextBlock Text="The left strip fades through the alpha of a linear brush. The layer above composes all of its children through one bitmap before alpha is applied."
+                   Foreground="{StaticResource Muted}"
+                   FontSize="9"
+                   Wrap="True" />
+      </StackPanel>
+    </Border>
+  </Grid>
+
+</local:ThemedStackPanel>

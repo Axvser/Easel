@@ -1,0 +1,15 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.DataContextCard"
+    Spacing="6">
+
+  <TextBlock Text="{Binding SaveCount, StringFormat='SaveCount: {0}'}"
+             Foreground="{StaticResource Text}" />
+
+  <Button Text="Run SaveCommand"
+          Height="30"
+          Command="{Binding SaveCommand}" />
+
+</local:ThemedStackPanel>

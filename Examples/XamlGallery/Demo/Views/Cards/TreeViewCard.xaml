@@ -1,0 +1,51 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TreeViewCard"
+    Width="620"
+    Spacing="8">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock Text="Component tree"
+                 Foreground="{StaticResource Text}"
+                 FontSize="18"
+                 FontWeight="SemiBold" />
+      <TextBlock Text="Three levels · expansion and selection are real visual items"
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9" />
+    </StackPanel>
+
+    <Border Grid.Column="1"
+            Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8,4"
+            VerticalAlignment="Center">
+      <TextBlock Text="HIERARCHY" Foreground="{StaticResource Muted}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <ScrollViewer Height="360">
+    <TreeView x:Name="tree"
+              SelectionChanged="OnSelectionChanged" />
+  </ScrollViewer>
+
+  <TextBlock x:Name="status"
+             Text="—"
+             Foreground="{StaticResource Muted}"
+             FontSize="9" />
+
+  <TextBlock Text="Click a chevron to expand; click a row to select. Reveal() expands the ancestors of a selected item."
+             Foreground="{StaticResource Muted}"
+             FontSize="9"
+             Wrap="True" />
+
+</local:ThemedStackPanel>

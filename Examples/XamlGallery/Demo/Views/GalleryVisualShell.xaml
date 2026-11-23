@@ -1,0 +1,150 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.GalleryVisualShell"
+    Background="{StaticResource Window}"
+    LastChildFill="True">
+
+  <!-- The shell is authored in visual XAML; only the catalog rows, preview disposal and splitter targets
+       stay in code-behind because they are view behaviour, not markup. -->
+
+  <Border x:Name="TitleBar"
+          DockPanel.Dock="Top"
+          Height="80"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="22,14">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="Modern WinForms Gallery"
+                   Style="{StaticResource Heading}" />
+        <TextBlock Text="A XAML-first WinForms runtime · one HWND · one visual tree · MVVM view models"
+                   Style="{StaticResource Caption}" />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="10"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Center">
+        <Border Background="{StaticResource AccentGradient}"
+                CornerRadius="10"
+                Padding="10,4">
+          <TextBlock Text="visual XAML" Foreground="{StaticResource AccentText}" FontSize="9" />
+        </Border>
+        <ComboBox x:Name="ThemePicker"
+                  Width="160"
+                  Height="32"
+                  ItemsSource="{Binding ThemeOptions}"
+                  SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}" />
+      </StackPanel>
+    </Grid>
+  </Border>
+
+  <Border x:Name="StatusBar"
+          DockPanel.Dock="Bottom"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,1,0,0"
+          Padding="22,5">
+    <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource Muted}" FontSize="9" />
+  </Border>
+
+  <Border x:Name="CatalogPane"
+          DockPanel.Dock="Left"
+          Width="280"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,1,0"
+          Padding="14">
+    <DockPanel LastChildFill="True">
+      <TextBox x:Name="CatalogFilter"
+               DockPanel.Dock="Top"
+               Height="30"
+               Placeholder="Filter demos…"
+               Margin="0,0,0,8"
+               Text="{Binding FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+      <ScrollViewer>
+        <TreeView x:Name="CatalogTree" SelectionChanged="OnCatalogSelectionChanged" />
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+
+  <GridSplitter x:Name="LeftSplitter"
+                DockPanel.Dock="Left"
+                Width="6"
+                Height="200"
+                Orientation="Vertical" />
+
+  <Border x:Name="InspectorPane"
+          DockPanel.Dock="Right"
+          Width="310"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1,0,0,0"
+          Padding="14">
+    <DockPanel LastChildFill="True">
+      <TextBlock DockPanel.Dock="Top"
+                 Text="Properties"
+                 Foreground="{StaticResource Accent}"
+                 FontSize="11"
+                 FontWeight="SemiBold"
+                 Margin="0,0,0,8" />
+      <ScrollViewer>
+        <ContentControl x:Name="InspectorHost" />
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+
+  <GridSplitter x:Name="RightSplitter"
+                DockPanel.Dock="Right"
+                Width="6"
+                Height="200"
+                Orientation="Vertical" />
+
+  <Border Background="{StaticResource Window}">
+    <DockPanel LastChildFill="True" Margin="18" Background="{StaticResource Window}">
+      <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,10">
+        <TextBlock x:Name="PreviewTitle"
+                   Foreground="{StaticResource Text}"
+                   FontSize="18"
+                   FontWeight="SemiBold"
+                   Text="{Binding Title}" />
+        <TextBlock x:Name="PreviewSummary"
+                   Foreground="{StaticResource Muted}"
+                   Wrap="True"
+                   Text="{Binding Summary}" />
+      </StackPanel>
+
+      <Expander x:Name="UsageExpander"
+                DockPanel.Dock="Bottom"
+                Header="Usage"
+                IsExpanded="False"
+                Margin="0,10,0,0">
+        <TextBlock x:Name="PreviewUsage"
+                   Foreground="{StaticResource Text}"
+                   FontSize="10"
+                   Wrap="True"
+                   Text="{Binding Usage}" />
+      </Expander>
+
+      <ScrollViewer x:Name="PreviewScroll" HorizontalScrollBarVisibility="Auto">
+        <Border Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18">
+          <ContentControl x:Name="PreviewHost" />
+        </Border>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+
+</local:ThemedDockPanel>

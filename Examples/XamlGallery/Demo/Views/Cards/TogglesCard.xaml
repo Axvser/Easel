@@ -1,0 +1,16 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TogglesCard"
+    Spacing="10">
+
+  <StackPanel Orientation="Horizontal" Spacing="16">
+    <ToggleButton IsChecked="True" />
+    <CheckBox IsChecked="True" />
+    <RadioButton GroupName="demo" IsChecked="True" />
+  </StackPanel>
+
+  <TextBlock Text="Toggle · Check · Radio" Foreground="{StaticResource Muted}" />
+
+</local:ThemedStackPanel>

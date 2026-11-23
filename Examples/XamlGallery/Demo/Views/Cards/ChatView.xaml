@@ -1,0 +1,76 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.ChatView"
+    Background="{StaticResource Surface}"
+    Width="540"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="Design review" Foreground="{StaticResource Text}" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Status}" Foreground="{StaticResource Muted}" FontSize="9" />
+      </StackPanel>
+      <Border Grid.Column="1" Background="{StaticResource AccentGradient}" CornerRadius="10" Padding="10,4" VerticalAlignment="Center">
+        <TextBlock Text="3 online" Foreground="{StaticResource AccentText}" FontSize="9" />
+      </Border>
+    </Grid>
+  </Border>
+
+  <Border DockPanel.Dock="Bottom"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,1,0,0"
+          Padding="14,10">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBox Grid.Column="0"
+               Margin="0,0,10,0"
+               Placeholder="Write a message…"
+               Text="{Binding Draft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+      <Button Grid.Column="1" Text="Send" Height="30" Command="{Binding SendCommand}" />
+    </Grid>
+  </Border>
+
+  <ScrollViewer Padding="16" HorizontalScrollBarVisibility="Disabled">
+    <ItemsControl ItemsSource="{Binding Messages}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Border Background="{StaticResource Raised}"
+                  BorderBrush="{StaticResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="10"
+                  Padding="12,9"
+                  Margin="0,0,0,8"
+                  Width="420"
+                  HorizontalAlignment="Left">
+            <StackPanel Spacing="3">
+              <TextBlock Text="{Binding Author}" Foreground="{StaticResource Accent}" FontSize="9" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Text}" Foreground="{StaticResource Text}" FontSize="11" Wrap="True" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </ScrollViewer>
+
+</local:ThemedDockPanel>

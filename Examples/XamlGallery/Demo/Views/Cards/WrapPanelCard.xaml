@@ -1,0 +1,45 @@
+<local:ThemedWrapPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.WrapPanelCard"
+    Width="300"
+    ItemWidth="70"
+    ItemHeight="32"
+    Spacing="6">
+
+  <local:ThemedWrapPanel.Resources>
+    <Style x:Key="TileText" TargetType="TextBlock">
+      <Style.Setters>
+        <Setter Property="Foreground" Value="{StaticResource AccentText}" />
+        <Setter Property="TextAlignment" Value="Center" />
+      </Style.Setters>
+    </Style>
+  </local:ThemedWrapPanel.Resources>
+
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+    <TextBlock Style="{StaticResource TileText}" Text="1" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+    <TextBlock Style="{StaticResource TileText}" Text="2" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+    <TextBlock Style="{StaticResource TileText}" Text="3" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+    <TextBlock Style="{StaticResource TileText}" Text="4" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+    <TextBlock Style="{StaticResource TileText}" Text="5" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+    <TextBlock Style="{StaticResource TileText}" Text="6" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Accent}">
+    <TextBlock Style="{StaticResource TileText}" Text="7" />
+  </Border>
+  <Border Width="70" Height="32" CornerRadius="6" Padding="8" Background="{StaticResource Focus}">
+    <TextBlock Style="{StaticResource TileText}" Text="8" />
+  </Border>
+
+</local:ThemedWrapPanel>

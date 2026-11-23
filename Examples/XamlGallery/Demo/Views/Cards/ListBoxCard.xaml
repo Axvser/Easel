@@ -1,0 +1,75 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ListBoxCard"
+    Width="600"
+    Spacing="8">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock Text="Work queue"
+                 Foreground="{StaticResource Text}"
+                 FontSize="18"
+                 FontWeight="SemiBold" />
+      <TextBlock Text="Twelve active items · the selected row is a dependency property"
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9" />
+    </StackPanel>
+
+    <Border Grid.Column="1"
+            Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8,4"
+            VerticalAlignment="Center">
+      <TextBlock Text="OBSERVABLE" Foreground="{StaticResource Muted}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <ScrollViewer Height="320">
+    <ListBox x:Name="listBox"
+             ItemsSource="{Binding Rows}"
+             SelectionChanged="OnSelectionChanged">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <Grid Height="40" Padding="10,3">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Name}"
+                         Foreground="{StaticResource Text}"
+                         FontSize="10" />
+              <TextBlock Text="{Binding Department}"
+                         Foreground="{StaticResource Muted}"
+                         FontSize="8" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+              <TextBlock Text="{Binding Owner}" Foreground="{StaticResource Muted}" FontSize="8" HorizontalAlignment="Right" />
+              <TextBlock Text="{Binding Status}" Foreground="{StaticResource Accent}" FontSize="8" HorizontalAlignment="Right" />
+            </StackPanel>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </ScrollViewer>
+
+  <TextBlock x:Name="status"
+             Text="—"
+             Foreground="{StaticResource Muted}"
+             FontSize="9" />
+
+  <TextBlock Text="Click anywhere in the row to move selection; Up/Down and Home/End work from the keyboard."
+             Foreground="{StaticResource Muted}"
+             FontSize="9"
+             Wrap="True" />
+
+</local:ThemedStackPanel>

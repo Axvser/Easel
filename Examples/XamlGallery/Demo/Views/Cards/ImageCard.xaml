@@ -1,0 +1,9 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ImageCard">
+
+  <Image x:Name="image" Width="220" Height="120" Stretch="Uniform" />
+
+</local:ThemedStackPanel>

@@ -1,0 +1,13 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ConverterCard">
+
+  <!-- The converter is registered in code-behind before InitializeComponent, so the reference resolves in markup. -->
+  <TextBlock Text="{Binding Amount, Converter={StaticResource Money}}"
+             Foreground="{StaticResource Accent}"
+             FontSize="16"
+             FontWeight="SemiBold" />
+
+</local:ThemedStackPanel>

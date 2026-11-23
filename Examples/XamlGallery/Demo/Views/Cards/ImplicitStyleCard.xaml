@@ -1,0 +1,21 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ImplicitStyleCard"
+    Orientation="Horizontal"
+    Spacing="10">
+
+  <StackPanel.Resources>
+    <Style TargetType="Button">
+      <Style.Setters>
+        <Setter Property="Background" Value="{StaticResource Accent}" />
+        <Setter Property="Foreground" Value="{StaticResource AccentText}" />
+      </Style.Setters>
+    </Style>
+  </StackPanel.Resources>
+
+  <Button Text="Styled A" Height="32" />
+  <Button Text="Styled B" Height="32" />
+
+</local:ThemedStackPanel>

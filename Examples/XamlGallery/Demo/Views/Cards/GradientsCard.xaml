@@ -1,0 +1,63 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.GradientsCard"
+    Spacing="12">
+
+  <TextBlock Text="Linear and radial gradient brushes declared inline and as resources; the same Brush contract paints borders, text and shapes."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <StackPanel Orientation="Horizontal" Spacing="12">
+    <Border Width="200" Height="80" CornerRadius="10" Padding="14">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+          <LinearGradientBrush.GradientStops>
+            <GradientStop Color="#FF00D2FF" Offset="0" />
+            <GradientStop Color="#FF0072FF" Offset="0.5" />
+            <GradientStop Color="#FF7B2FF7" Offset="1" />
+          </LinearGradientBrush.GradientStops>
+        </LinearGradientBrush>
+      </Border.Background>
+      <TextBlock Text="Inline linear gradient" Foreground="White" />
+    </Border>
+
+    <Border Width="110" Height="80" CornerRadius="10" Background="{StaticResource SunsetGradient}" />
+    <Border Width="110" Height="80" CornerRadius="10" Background="{StaticResource AuroraGradient}" />
+    <Border Width="110" Height="80" CornerRadius="10" Background="{StaticResource RadialGlow}" />
+  </StackPanel>
+
+  <StackPanel Orientation="Horizontal" Spacing="14">
+    <Ellipse Width="72" Height="72">
+      <Ellipse.Fill>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+          <LinearGradientBrush.GradientStops>
+            <GradientStop Color="#FFFF512F" Offset="0" />
+            <GradientStop Color="#FFF09819" Offset="1" />
+          </LinearGradientBrush.GradientStops>
+        </LinearGradientBrush>
+      </Ellipse.Fill>
+    </Ellipse>
+
+    <Border Width="180"
+            Height="72"
+            CornerRadius="10"
+            BorderBrush="{StaticResource MagentaGradient}"
+            BorderThickness="2"
+            Padding="14">
+      <TextBlock Text="Gradient border" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
+    </Border>
+
+    <VisualPresenter x:Name="gradientTextPresenter" Width="220" Height="72">
+      <VisualPresenter.Content>
+        <ContainerVisual>
+          <ContainerVisual.Children>
+            <TextVisual Bounds="8,16,204,40" Text="Gradient text" Foreground="{StaticResource TextSpectrumGradient}" />
+          </ContainerVisual.Children>
+        </ContainerVisual>
+      </VisualPresenter.Content>
+    </VisualPresenter>
+  </StackPanel>
+
+</local:ThemedStackPanel>

@@ -1,0 +1,244 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.DashboardView"
+    Background="{StaticResource Surface}"
+    Width="540"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12"
+          Margin="0,0,0,14">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="Northwind analytics"
+                   Foreground="{StaticResource Text}"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Status}"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="10" />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="10"
+                  VerticalAlignment="Center">
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <TextBlock Text="LAST REFRESH"
+                     Foreground="{StaticResource Muted}"
+                     FontSize="8" />
+          <TextBlock Text="{Binding LastRefresh}"
+                     Foreground="{StaticResource Text}"
+                     FontSize="12"
+                     FontWeight="SemiBold" />
+        </StackPanel>
+        <Button Text="Refresh"
+                Height="30"
+                Command="{Binding RefreshCommand}" />
+      </StackPanel>
+    </Grid>
+  </Border>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="14">
+
+      <Grid Height="104">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Background="{StaticResource AuroraGradient}" CornerRadius="12" Padding="14" Margin="0,0,8,0">
+          <StackPanel Spacing="4">
+            <TextBlock Text="REVENUE" Foreground="{StaticResource AccentText}" FontSize="8" />
+            <TextBlock Text="$48.2k" Foreground="{StaticResource AccentText}" FontSize="20" FontWeight="Bold" />
+            <TextBlock Text="+12.4% vs last month" Foreground="{StaticResource AccentText}" FontSize="8" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Background="{StaticResource SunsetGradient}" CornerRadius="12" Padding="14" Margin="0,0,8,0">
+          <StackPanel Spacing="4">
+            <TextBlock Text="ACTIVE USERS" Foreground="{StaticResource AccentText}" FontSize="8" />
+            <TextBlock Text="8,942" Foreground="{StaticResource AccentText}" FontSize="20" FontWeight="Bold" />
+            <TextBlock Text="+318 this week" Foreground="{StaticResource AccentText}" FontSize="8" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Background="{StaticResource EmeraldGradient}" CornerRadius="12" Padding="14" Margin="0,0,8,0">
+          <StackPanel Spacing="4">
+            <TextBlock Text="CONVERSION" Foreground="{StaticResource AccentText}" FontSize="8" />
+            <TextBlock Text="{Binding Conversion, StringFormat=F0}" Foreground="{StaticResource AccentText}" FontSize="20" FontWeight="Bold" />
+            <TextBlock Text="percent of trials" Foreground="{StaticResource AccentText}" FontSize="8" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="3" Background="{StaticResource MagentaGradient}" CornerRadius="12" Padding="14">
+          <StackPanel Spacing="4">
+            <TextBlock Text="CHURN" Foreground="{StaticResource AccentText}" FontSize="8" />
+            <TextBlock Text="1.8%" Foreground="{StaticResource AccentText}" FontSize="20" FontWeight="Bold" />
+            <TextBlock Text="−0.3 pts" Foreground="{StaticResource AccentText}" FontSize="8" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Grid Height="250">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="3*" />
+          <ColumnDefinition Width="2*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16"
+                Margin="0,0,12,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="Revenue trend" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="Last 12 weeks · all channels" Foreground="{StaticResource Muted}" FontSize="9" />
+              </StackPanel>
+              <Border Grid.Column="1" Background="{StaticResource Raised}" CornerRadius="8" Padding="8,3" VerticalAlignment="Top">
+                <TextBlock Text="LIVE" Foreground="{StaticResource Accent}" FontSize="8" />
+              </Border>
+            </Grid>
+
+            <Viewbox Grid.Row="1" Width="280" Height="160" Stretch="Uniform">
+              <Canvas Width="620" Height="170">
+                <Line X1="0" Y1="25" X2="620" Y2="25" Stroke="{StaticResource Border}" StrokeThickness="1" />
+                <Line X1="0" Y1="70" X2="620" Y2="70" Stroke="{StaticResource Border}" StrokeThickness="1" />
+                <Line X1="0" Y1="115" X2="620" Y2="115" Stroke="{StaticResource Border}" StrokeThickness="1" />
+                <Line X1="0" Y1="160" X2="620" Y2="160" Stroke="{StaticResource Border}" StrokeThickness="1" />
+
+                <Polygon Points="0,140 52,128 104,132 156,104 208,112 260,86 312,94 364,66 416,78 468,52 520,60 572,30 620,38 620,160 0,160">
+                  <Polygon.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                      <LinearGradientBrush.GradientStops>
+                        <GradientStop Color="#6600D2FF" Offset="0" />
+                        <GradientStop Color="#000072FF" Offset="1" />
+                      </LinearGradientBrush.GradientStops>
+                    </LinearGradientBrush>
+                  </Polygon.Fill>
+                </Polygon>
+
+                <Polyline Points="0,140 52,128 104,132 156,104 208,112 260,86 312,94 364,66 416,78 468,52 520,60 572,30 620,38"
+                          Stroke="{StaticResource Accent}"
+                          StrokeThickness="2.5" />
+
+                <Ellipse Canvas.Left="564" Canvas.Top="24" Width="12" Height="12" Fill="{StaticResource Accent}" />
+                <Border Canvas.Left="500" Canvas.Top="6" Background="{StaticResource Raised}" CornerRadius="8" Padding="8,3">
+                  <TextBlock Text="$48.2k" Foreground="{StaticResource Text}" FontSize="9" />
+                </Border>
+              </Canvas>
+            </Viewbox>
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16">
+          <StackPanel Spacing="11">
+            <TextBlock Text="Activity" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <StackPanel Spacing="2">
+              <TextBlock Text="Ada deployed the shell" Foreground="{StaticResource Text}" FontSize="10" />
+              <TextBlock Text="2 minutes ago · visual XAML" Foreground="{StaticResource Muted}" FontSize="8" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Gradient brushes merged" Foreground="{StaticResource Text}" FontSize="10" />
+              <TextBlock Text="18 minutes ago · graphics" Foreground="{StaticResource Muted}" FontSize="8" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="3D showcase captured" Foreground="{StaticResource Text}" FontSize="10" />
+              <TextBlock Text="1 hour ago · transforms" Foreground="{StaticResource Muted}" FontSize="8" />
+            </StackPanel>
+            <StackPanel Spacing="2">
+              <TextBlock Text="Cache hit rate 98.7%" Foreground="{StaticResource Text}" FontSize="10" />
+              <TextBlock Text="3 hours ago · composition" Foreground="{StaticResource Muted}" FontSize="8" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16"
+                Margin="0,0,12,0">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Quarterly goals" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <StackPanel Spacing="3">
+              <Grid>
+                <TextBlock Text="Revenue" Foreground="{StaticResource Muted}" FontSize="9" />
+                <TextBlock Text="82%" Foreground="{StaticResource Text}" FontSize="9" HorizontalAlignment="Right" />
+              </Grid>
+              <ProgressBar Height="8" Value="82" />
+            </StackPanel>
+            <StackPanel Spacing="3">
+              <Grid>
+                <TextBlock Text="Retention" Foreground="{StaticResource Muted}" FontSize="9" />
+                <TextBlock Text="67%" Foreground="{StaticResource Text}" FontSize="9" HorizontalAlignment="Right" />
+              </Grid>
+              <ProgressBar Height="8" Value="67" />
+            </StackPanel>
+            <StackPanel Spacing="3">
+              <Grid>
+                <TextBlock Text="Conversion" Foreground="{StaticResource Muted}" FontSize="9" />
+                <TextBlock Text="54%" Foreground="{StaticResource Text}" FontSize="9" HorizontalAlignment="Right" />
+              </Grid>
+              <ProgressBar Height="8" Value="{Binding Conversion}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="16">
+          <StackPanel Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="One XAML view" Foreground="{StaticResource Accent}" FontSize="14" FontWeight="SemiBold" />
+            <TextBlock Text="Gradient tiles, a chart drawn with Polyline, Polygon and Line, progress bars and a feed — every element declared in markup and bound to DashboardViewModel."
+                       Foreground="{StaticResource Muted}"
+                       FontSize="9"
+                       Wrap="True" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</local:ThemedDockPanel>

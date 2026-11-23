@@ -1,0 +1,24 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.GridSplitterCard"
+    Orientation="Horizontal"
+    Spacing="6">
+
+  <Border x:Name="pane"
+          Width="150"
+          Background="{StaticResource SurfaceAlt}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="6">
+    <TextBlock Text="Resize me" Foreground="{StaticResource Text}" />
+  </Border>
+
+  <GridSplitter x:Name="splitter" Width="6" Height="120" Orientation="Vertical" />
+
+  <Border Width="220" Height="120" Background="{StaticResource Surface}">
+    <TextBlock Text="Fill pane" Foreground="{StaticResource MutedText}" />
+  </Border>
+
+</local:ThemedStackPanel>

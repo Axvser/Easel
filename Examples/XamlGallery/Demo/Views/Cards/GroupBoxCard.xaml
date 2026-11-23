@@ -1,0 +1,13 @@
+<local:ThemedUserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.GroupBoxCard">
+
+  <GroupBox Width="320" Header="Settings">
+    <StackPanel Spacing="6">
+      <TextBlock Text="Content sits inside the frame." Foreground="{StaticResource Text}" />
+    </StackPanel>
+  </GroupBox>
+
+</local:ThemedUserControl>

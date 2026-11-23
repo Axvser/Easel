@@ -1,0 +1,14 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.OneWayBindingCard"
+    Spacing="6">
+
+  <TextBlock Text="model.Amount"
+             Foreground="{StaticResource Muted}" />
+
+  <TextBlock Text="{Binding Amount, StringFormat=N2}"
+             Foreground="{StaticResource Text}" />
+
+</local:ThemedStackPanel>

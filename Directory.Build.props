@@ -1,0 +1,19 @@
+<Project>
+	<PropertyGroup>
+		<!-- false: the demo and other local projects consume the Easel source projects.
+		     true: they consume the packed Easel / Easel.Generator packages from artifacts/packages.
+		     Run scripts/pack-local.ps1 before switching to true. -->
+		<UseEaselPackage Condition="'$(UseEaselPackage)' == ''">false</UseEaselPackage>
+		<EaselPackageVersion Condition="'$(EaselPackageVersion)' == ''">1.0.0</EaselPackageVersion>
+		<EaselGeneratorPackageVersion Condition="'$(EaselGeneratorPackageVersion)' == ''">1.0.0</EaselGeneratorPackageVersion>
+		<EaselLocalPackageSource>$(MSBuildThisFileDirectory)artifacts/packages</EaselLocalPackageSource>
+		<RestoreAdditionalProjectSources Condition="Exists('$(EaselLocalPackageSource)')">$(RestoreAdditionalProjectSources);$(EaselLocalPackageSource)</RestoreAdditionalProjectSources>
+
+		<!-- The gallery demo's MVVM generator comes from VeloxDev.Core. Resolve the VeloxDev checkout
+		     whether Easel sits beside it (sibling clone) or inside it (git submodule). -->
+		<VeloxDevCoreProject Condition="Exists('$(MSBuildThisFileDirectory)..\VeloxDev\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj')">$(MSBuildThisFileDirectory)..\VeloxDev\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj</VeloxDevCoreProject>
+		<VeloxDevCoreProject Condition="'$(VeloxDevCoreProject)' == '' and Exists('$(MSBuildThisFileDirectory)..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj')">$(MSBuildThisFileDirectory)..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj</VeloxDevCoreProject>
+		<VeloxDevCoreGeneratorProject Condition="Exists('$(MSBuildThisFileDirectory)..\VeloxDev\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj')">$(MSBuildThisFileDirectory)..\VeloxDev\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj</VeloxDevCoreGeneratorProject>
+		<VeloxDevCoreGeneratorProject Condition="'$(VeloxDevCoreGeneratorProject)' == '' and Exists('$(MSBuildThisFileDirectory)..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj')">$(MSBuildThisFileDirectory)..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj</VeloxDevCoreGeneratorProject>
+	</PropertyGroup>
+</Project>

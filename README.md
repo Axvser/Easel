@@ -1,0 +1,241 @@
+<div align="center">
+
+<img src="Assets/easel-logo.png" width="96" height="96" alt="Easel logo">
+
+# Easel
+
+**A XAML-first UI runtime for WinForms.**
+
+[![NuGet](https://img.shields.io/nuget/v/Easel?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Easel)
+[![NuGet](https://img.shields.io/nuget/v/Easel.Generator?logo=nuget&label=Generator)](https://www.nuget.org/packages/Easel.Generator)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE.txt)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-skills-d97757)](skills/)
+
+<img src="Assets/gallery-dashboard.png" width="100%" alt="XamlGallery in Light+: a XAML-first WinForms dashboard with one visual tree, gradient brushes, charts and an MVVM view model">
+
+<sub><code>Examples/XamlGallery</code> · Light+ · one HWND, a visual tree, XAML views and view models.</sub>
+
+</div>
+
+## One HWND, one visual tree
+
+Easel puts a WPF/Avalonia-shaped control library over a single `VisualHost`. Every control derives
+from `VisualElement`, not from a WinForms control; the only window is the host, and the whole tree is
+painted in one pass. `NativeControlHost` is the explicit native-island escape hatch.
+
+```csharp
+ApplicationConfiguration.Initialize();
+
+var host = new VisualHost { Dock = DockStyle.Fill };
+host.Root = new DashboardView();     // a partial class compiled from visual XAML
+Controls.Add(host);
+```
+
+That gives you dependency properties, measure/arrange, styles, templates, triggers, bindings, commands,
+resource dictionaries and a retained visual layer without giving up the WinForms application model.
+
+## XAML in, controls out
+
+A view is a normal `x:Class` file. The Roslyn compiler turns `AdditionalFiles` into an
+`InitializeComponent()`; a second generator turns `[XamlProperty]` into dependency properties.
+
+```xml
+<StackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="MyApp.Views.SettingsView"
+    Spacing="12">
+
+  <StackPanel.Resources>
+    <Style x:Key="Title" TargetType="TextBlock">
+      <Style.Setters>
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+      </Style.Setters>
+    </Style>
+  </StackPanel.Resources>
+
+  <TextBlock Style="{StaticResource Title}" Text="Workspace settings" />
+  <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+  <Button Text="Save" Command="{Binding SaveCommand}" />
+</StackPanel>
+```
+
+```csharp
+public sealed partial class SettingsView : StackPanel
+{
+    public SettingsView()
+    {
+        DataContext = new SettingsViewModel();
+        InitializeComponent();
+    }
+}
+```
+
+## What is in the box
+
+| Area | What you get |
+| --- | --- |
+| **Layout** | `StackPanel`, `DockPanel`, `Grid`, `WrapPanel`, `Canvas`, `UniformGrid`, `Viewbox`, `GridSplitter`, `GroupBox`, `Expander`, `TabControl` |
+| **Text** | `TextBlock`, self-drawn `TextBox`, password/multiline editing, fully visual templated fields, `RichTextBox`, `Image` |
+| **Data** | `DataGrid` (virtualized 2-D table with sortable headers and badge/progress cells), `ListBox`, `ComboBox`, `VirtualList`, `TreeView`, `Calendar`, `DatePicker`, `CollectionView`, native drag in/out with `DropZone` |
+| **Input** | `Button`/`RepeatButton`, toggles, `Slider`, `ProgressBar`, focus and keyboard navigation |
+| **Overlay** | `VisualPopup`, `VisualMenu`, `VisualContextMenu` in a surface overlay above the root tree |
+| **Styling** | Styles, triggers, `ControlTemplate` + `ContentPresenter`, keyed resources, `StaticResource` and `DynamicResource` |
+| **Binding** | One-way/two-way/one-time paths, converters, validation, inherited `DataContext`, commands |
+| **Visuals** | Brushes, gradients, opacity/clip/effects, opacity masks, cached layers, exact-perspective 3D transforms |
+| **Theme** | Dark+/Light+ XAML dictionaries, high contrast, follow-system mode, custom `ResourceDictionary` themes |
+
+## Themes are resource dictionaries
+
+The built-in Dark+ and Light+ palettes and typography styles are WPF-style `<ResourceDictionary>` XAML
+files in [`Src/Easel/Themes/`](Src/Easel/Themes/). `Theme.CreateDark()` / `CreateLight()` read those
+resources, and `Theme.CreateResourceDictionary(mode)` returns a copy for an application.
+
+```xml
+<ResourceDictionary x:Class="Easel.Themes.DarkTheme" ...>
+  <SolidColorBrush x:Key="Window" Color="#FF141414" />
+  <SolidColorBrush x:Key="Accent" Color="#FF0078D4" />
+  <x:Double x:Key="CornerRadius">4</x:Double>
+  <x:Int32 x:Key="ControlHeight">28</x:Int32>
+  <Style x:Key="Heading" TargetType="TextBlock">…</Style>
+</ResourceDictionary>
+```
+
+- `ThemeMode.System` follows the Windows app theme and listens for later changes through
+  `SystemEvents.UserPreferenceChanged`; Windows high contrast resolves to the high-contrast palette.
+- Applications can author their own dictionary and apply it with
+  `ThemePalette.FromResourceDictionary(...)`; the gallery's High contrast option is exactly that demo.
+- Standalone dictionary roots, keyed styles/templates, scalar resources and `MergedDictionaries`
+  (compiled dictionary types or inline dictionaries) are supported. File-URI `Source="..."` is not:
+  Easel has no runtime XAML loader.
+
+## Brushes, composition and 3D
+
+```xml
+<Border.Background>
+  <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="#FF00D2FF" Offset="0" />
+    <GradientStop Color="#FF7B2FF7" Offset="1" />
+  </LinearGradientBrush>
+</Border.Background>
+
+<Border.Transform3D>
+  <Rotate3DTransform AngleX="16" AngleY="24" CenterX="120" CenterY="90" Depth="700" />
+</Border.Transform3D>
+```
+
+- Gradients work as brushes and as text foregrounds: `DrawString` receives the native gradient brush.
+- `Visual`/`ContainerVisual`/`ShapeVisual`/`TextVisual` compose through `VisualPresenter`; group
+  opacity, clip, drop shadow, `CacheAsBitmap` and `OpacityMask` (Alpha or Luminance) all compose one
+  layer before painting.
+- `Rotate3DTransform` / `Scale3DTransform` / `Translate3DTransform` / `MatrixTransform3D` /
+  `Transform3DGroup` project a 2D subtree through a perspective-correct inverse homography.
+  Hit testing and damage bounds use the same map, and `CacheAsBitmap` reuses the pre-warp layer.
+
+## Data tables and native drag
+
+`DataGrid` is a row-virtualized two-dimensional table. Columns are plain objects with a binding path, width,
+alignment, sortability and a cell kind (`Text`, `Badge`, `Check`, `Progress`); zero-width columns share the room
+left by the fixed ones, and the header edge resizes a column in place.
+
+```xml
+<DataGrid ItemsSource="{Binding Rows}" ShowRowNumbers="True" RowHeight="32">
+  <DataGrid.Columns>
+    <DataGridColumn Header="Project" BindingPath="Name" Width="0" MinWidth="140" />
+    <DataGridColumn Header="Value" BindingPath="Value" Width="80" TextAlignment="Right" StringFormat="N0" />
+    <DataGridColumn Header="Status" BindingPath="Status" Width="96" Kind="Badge" />
+    <DataGridColumn Header="Progress" BindingPath="Progress" Width="104" Kind="Progress" StringFormat="0'%'" />
+    <DataGridColumn Header="Live" BindingPath="Enabled" Width="50" Kind="Check" TextAlignment="Center" />
+  </DataGrid.Columns>
+</DataGrid>
+```
+
+Dragging is the native Windows OLE loop, not a private gesture. `AllowDrop` on any element routes
+`DragEnter`/`DragOver`/`DragLeave`/`Drop` to the deepest target and bubbles through its ancestors; `DropZone`
+is a ready surface for files, text and rows; `VisualDragDrop.StartDrag` starts a drag with text and
+`FileDrop` formats. Two `DataGrid`s in one process exchange an `Easel.DataGrid.Rows` payload, so a move keeps
+the same row object and removes it from the source collection.
+
+## The living reference
+
+`Examples/XamlGallery` is the catalogue and the contract: a three-pane workbench whose shell, every card
+and the full scenario pages are XAML views with view models.
+
+```bash
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj
+```
+
+Useful switches:
+
+```bash
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --smoke
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --entry scenario.dashboard
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --light
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --system
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --capture ./captures --all
+```
+
+[`Examples/XamlGallery/README.md`](Examples/XamlGallery/README.md) has the catalog table, capture
+details and the per-feature notes.
+
+## Packages
+
+```powershell
+dotnet add package Easel
+dotnet add package Easel.Generator
+```
+
+| Package | Targets |
+| --- | --- |
+| `Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
+| `Easel.Generator` | `netstandard2.0` (Roslyn 4.8) |
+
+The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
+`[VeloxProperty]` / `[VeloxCommand]` view models, and opts into WPF for the real `MediaPlayer` /
+`MediaElement` audio and video pages; the Easel runtime still has no WPF dependency.
+
+## Build and test
+
+```bash
+dotnet build Easel.slnx -c Release
+dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj
+```
+
+### Two reference modes
+
+The gallery consumes the Easel source projects by default. To test the packed form:
+
+```powershell
+pwsh scripts/pack-local.ps1
+dotnet build Examples/XamlGallery/Demo/Demo.csproj -p:UseEaselPackage=true
+```
+
+`UseEaselPackage` defaults to `false`; `Directory.Build.props` adds `artifacts/packages` to the
+restore sources when it exists.
+
+## Animation is a contract
+
+Easel owns the animation contract but not an engine. `Easel.Animation.AnimationRuntime.Animator`
+accepts an `IVisualAnimator`; trigger actions, keyframe animations and `VisualTransition` delegate
+interpolation, frame pacing and hold-end semantics to it. Without an injected backend, an animation
+request throws a clear `InvalidOperationException`. **Install `VeloxDev.WinForms` 12.0.0 or later** if
+the app accepts the VeloxDev dependency: its module initializer wires `EaselVisualAnimator` automatically,
+so Easel animations work immediately with no extra package or manual registration.
+
+## Repository map
+
+| Path | What it holds |
+| --- | --- |
+| [`Src/Easel/`](Src/Easel/) | The runtime: dependency properties, visual tree, controls, themes |
+| [`Src/Easel/Themes/`](Src/Easel/Themes/) | Built-in Dark+/Light+ XAML resource dictionaries |
+| [`Src/Generators/Easel.Generator/`](Src/Generators/Easel.Generator/) | The XAML compiler and dependency-property generator |
+| [`Src/Test/Unit/Easel.Test/`](Src/Test/Unit/Easel.Test/) | Unit, render and generator tests |
+| [`Examples/XamlGallery/`](Examples/XamlGallery/) | The living catalogue and all scenario pages |
+| [`skills/`](skills/) | The Easel WinForms-XAML UI guide |
+
+## License
+
+Released under the [MIT License](LICENSE.txt). © 2025 Axvser

@@ -1,0 +1,41 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.VisualPresenterCard"
+    Spacing="12">
+
+  <TextBlock Text="A VisualPresenter gives a lightweight ContainerVisual tree a slot in the control tree; the visuals have no windows and no layout pass of their own."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <Border Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="10"
+          HorizontalAlignment="Left">
+    <VisualPresenter x:Name="presenter" Width="240" Height="140">
+      <VisualPresenter.Content>
+        <ContainerVisual>
+          <ContainerVisual.Children>
+            <ShapeVisual Bounds="8,8,78,78" Fill="{StaticResource Accent}" Opacity="0.85">
+              <ShapeVisual.Geometry>
+                <EllipseGeometry />
+              </ShapeVisual.Geometry>
+            </ShapeVisual>
+            <ShapeVisual Bounds="58,8,78,78" Fill="{StaticResource Selection}" Opacity="0.6">
+              <ShapeVisual.Geometry>
+                <RectangleGeometry RadiusX="18" RadiusY="18" />
+              </ShapeVisual.Geometry>
+            </ShapeVisual>
+            <TextVisual Bounds="0,96,220,24"
+                        Text="ContainerVisual · ShapeVisual · TextVisual"
+                        Foreground="{StaticResource Text}" />
+          </ContainerVisual.Children>
+        </ContainerVisual>
+      </VisualPresenter.Content>
+    </VisualPresenter>
+  </Border>
+
+</local:ThemedStackPanel>

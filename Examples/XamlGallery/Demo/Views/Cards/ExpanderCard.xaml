@@ -1,0 +1,13 @@
+<local:ThemedUserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ExpanderCard">
+
+  <Expander Width="340" IsExpanded="True" Header="Advanced options">
+    <TextBlock Text="The content is measured only while the expander is open."
+               Foreground="{StaticResource MutedText}"
+               Wrap="True" />
+  </Expander>
+
+</local:ThemedUserControl>

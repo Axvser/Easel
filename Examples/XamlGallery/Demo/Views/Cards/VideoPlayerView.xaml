@@ -1,0 +1,60 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.VideoPlayerView"
+    Width="540"
+    Background="{StaticResource Surface}"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12"
+          Margin="0,0,0,14">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="Video player" Style="{StaticResource Heading}" />
+        <TextBlock Text="A WPF MediaElement in a NativeControlHost island: embedded H.264/AAC with real transport and seek."
+                   Foreground="{StaticResource Muted}"
+                   FontSize="10"
+                   Wrap="True" />
+      </StackPanel>
+      <Border Grid.Column="1" Background="{StaticResource AuroraGradient}" CornerRadius="10" Padding="10,4" VerticalAlignment="Center">
+        <TextBlock Text="real media" Foreground="{StaticResource AccentText}" FontSize="9" />
+      </Border>
+    </Grid>
+  </Border>
+
+  <StackPanel Spacing="12">
+    <Border Background="{StaticResource Raised}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="10"
+            HorizontalAlignment="Center">
+      <NativeControlHost x:Name="videoHost" Width="480" Height="270" />
+    </Border>
+
+    <Grid>
+      <TextBlock x:Name="positionText" Text="0:00" Foreground="{StaticResource Muted}" FontSize="9" HorizontalAlignment="Left" />
+      <TextBlock x:Name="durationText" Text="0:00" Foreground="{StaticResource Muted}" FontSize="9" HorizontalAlignment="Right" />
+    </Grid>
+
+    <Slider x:Name="seekSlider" Minimum="0" Maximum="100" ValueChanged="OnSeekChanged" />
+
+    <StackPanel Orientation="Horizontal" Spacing="10">
+      <Button x:Name="playButton" Text="Play" Height="32" Width="88" Click="OnPlayClicked" />
+      <TextBlock Text="Embedded · 640×360 · 30 fps · AAC" Foreground="{StaticResource Muted}" FontSize="9" VerticalAlignment="Center" />
+    </StackPanel>
+  </StackPanel>
+
+</local:ThemedDockPanel>

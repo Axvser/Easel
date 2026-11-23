@@ -1,0 +1,24 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TypographyCard"
+    Spacing="8">
+
+  <TextBlock Text="Segoe UI Semibold 18"
+             Foreground="{StaticResource Text}"
+             FontSize="18"
+             FontWeight="SemiBold" />
+
+  <TextBlock Text="Segoe UI 14"
+             Foreground="{StaticResource Text}"
+             FontSize="14" />
+
+  <TextBlock Text="Segoe UI 11.5"
+             Foreground="{StaticResource Muted}"
+             FontSize="11.5" />
+
+  <TextBlock Text="Segoe UI 9.5 · default"
+             Foreground="{StaticResource Muted}" />
+
+</local:ThemedStackPanel>
