@@ -20,13 +20,17 @@ name: publish
 #   packed and pushed; a package whose version is already there is skipped. A run that failed
 #   halfway can therefore be retried without repacking what already landed.
 #
+#   Easel.csproj's Release reference takes its generator version from EaselGeneratorPackageVersion
+#   in Directory.Build.props; it must match Easel.Generator's own <Version>. The version job fails
+#   early when the two disagree.
+#
 # Release order:
 #   Easel.Generator -> Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The pre-publish
 #   test job builds in Debug against the local generator project. The publish job restores,
 #   Release-builds, packs and pushes the generator, polls flatcontainer until NuGet serves it, and
 #   only then restores, Release-builds and tests the runtime before packing and pushing it. The
-#   runtime does not carry a package dependency on the generator (consumers add both); the order
-#   keeps the runtime from being discoverable before the compiler it was built against.
+#   runtime's Release graph references the generator package, so the order keeps the runtime from
+#   being restored, packed or published before the compiler it depends on is downloadable.
 #
 # Target frameworks:
 #   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
@@ -119,6 +123,14 @@ jobs:
             $match = [regex]::Match((Get-Content $project.Path -Raw), '<Version>([^<]+)</Version>')
             if (-not $match.Success) { throw "no <Version> in $($project.Path)" }
             $project.Version = $match.Groups[1].Value
+          }
+
+          # The runtime's Release reference and the generator's own <Version> must agree.
+          $propsMatch = [regex]::Match((Get-Content "Directory.Build.props" -Raw), '<EaselGeneratorPackageVersion[^>]*>([^<]+)</EaselGeneratorPackageVersion>')
+          if (-not $propsMatch.Success) { throw "no EaselGeneratorPackageVersion in Directory.Build.props" }
+          $generatorVersion = ($projects | Where-Object { $_.Kind -eq 'generator' } | Select-Object -First 1).Version
+          if ($propsMatch.Groups[1].Value -ne $generatorVersion) {
+            throw "EaselGeneratorPackageVersion $($propsMatch.Groups[1].Value) does not match Easel.Generator <Version> $generatorVersion"
           }
 
           # force keeps the old meaning: pretend nothing is published and run the whole pipeline

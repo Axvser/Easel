@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Debug 用本地生成器工程，Release 用 NuGet 包。本地 Release 打包时生成器包可能还没上 NuGet，
+    传 -p:EaselLocalGenerator=true 把 PackageReference 换回工程引用（与 VeloxDev 的 VeloxDevLocalCore 相同）。
+    只替换真正引用了 Easel.Generator 包的项目，不影响其他项目。
+  -->
+  <ItemGroup Condition="'$(EaselLocalGenerator)' == 'true' And '$(Configuration)' != 'Debug'">
+    <_EaselGeneratorConsumer Include="@(PackageReference->WithMetadataValue('Identity', 'Easel.Generator'))" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EaselLocalGenerator)' == 'true' And '$(Configuration)' != 'Debug' And '@(_EaselGeneratorConsumer)' != ''">
+    <PackageReference Remove="Easel.Generator" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Src/Generators/Easel.Generator/Easel.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
