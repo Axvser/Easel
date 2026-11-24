@@ -2346,11 +2346,16 @@ internal sealed class XamlCompiler
                         positional ?? (arguments.TryGetValue("Member", out var member) ? member : null));
 
                 case "StaticResource":
-                    Report(
-                        Diagnostics.UnsupportedResource,
-                        valueAttribute,
-                        "A StaticResource value in a visual setter is not implemented; declare the value inline.");
-                    return null;
+                    var staticKey = arguments.TryGetValue("Key", out var explicitKey) ? explicitKey : positional;
+                    if (string.IsNullOrEmpty(staticKey))
+                    {
+                        Report(Diagnostics.UnsupportedResource, valueAttribute, "A StaticResource reference needs a key.");
+                        return null;
+                    }
+
+                    // 与样式 setter 同一条解析：资源保持自身类型，交给 SetValue / 动作按属性类型转换。
+                    // 动作在 InitializeComponent 里构造，此时合并字典（主题、渐变）已经就位。
+                    return ResourceGet("object", staticKey);
 
                 default:
                     Report(

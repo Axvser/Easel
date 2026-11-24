@@ -44,6 +44,7 @@ public sealed class VisualActionsAndCommandsTests
             x:Class="ProbeActions.ActionView">
 
           <local:ActionView.Resources>
+            <SolidColorBrush x:Key="AccentFill" Color="#FF00D2FF" />
             <ControlTemplate x:Key="Chrome" TargetType="Border">
               <Border x:Name="PART_Frame" />
               <ControlTemplate.Triggers>
@@ -51,6 +52,7 @@ public sealed class VisualActionsAndCommandsTests
                   <Trigger.EnterAction>
                     <TriggerActionGroup>
                       <TransitionAction Property="Width" To="90" />
+                      <TransitionAction Property="Background" To="{StaticResource AccentFill}" />
                       <KeyFrameAnimation Property="Height" Duration="0:0:0.1">
                         <KeyFrame Offset="0" Value="10" />
                         <KeyFrame Offset="1" Value="20" />
@@ -115,6 +117,10 @@ public sealed class VisualActionsAndCommandsTests
         StringAssert.Contains(generated, ".ExitAction = ");
         StringAssert.Contains(generated, ".Actions.Add(");
         StringAssert.Contains(generated, ".KeyFrames.Add(new global::Easel.Visuals.KeyFrame");
+
+        // 动作的端点也可以引用资源：渐变端点只能这样写，字符串字面量表达不了 Brush。
+        StringAssert.Contains(generated, "VisualResourceLookup.Get<object>(");
+        StringAssert.Contains(generated, "\"AccentFill\"");
     }
 
     [TestMethod]
