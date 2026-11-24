@@ -105,10 +105,11 @@ bridges Easel's DP animation to VeloxDev's transition engine:
 AnimationRuntime.Animator = myAnimator;
 ```
 
-**If the application accepts the VeloxDev dependency, install `VeloxDev.WinForms` version `12.0.0` or later.**
-That package's module initializer assigns `AnimationRuntime.Animator = new EaselVisualAnimator()` as soon as the
-assembly loads — no separate animation package, no manual registration, and no code in the UI layer. The
-earliest supported version for automatic Easel animation wiring is **V12**.
+**If the application accepts the VeloxDev dependency, install `VeloxDev.WinForms`.** Its module initializer
+assigns `AnimationRuntime.Animator` when the first code in that assembly runs — which covers any app that uses
+its workflow surface. A module initializer fires on execution, not on reference, so an app that installs the
+package *only* for the animation backend calls `EaselAnimationBootstrap.EnsureRegistered()` once at startup:
+it is idempotent and leaves a backend the host already supplied in place.
 
 - The adapter owns samplers, frame pacing and easing. Easel does not ship samplers for arbitrary types.
 - `CanAnimate` decides whether a DP is accepted. A backend may support only its sampler table; a custom type
@@ -120,8 +121,31 @@ earliest supported version for automatic Easel animation wiring is **V12**.
 ## Animatable properties
 
 Animate **DP-backed** properties: opacity, margin/padding, width/height, corner radius, background/foreground
-brushes, a custom `[XamlProperty]`, etc. The backend determines which CLR types it can interpolate. A property
-with no sampler is rejected by `VisualTransition`; do not rely on a silent no-op.
+brushes, `Transform`, `Transform3D`, `Clip`, a custom `[XamlProperty]`, etc. The backend determines which CLR
+types it can interpolate. A property with no sampler is rejected by `VisualTransition`; do not rely on a silent
+no-op.
+
+With the `VeloxDev.WinForms` backend the sampled types are:
+
+| Group | Types |
+| --- | --- |
+| numbers | `double`, `float`, `int`, `long` |
+| geometry | `Point`, `PointF`, `Size`, `SizeF`, `Rectangle`, `RectangleF`, `RectangleF?`, `Padding`, `Thickness` |
+| transforms | `Matrix` (2D) and `Transform3D` |
+| colour | `Color`, `Brush` |
+
+Brush and `Transform3D` interpolation is **structural** — the algorithms live in Easel
+(`BrushInterpolation`, `Transform3DInterpolation`) and the backend only adapts them:
+
+- solid↔solid lerps the colour and the brush opacity;
+- gradient↔gradient lerps the stop list, the geometry and the opacity; a solid against a gradient is lifted to
+  the gradient kind and both sides are sampled at the union of their stop offsets, so both endpoints stay exact;
+- `Transform3D` of the same kind lerps its own angles/centres/scale/depth; mixed kinds blend the composed matrix;
+- a pair with no shared structure (linear↔radial, any `ImageBrush`) returns a `CrossFadeBrush`: each side is
+  rendered into its own layer and the layers are blended, so the transition is a real cross-fade.
+
+Not animatable, by design: `bool`, enums (`Visibility`, alignments, `FontWeight`, `OpacityMaskMode`), `string`,
+`Cursor` and `VisualEffect`. `VisualTransition` throws `NotSupportedException` naming the property.
 
 `Visual.Opacity`, `Visual.Transform`, `Visual.Clip` and `Visual.Effect` are plain visual properties with no
 change notification. On a `VisualElement`, the `Opacity`/`Transform`/`Clip`/`Effect` DPs are available; on a

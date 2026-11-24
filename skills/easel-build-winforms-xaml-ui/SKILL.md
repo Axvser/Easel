@@ -105,6 +105,11 @@ member is `EASEL_XAML015`.
 
 ## Hard rules
 
+⚙ **DPI takes two settings.** Per-monitor v2 awareness (`<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>`
+or `Application.SetHighDpiMode` before the first window) **and** `AutoScaleMode = AutoScaleMode.None` on the form
+that hosts `VisualHost`. Miss the second and WinForms scales the form while the host scales the tree, so everything
+renders twice as large. Details in [references/runtime.md](references/runtime.md#dpi).
+
 ⚙ **One HWND.** Never add a WinForms control to a visual tree. The only native paths are
 `NativeControlHost` (an explicit rectangular island) and the focused `TextBox`'s private native editor.
 
@@ -150,9 +155,9 @@ on a multiline `TextBox` restarts per line.
 
 ⚙ **Easel does not ship an animation engine.** Trigger actions and `VisualTransition` call
 `AnimationRuntime.Animator`; without an injected `IVisualAnimator` they throw a clear
-`InvalidOperationException`. If the app accepts VeloxDev, install **`VeloxDev.WinForms` 12.0.0 or later** — its
-module initializer wires `EaselVisualAnimator` automatically, so no separate animation package or manual
-registration is needed.
+`InvalidOperationException`. If the app accepts VeloxDev, install **`VeloxDev.WinForms`** — its module
+initializer wires its animator, but only once code in that assembly runs; an app that uses the package *only*
+for animation calls `EaselAnimationBootstrap.EnsureRegistered()` once at startup.
 
 ## Reference index
 

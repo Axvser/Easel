@@ -108,6 +108,25 @@ All layout, bounds, pointer coordinates and fonts are logical DIPs. The host app
 painting and when placing native islands. Authored sizes/font sizes therefore stay identical at 100%, 150% and
 per-monitor DPI. Native HWNDs are placed in physical pixels from logical bounds.
 
+Two settings are required:
+
+1. **Per-monitor v2 awareness** — `<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>` in the csproj,
+   read by `ApplicationConfiguration.Initialize()`, or `Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)`
+   before the first window. Without it Windows bitmap-stretches the window.
+2. **`AutoScaleMode.None` on the hosting form** — otherwise WinForms scales the form by its font factor and
+   `VisualHost` then scales the visual tree by `DpiScale` as well, so everything renders at double size.
+
+```csharp
+ApplicationConfiguration.Initialize();              // reads ApplicationHighDpiMode
+var form = new Form { AutoScaleMode = AutoScaleMode.None };
+form.Controls.Add(new VisualHost { Dock = DockStyle.Fill });
+```
+
+- `DpiScale` re-reads the device DPI on a resize and on `OnDpiChangedAfterParent`; that override is not compiled
+  into the `netframework4.6.1` target, so a monitor change there refreshes on the next resize.
+- Tests and captures pin the scale with `DpiScaleOverride`; `RenderTo` never applies DPI.
+- `NativeControlHost` children keep their own DPI behaviour; Easel only places their rectangles.
+
 ## Lifetime
 
 `VisualHost.ClosePopups()` and replacing `Root` release popups and native islands. `VisualElement.Dispose()`

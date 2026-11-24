@@ -111,6 +111,7 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 | Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
 | Theme | Palette swatches, typography, the three-mode palette rebuild, and a XAML resource dictionary with keyed styles, a trigger, a control template and a data template. |
 | Visuals | A generated XAML view with a XAML click handler. |
+| Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
 
 ## New in this revision
 
@@ -133,6 +134,11 @@ the thread that selected the mode, rebuilding the gallery without a restart.
   bounds use the same map. `Depth <= 0` is orthographic, and `CacheAsBitmap` reuses the pre-warp layer across
   transform-only frames. XAML:
   `<Border.Transform3D><Rotate3DTransform AngleX="16" AngleY="24" Depth="700" /></Border.Transform3D>`.
+- **Animation** — a new Group runs four scenes and prints the markup next to each: `TransitionAction` on
+  `Opacity`/`CornerRadius`, a `KeyFrameAnimation` chain, brush interpolation (`{StaticResource}` endpoints,
+  structural gradient→gradient and the cross-fade fallback), and a `Transform3D` endpoint. The cards run on
+  VeloxDev.WinForms' transition engine when that checkout is present (`Program` calls its
+  `EaselAnimationBootstrap.EnsureRegistered`); Easel itself ships no engine.
 - **MVVM + XAML** — the shell is XAML bound to `GalleryShellViewModel`; scenario pages are XAML bound to
   `DashboardViewModel`, `SettingsViewModel`, `PlayerViewModel` and `ChatViewModel`. Card roots derive from
   `ThemedStackPanel`/`ThemedGrid`/`ThemedDockPanel`/`ThemedBorder`, which seed the palette and gradient
