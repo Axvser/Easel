@@ -29,3 +29,4 @@ EASEL_XAMLP002 | Easel.Xaml | Error | XamlProperty owner unsupported
 EASEL_XAMLP003 | Easel.Xaml | Error | Invalid attached property accessors
 EASEL_XAMLP004 | Easel.Xaml | Error | Dependency property name conflict
 EASEL_XAMLP005 | Easel.Xaml | Error | Dependency property default value required
+EASEL_XAMLP006 | Easel.Xaml | Error | Invalid changed callback

@@ -187,6 +187,9 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
         BindingPriority priority = BindingPriority.LocalValue)
     {
         var args = new DependencyPropertyChangedEventArgs(property, oldValue, newValue, priority);
+
+        // 视觉元素不是 Control，所以 Control 版回调在这里既没有意义也无法转换；元数据里的视觉回调是这一路的唯一入口。
+        property.Metadata.VisualPropertyChangedCallback?.Invoke(this, args);
         OnPropertyChanged(args);
         PropertyChanged?.Invoke(this, args);
         _clrPropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property.Name));

@@ -127,4 +127,9 @@ internal static class Diagnostics
         "EASEL_XAMLP005", "Dependency property default value required",
         "The dependency property '{0}' is typed '{1}' (non-nullable reference); set DefaultValue or declare it nullable",
         PropertyCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor ChangedCallbackInvalid = new(
+        "EASEL_XAMLP006", "Invalid changed callback",
+        "{0}",
+        PropertyCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
 }

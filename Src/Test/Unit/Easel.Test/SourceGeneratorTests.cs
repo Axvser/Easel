@@ -219,6 +219,94 @@ public sealed class SourceGeneratorTests
         StringAssert.Contains(diagnostic.GetMessage(), "TitleProperty");
     }
 
+    [TestMethod]
+    public void XamlAttachedProperty_EmitsTheVisualChangedCallback()
+    {
+        var (run, output) = GeneratorProbe.RunAndCompile(
+            [new DependencyPropertyGenerator()],
+            """
+            using Easel;
+
+            namespace Probe;
+
+            public static partial class Attachments
+            {
+                [XamlAttachedProperty(ChangedCallback = nameof(OnNoteChanged))]
+                public static partial string? GetNote(Easel.Visuals.VisualElement target);
+
+                [XamlAttachedProperty]
+                public static partial void SetNote(Easel.Visuals.VisualElement target, string? value);
+
+                private static void OnNoteChanged(Easel.IWinformsObject target, Easel.DependencyPropertyChangedEventArgs e)
+                {
+                }
+            }
+            """,
+            "XamlAttachedCallbackProbe");
+
+        Assert.IsEmpty(run.Diagnostics, GeneratorProbe.Describe(run.Diagnostics));
+        var errors = output.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.IsEmpty(errors, GeneratorProbe.Describe(errors));
+
+        StringAssert.Contains(
+            run.GeneratedText(),
+            "VisualPropertyChangedCallback = global::Probe.Attachments.OnNoteChanged");
+    }
+
+    [TestMethod]
+    public void XamlProperty_EmitsTheVisualChangedCallback()
+    {
+        // 这段不编译：生成器发射的是 C# 13 的 partial 属性实现，测试用的内存编译不承载这套语法；
+        // 附加属性那一路（方法）已经把「生成的引用真的能编译」验过了。
+        var result = GeneratorProbe.Run(new DependencyPropertyGenerator(), """
+            using Easel;
+
+            namespace Probe;
+
+            public partial class Card : Easel.Visuals.Controls.Border
+            {
+                [XamlProperty(ChangedCallback = nameof(OnTitleChanged))]
+                public partial string? Title { get; set; }
+
+                private static void OnTitleChanged(Easel.IWinformsObject target, Easel.DependencyPropertyChangedEventArgs e)
+                {
+                }
+            }
+            """, "XamlPropertyCallbackProbe");
+
+        Assert.IsEmpty(result.Diagnostics, GeneratorProbe.Describe(result.Diagnostics));
+
+        StringAssert.Contains(
+            result.GeneratedText(),
+            "VisualPropertyChangedCallback = global::Probe.Card.OnTitleChanged");
+    }
+
+    [TestMethod]
+    public void AChangedCallbackWithTheWrongSignature_IsRefusedWithXamlp006()
+    {
+        var result = GeneratorProbe.Run(new DependencyPropertyGenerator(), """
+            using Easel;
+
+            namespace Probe;
+
+            public static partial class Attachments
+            {
+                [XamlAttachedProperty(ChangedCallback = nameof(OnNoteChanged))]
+                public static partial string? GetNote(Easel.Visuals.VisualElement target);
+
+                // 少一个参数：不是 VisualPropertyChangedCallback 的形状。
+                private static void OnNoteChanged(Easel.IWinformsObject target)
+                {
+                }
+            }
+            """, "XamlAttachedBadCallbackProbe");
+
+        var diagnostic = AssertSingle(result, "EASEL_XAMLP006");
+        Assert.AreEqual(DiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
     private static Diagnostic AssertSingle(GeneratorDriverRunResult result, string id)
     {
         var matches = result.Diagnostics.Where(diagnostic => diagnostic.Id == id).ToArray();

@@ -51,6 +51,14 @@ public sealed class XamlPropertyAttribute : Attribute
 
     /// <summary>Whether descendants inherit the value when they have none of their own.</summary>
     public bool Inherits { get; set; }
+
+    /// <summary>Name of a static method invoked after the property changes on a visual element.</summary>
+    /// <remarks>
+    /// The method must be declared on the declaring type, be static, return void and take
+    /// (<see cref="IWinformsObject"/> target, <see cref="DependencyPropertyChangedEventArgs"/> e). A visual element is
+    /// not a <see cref="System.Windows.Forms.Control"/>, so the control-shaped callback cannot serve it.
+    /// </remarks>
+    public string? ChangedCallback { get; set; }
 }
 
 /// <summary>
@@ -103,4 +111,12 @@ public sealed class XamlAttachedPropertyAttribute : Attribute
 
     /// <summary>Whether descendants inherit the value when they have none of their own.</summary>
     public bool Inherits { get; set; }
+
+    /// <summary>Name of a static method invoked after the property changes on a visual element.</summary>
+    /// <remarks>
+    /// The method must be declared on the declaring type, be static, return void and take
+    /// (<see cref="IWinformsObject"/> target, <see cref="DependencyPropertyChangedEventArgs"/> e). A visual element is
+    /// not a <see cref="System.Windows.Forms.Control"/>, so the control-shaped callback cannot serve it.
+    /// </remarks>
+    public string? ChangedCallback { get; set; }
 }

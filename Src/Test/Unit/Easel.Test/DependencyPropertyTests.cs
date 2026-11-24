@@ -99,6 +99,43 @@ public sealed class DependencyPropertyTests
             => Changes.Add((target, e.OldValue, e.NewValue));
     }
 
+    /// <summary>An attached property that observes changes on visual elements through the visual callback.</summary>
+    private static class VisualCallbackProbe
+    {
+        public static readonly DependencyProperty LevelProperty = DependencyProperty.RegisterAttached(
+            "Level",
+            typeof(int),
+            typeof(VisualCallbackProbe),
+            new PropertyMetadata(3) { VisualPropertyChangedCallback = OnLevelChanged });
+
+        public static List<(Easel.IWinformsObject Target, object? OldValue, object? NewValue)> Changes { get; } = [];
+
+        /// <summary>When set, the callback writes the new value back to prove a same-value write cannot recurse.</summary>
+        public static bool WriteBack { get; set; }
+
+        public static int GetLevel(Easel.Visuals.VisualElement target) => (int)LevelProperty.GetValue(target)!;
+
+        public static void SetLevel(Easel.Visuals.VisualElement target, int value) => LevelProperty.SetValue(target, value);
+
+        public static void ClearLevel(Easel.Visuals.VisualElement target) => LevelProperty.ClearValue(target);
+
+        public static void Reset()
+        {
+            Changes.Clear();
+            WriteBack = false;
+        }
+
+        private static void OnLevelChanged(Easel.IWinformsObject target, DependencyPropertyChangedEventArgs e)
+        {
+            Changes.Add((target, e.OldValue, e.NewValue));
+
+            if (WriteBack)
+            {
+                LevelProperty.SetValue(target, e.NewValue!);
+            }
+        }
+    }
+
     [TestMethod]
     public void ClrWrapper_ReadsTheDefaultUntilALocalValueExists()
     {
@@ -252,6 +289,73 @@ public sealed class DependencyPropertyTests
 
         Assert.AreEqual("(none)", AttachedProbe.GetNote(border));
         Assert.IsFalse(border.IsSet(AttachedProbe.NoteProperty));
+    }
+
+    [TestMethod]
+    public void AttachedProperty_OnVisualElements_RaisesTheVisualChangedCallback()
+    {
+        VisualCallbackProbe.Reset();
+        using var border = new VC.Border();
+        using var text = new VC.TextBlock();
+
+        VisualCallbackProbe.SetLevel(border, 9);
+        VisualCallbackProbe.SetLevel(text, 4);
+
+        Assert.HasCount(2, VisualCallbackProbe.Changes);
+        Assert.AreSame(border, VisualCallbackProbe.Changes[0].Target);
+        Assert.AreEqual(3, VisualCallbackProbe.Changes[0].OldValue);
+        Assert.AreEqual(9, VisualCallbackProbe.Changes[0].NewValue);
+        Assert.AreSame(text, VisualCallbackProbe.Changes[1].Target);
+        Assert.AreEqual(4, VisualCallbackProbe.Changes[1].NewValue);
+    }
+
+    [TestMethod]
+    public void AttachedProperty_SettingTheSameVisualValueTwice_RaisesTheVisualCallbackOnce()
+    {
+        VisualCallbackProbe.Reset();
+        using var border = new VC.Border();
+
+        VisualCallbackProbe.SetLevel(border, 9);
+        VisualCallbackProbe.SetLevel(border, 9);
+        VisualCallbackProbe.SetLevel(border, 4);
+
+        Assert.HasCount(2, VisualCallbackProbe.Changes);
+        Assert.AreEqual(9, VisualCallbackProbe.Changes[1].OldValue);
+        Assert.AreEqual(4, VisualCallbackProbe.Changes[1].NewValue);
+    }
+
+    [TestMethod]
+    public void ClearingAVisualAttachedProperty_RaisesTheVisualCallbackWithTheDefault()
+    {
+        VisualCallbackProbe.Reset();
+        using var border = new VC.Border();
+        VisualCallbackProbe.SetLevel(border, 9);
+
+        VisualCallbackProbe.ClearLevel(border);
+
+        Assert.HasCount(2, VisualCallbackProbe.Changes);
+        Assert.AreEqual(9, VisualCallbackProbe.Changes[1].OldValue);
+        Assert.AreEqual(3, VisualCallbackProbe.Changes[1].NewValue);
+        Assert.IsFalse(border.IsSet(VisualCallbackProbe.LevelProperty));
+    }
+
+    [TestMethod]
+    public void AVisualCallbackThatWritesTheSameValue_DoesNotRecurse()
+    {
+        VisualCallbackProbe.Reset();
+        VisualCallbackProbe.WriteBack = true;
+        try
+        {
+            using var border = new VC.Border();
+
+            VisualCallbackProbe.SetLevel(border, 9);
+
+            Assert.HasCount(1, VisualCallbackProbe.Changes, "writing the value it just received must not raise again");
+        }
+        finally
+        {
+            VisualCallbackProbe.WriteBack = false;
+        }
     }
 
     [TestMethod]

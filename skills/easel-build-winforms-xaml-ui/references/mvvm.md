@@ -158,6 +158,26 @@ public sealed partial class GlowCard : Easel.Visuals.Controls.Border
 - Generated members are usable in XAML styles, triggers, bindings and animations.
 - A DP-backed property is needed for a style setter; plain CLR properties cannot be styled.
 
+### Change callbacks
+
+Both attributes accept `ChangedCallback = nameof(OnXChanged)`, naming a **static void** method on the declaring
+type that takes `(IWinformsObject target, DependencyPropertyChangedEventArgs e)`:
+
+```csharp
+[XamlAttachedProperty(ChangedCallback = nameof(OnIsEnabledChanged))]
+public static partial bool GetIsEnabled(VisualElement element);
+public static partial void SetIsEnabled(VisualElement element, bool value);
+
+private static void OnIsEnabledChanged(IWinformsObject target, DependencyPropertyChangedEventArgs e)
+    => ((VisualElement)target).InvalidateMeasure();
+```
+
+- The callback runs after the effective value changes — on the first write, on a later different value, and on
+  `ClearValue` falling back to the default. Writing the same effective value again does not notify.
+- `VisualPropertyChangedCallback` is the visual-element path; a property also used on a native `Control` needs the
+  control-shaped `PropertyChangedCallback` in its metadata as well.
+- A callback that writes the same property again does not recurse (the second write is the same effective value).
+
 ## Selecting a view model
 
 `DataContext` can be any object. For design/test separation, pass a view model into the view constructor

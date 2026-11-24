@@ -7,6 +7,16 @@ namespace Easel;
 /// <param name="e">The <see cref="DependencyPropertyChangedEventArgs"/> carrying both values.</param>
 public delegate void PropertyChangedCallback(System.Windows.Forms.Control target, DependencyPropertyChangedEventArgs e);
 
+/// <summary>Receives the old and new values after a dependency property on a visual element has been changed.</summary>
+/// <param name="target">The visual object whose property changed.</param>
+/// <param name="e">The <see cref="DependencyPropertyChangedEventArgs"/> carrying both values.</param>
+/// <remarks>
+/// <see cref="PropertyChangedCallback"/> cannot serve this path: its target is a <see cref="System.Windows.Forms.Control"/>,
+/// and a visual element is an <see cref="IWinformsObject"/> rather than a control. A property used on both kinds of
+/// target supplies both callbacks.
+/// </remarks>
+public delegate void VisualPropertyChangedCallback(IWinformsObject target, DependencyPropertyChangedEventArgs e);
+
 /// <summary>Coerces a value before it is stored in a dependency property.</summary>
 /// <param name="target">
 /// The object receiving the value: a <see cref="System.Windows.Forms.Control"/> for an attached value, or an
@@ -65,7 +75,7 @@ public readonly struct DependencyPropertyChangedEventArgs
 
 /// <summary>The default value, change notification and coercion hooks of a dependency property.</summary>
 /// <remarks>
-/// Deliberately smaller than WPF's metadata table: this layer supports a single default value and two callbacks.
+/// Deliberately smaller than WPF's metadata table: this layer supports a single default value and three callbacks.
 /// Inheritance, value precedence and per-type overrides are not part of the subset.
 /// </remarks>
 public class PropertyMetadata
@@ -104,6 +114,16 @@ public class PropertyMetadata
 
     /// <summary>The callback invoked after a value is stored, or <see langword="null"/>.</summary>
     public PropertyChangedCallback? PropertyChangedCallback { get; }
+
+    /// <summary>
+    /// The callback invoked after a visual element's value is stored, or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="PropertyChangedCallback"/> covers the attached-property store on native controls; this one covers the
+    /// priority table on visual elements. Without it an attached property assigned in XAML would change silently on a
+    /// visual element, so a behaviour had to be installed by walking the tree instead of observing the property.
+    /// </remarks>
+    public VisualPropertyChangedCallback? VisualPropertyChangedCallback { get; init; }
 
     /// <summary>The callback invoked before a value is stored, or <see langword="null"/>.</summary>
     public CoerceValueCallback? CoerceValueCallback { get; }
