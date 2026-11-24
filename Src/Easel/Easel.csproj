@@ -21,7 +21,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>WinForms.Easel</PackageId>
 		<Title>Easel</Title>
-		<Version>1.1.0</Version>
+		<Version>1.1.1</Version>
 		<Authors>Axvser</Authors>
 		<Description>A XAML-first UI runtime for WinForms: dependency properties, a Roslyn XAML compiler, a WPF/Avalonia-shaped visual control library over a single HWND, and an injectable property-animation abstraction.</Description>
 		<PackageIcon>easel-logo.png</PackageIcon>
