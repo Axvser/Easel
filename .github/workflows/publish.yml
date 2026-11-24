@@ -20,9 +20,8 @@ name: publish
 #   packed and pushed; a package whose version is already there is skipped. A run that failed
 #   halfway can therefore be retried without repacking what already landed.
 #
-#   WinForms.Easel's Release reference takes its generator version from EaselGeneratorPackageVersion
-#   in Directory.Build.props; it must match WinForms.Easel.Generator's own <Version>. The version job fails
-#   early when the two disagree.
+#   WinForms.Easel's Release reference pins its generator version in Src/Easel/Easel.csproj; it must
+#   match WinForms.Easel.Generator's own <Version>. The version job fails early when the two disagree.
 #
 # Release order:
 #   WinForms.Easel.Generator -> WinForms.Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The pre-publish
@@ -35,8 +34,8 @@ name: publish
 # Target frameworks:
 #   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
 #   test and publish jobs install the older SDKs for their Windows Desktop reference packs.
-#   scripts/pack-local.ps1 deliberately builds net8.0-windows only; CI is the only place that
-#   proves the other three are in the package, and the runtime pack is checked before the push.
+#   CI is the only place that proves every target framework is in the package; the runtime pack
+#   is checked before the push.
 #
 # Trigger:
 #   - push to main when package sources change. Each package's own <Version> is read, and only the
@@ -126,11 +125,11 @@ jobs:
           }
 
           # The runtime's Release reference and the generator's own <Version> must agree.
-          $propsMatch = [regex]::Match((Get-Content "Directory.Build.props" -Raw), '<EaselGeneratorPackageVersion[^>]*>([^<]+)</EaselGeneratorPackageVersion>')
-          if (-not $propsMatch.Success) { throw "no EaselGeneratorPackageVersion in Directory.Build.props" }
+          $runtimeMatch = [regex]::Match((Get-Content "Src/Easel/Easel.csproj" -Raw), 'Include="WinForms\.Easel\.Generator" Version="([^"]+)"')
+          if (-not $runtimeMatch.Success) { throw "no WinForms.Easel.Generator PackageReference in Src/Easel/Easel.csproj" }
           $generatorVersion = ($projects | Where-Object { $_.Kind -eq 'generator' } | Select-Object -First 1).Version
-          if ($propsMatch.Groups[1].Value -ne $generatorVersion) {
-            throw "EaselGeneratorPackageVersion $($propsMatch.Groups[1].Value) does not match WinForms.Easel.Generator <Version> $generatorVersion"
+          if ($runtimeMatch.Groups[1].Value -ne $generatorVersion) {
+            throw "WinForms.Easel.Generator PackageReference $($runtimeMatch.Groups[1].Value) does not match the generator <Version> $generatorVersion"
           }
 
           # force keeps the old meaning: pretend nothing is published and run the whole pipeline
@@ -189,7 +188,7 @@ jobs:
       # Source-level gate. Debug resolves the generator through its ProjectReference, so this can
       # run before the generator is published. The Release graph resolves the published generator
       # and is restored, built and tested in the publish job once NuGet serves it.
-      # The gallery demo is not built either: it needs VeloxDev.Core 12.0.0 from NuGet.
+      # The gallery demo is not built either: it tracks the latest VeloxDev packages from NuGet.
       - name: Restore
         run: dotnet restore Src/Test/Unit/Easel.Test/Easel.Test.csproj
 
@@ -341,8 +340,8 @@ jobs:
           dotnet pack "Src/Easel/Easel.csproj" -c Release -o artifacts -p:GeneratePackageOnBuild=false
           if ($LASTEXITCODE -ne 0) { throw "pack failed: Easel" }
 
-          # scripts/pack-local.ps1 builds net8.0-windows only. This is the one place where the
-          # older target frameworks are proven to be in the package before it is published.
+          # This is the one place where every target framework is proven to be in the package
+          # before it is published.
           $file = Join-Path "artifacts" "WinForms.Easel.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
           Add-Type -AssemblyName System.IO.Compression.FileSystem

@@ -190,8 +190,9 @@ dotnet add package WinForms.Easel
 | `WinForms.Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
 
 The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
-`[VeloxProperty]` / `[VeloxCommand]` view models, and opts into WPF for the real `MediaPlayer` /
-`MediaElement` audio and video pages; the Easel runtime still has no WPF dependency.
+`[VeloxProperty]` / `[VeloxCommand]` view models and `VeloxDev.WinForms` for the animation backend,
+both taken from NuGet at their latest published versions; it also opts into WPF for the real
+`MediaPlayer` / `MediaElement` audio and video pages. The Easel runtime still has no WPF dependency.
 
 ## Build and test
 
@@ -201,24 +202,18 @@ dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Release
 dotnet run --project Examples/XamlGallery/Demo/Demo.csproj
 ```
 
-### Two reference modes
+### Gallery references
 
-The gallery consumes the Easel source projects by default. To test the packed form:
-
-```powershell
-pwsh scripts/pack-local.ps1
-dotnet build Examples/XamlGallery/Demo/Demo.csproj -p:UseEaselPackage=true
-```
-
-`UseEaselPackage` defaults to `false`; `Directory.Build.props` adds `artifacts/packages` to the
-restore sources when it exists.
+The gallery always builds against the Easel source projects in this repository. Its VeloxDev
+dependencies use floating `*` versions, so a demo build tracks the latest published packages
+instead of pinning a revision.
 
 ## Animation is a contract
 
 Easel owns the animation contract but not an engine. `Easel.Animation.AnimationRuntime.Animator`
 accepts an `IVisualAnimator`; trigger actions, keyframe animations and `VisualTransition` delegate
 interpolation, frame pacing and hold-end semantics to it. Without an injected backend, an animation
-request throws a clear `InvalidOperationException`. **Install `VeloxDev.WinForms` 12.0.0 or later** if
+request throws a clear `InvalidOperationException`. **Install the latest `VeloxDev.WinForms`** if
 the app accepts the VeloxDev dependency: its module initializer wires `EaselVisualAnimator` automatically,
 so Easel animations work immediately with no extra package or manual registration.
 

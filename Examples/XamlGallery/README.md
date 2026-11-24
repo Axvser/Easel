@@ -137,7 +137,7 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 - **Animation** — a new Group runs four scenes and prints the markup next to each: `TransitionAction` on
   `Opacity`/`CornerRadius`, a `KeyFrameAnimation` chain, brush interpolation (`{StaticResource}` endpoints,
   structural gradient→gradient and the cross-fade fallback), and a `Transform3D` endpoint. The cards run on
-  VeloxDev.WinForms' transition engine when that checkout is present (`Program` calls its
+  VeloxDev.WinForms' transition engine, resolved from NuGet at the latest version (`Program` calls
   `EaselAnimationBootstrap.EnsureRegistered`); Easel itself ships no engine.
 - **MVVM + XAML** — the shell is XAML bound to `GalleryShellViewModel`; scenario pages are XAML bound to
   `DashboardViewModel`, `SettingsViewModel`, `PlayerViewModel` and `ChatViewModel`. Card roots derive from

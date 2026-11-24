@@ -27,50 +27,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The demo consumes the source projects by default. Pass -p:UseEaselPackage=true after
-         scripts/pack-local.ps1 to consume the packed WinForms.Easel/WinForms.Easel.Generator packages instead. -->
-    <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj"
-                      Condition="'$(UseEaselPackage)' != 'true'" />
-    <PackageReference Include="WinForms.Easel" Version="$(EaselPackageVersion)"
-                      Condition="'$(UseEaselPackage)' == 'true'" />
+    <!-- The gallery always builds against the Easel source projects in this repository. -->
+    <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj" />
     <ProjectReference Include="..\..\..\Src\Generators\Easel.Generator\Easel.Generator.csproj"
                       OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      Condition="'$(UseEaselPackage)' != 'true'" />
-    <PackageReference Include="WinForms.Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
-                      Condition="'$(UseEaselPackage)' == 'true'" />
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The gallery demo is allowed to use VeloxDev.Core's [VeloxProperty]/[VeloxCommand] generator and
-         VeloxCommand; the Easel runtime and its generator stay independent of VeloxDev. Directory.Build.props
-         resolves the VeloxDev checkout for both the sibling and the submodule layout; otherwise the published
-         12.0.0 packages are used. -->
-    <ProjectReference Include="$(VeloxDevCoreProject)"
-                      Condition="'$(VeloxDevCoreProject)' != ''" />
-    <ProjectReference Include="$(VeloxDevCoreGeneratorProject)"
-                      OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false"
-                      Condition="'$(VeloxDevCoreGeneratorProject)' != ''" />
-    <PackageReference Include="VeloxDev.Core" Version="12.0.0"
-                      Condition="'$(VeloxDevCoreProject)' == ''" />
-    <PackageReference Include="VeloxDev.Core.Generator" Version="12.0.0"
-                      Condition="'$(VeloxDevCoreGeneratorProject)' == ''" />
+    <!-- The gallery is a demo: it tracks the latest published VeloxDev packages instead of a local checkout. -->
+    <PackageReference Include="VeloxDev.Core" Version="*" />
+    <PackageReference Include="VeloxDev.Core.Generator" Version="*" />
+    <PackageReference Include="VeloxDev.WinForms" Version="*" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!-- The animation cards need a real IVisualAnimator: VeloxDev.WinForms' module initializer supplies it.
-         Only the local checkout is used; there is no package fallback because the adapter is released against
-         the Easel package, and a standalone clone is expected to build the gallery without the Animation group
-         running. -->
-    <ProjectReference Include="$(VeloxDevWinFormsProject)"
-                      Condition="'$(VeloxDevWinFormsProject)' != ''" />
-  </ItemGroup>
-
-  <PropertyGroup Condition="'$(VeloxDevWinFormsProject)' != ''">
-    <!-- Lets Program call the adapter's registration hook only when the adapter is actually referenced. -->
-    <DefineConstants>$(DefineConstants);VELOXDEV_WINFORMS</DefineConstants>
-  </PropertyGroup>
 
   <ItemGroup>
     <AdditionalFiles Include="**/*.xaml" />
