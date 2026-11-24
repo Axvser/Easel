@@ -932,11 +932,22 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// child's desired size, and re-measuring the whole tree is what made a node drag re-lay-out every card per move.
     /// A size that actually changes still re-measures through <see cref="Measure"/>'s available-size comparison.
     /// </remarks>
-    public void InvalidateArrange()
+    public void InvalidateArrange() => InvalidateArrangeCore(frameFull: true);
+
+    // 只是移动了某个已定位子项：窗口照旧整面重画，帧缓存可以只记局部脏区。
+    internal void InvalidateArrangeLocal() => InvalidateArrangeCore(frameFull: false);
+
+    private void InvalidateArrangeCore(bool frameFull)
     {
         _arrangeValid = false;
-        ParentElement?.InvalidateArrange();
-        Surface?.InvalidateSurface();
+        if (ParentElement is { } parent)
+        {
+            parent.InvalidateArrangeCore(frameFull);
+        }
+        else
+        {
+            Surface?.NotifyArrangeInvalidated(frameFull);
+        }
     }
 
     /// <summary>Requests a repaint of the hosting surface without a new layout pass.</summary>
@@ -1068,6 +1079,98 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     protected virtual RectangleF GetInvalidationBounds()
         => new(0f, 0f, Bounds.Width, Bounds.Height);
 
+    // 移动一个元素时，旧/新包围盒能否覆盖全部变化；子树有任何越界绘制就交给整面重画。
+    internal bool TryCollectMovementDamage(out RectangleF damage)
+    {
+        damage = RectangleF.Empty;
+        if (HasUnboundedDrawing(this))
+        {
+            return false;
+        }
+
+        if (AccumulateSubtreeBounds(this) is { } bounds)
+        {
+            bounds.Inflate(2f, 2f);
+            damage = bounds;
+        }
+
+        return true;
+    }
+
+    private static bool HasUnboundedDrawing(Visual visual)
+    {
+        if (visual.CacheAsBitmap
+            || visual.Effect is not null
+            || visual.OpacityMask is not null
+            || visual.Transform3D is { IsIdentity: false }
+            || visual.UnboundedHitTest)
+        {
+            return true;
+        }
+
+        if (visual is ContainerVisual container)
+        {
+            foreach (var child in container.Children)
+            {
+                if (child is not null && HasUnboundedDrawing(child))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static RectangleF? AccumulateSubtreeBounds(Visual visual)
+    {
+        RectangleF? bounds = visual.GetSurfaceBounds() is { Width: > 0f, Height: > 0f } own ? own : null;
+        if (visual is not ContainerVisual container)
+        {
+            return bounds;
+        }
+
+        foreach (var child in container.Children)
+        {
+            if (child is null || AccumulateSubtreeBounds(child) is not { } childBounds)
+            {
+                continue;
+            }
+
+            bounds = bounds is { } current ? RectangleF.Union(current, childBounds) : childBounds;
+        }
+
+        return bounds;
+    }
+
+    // 线性部分完全一致、只有 OffsetX/OffsetY 变化，才算整帧可平移的纯平移。
+    private static bool TryGetTranslationDelta(Matrix? oldTransform, Matrix? newTransform, out float dx, out float dy)
+    {
+        var oldElements = oldTransform?.Elements;
+        var newElements = newTransform?.Elements;
+
+        // 只有位移变化才允许整帧平移；矩阵元素缺失时按单位矩阵处理。
+        for (var index = 0; index < 4; index++)
+        {
+            var oldValue = oldElements is null ? (index is 0 or 3 ? 1f : 0f) : oldElements[index];
+            var newValue = newElements is null ? (index is 0 or 3 ? 1f : 0f) : newElements[index];
+            if (Math.Abs(oldValue - newValue) > 0.0001f)
+            {
+                dx = 0f;
+                dy = 0f;
+                return false;
+            }
+        }
+
+        var oldX = oldElements is null ? 0f : oldElements[4];
+        var oldY = oldElements is null ? 0f : oldElements[5];
+        var newX = newElements is null ? 0f : newElements[4];
+        var newY = newElements is null ? 0f : newElements[5];
+        dx = newX - oldX;
+        dy = newY - oldY;
+        return dx != 0f || dy != 0f;
+    }
+
     private RectangleF GetAbsoluteBounds(RectangleF local)
     {
         // A scaled/rotated element is no longer axis-aligned; use the transformed corners.
@@ -1187,6 +1290,23 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     {
         base.OnPropertyChanged(e);
 
+        // 根节点只有位移变化时，整帧像素就是平移；本地记录平移量，避免把整棵树重画一遍。
+        var rootTranslation = false;
+        if (Surface is { } rootSurface && ReferenceEquals(rootSurface.Root, this))
+        {
+            if (ReferenceEquals(e.Property, TransformProperty)
+                && TryGetTranslationDelta(e.OldValue as Matrix, e.NewValue as Matrix, out var panDx, out var panDy))
+            {
+                rootTranslation = true;
+                rootSurface.RecordRootTranslation(panDx, panDy);
+            }
+            else if (e.Property.Metadata.AffectsRender)
+            {
+                // 根自身的其它绘制属性变化不能被当成平移的一部分吞掉。
+                rootSurface.NotifyRootContentChanged();
+            }
+        }
+
         if (ReferenceEquals(e.Property, VisibilityProperty))
         {
             IsVisible = Visibility == XamlVisibility.Visible;
@@ -1215,8 +1335,16 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         else if (ReferenceEquals(e.Property, Canvas.LeftProperty)
                  || ReferenceEquals(e.Property, Canvas.TopProperty))
         {
-            // 画布坐标只让父级重新摆放这一项；子级内部不用重排。
-            ParentElement?.InvalidateArrange();
+            // 画布坐标只让父级重新摆放这一项；旧/新包围盒都记进脏区，帧缓存就不必整面重画。
+            if (Surface is { } surface && TryCollectMovementDamage(out var oldDamage))
+            {
+                surface.RecordLocalMove(this, oldDamage);
+                InvalidateArrangeLocal();
+            }
+            else
+            {
+                ParentElement?.InvalidateArrange();
+            }
         }
 
         if (ReferenceEquals(e.Property, CacheAsBitmapProperty) && !CacheAsBitmap)
@@ -1253,7 +1381,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             InvalidateArrange();
         }
 
-        if (e.Property.Metadata.AffectsRender && !preserveContentCache)
+        if (e.Property.Metadata.AffectsRender && !preserveContentCache && !rootTranslation)
         {
             InvalidateVisual();
         }

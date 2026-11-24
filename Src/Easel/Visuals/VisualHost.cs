@@ -58,6 +58,22 @@ public class VisualHost : System.Windows.Forms.Control
     private bool _renderingMotion;
     private bool _gestureDrewMotionFrame;
 
+    // RenderTo 的整帧缓存。只在根为 VisualElement、目标为恒等世界变换时启用。
+    private Bitmap? _frameCache;
+    private Graphics? _frameCacheGraphics;
+    private Bitmap? _frameScratch;
+    private Graphics? _frameScratchGraphics;
+    private bool _frameCacheValid;
+    private RectangleF _frameDamage;
+    private bool _frameDamageFull = true;
+    private bool _framePanPending;
+    private float _framePanDx;
+    private float _framePanDy;
+    private int _frameContentStamp;
+    private int _framePanStamp;
+    private readonly List<VisualElement> _frameMovedVisuals = [];
+    private SolidBrush? _frameClearBrush;
+
     /// <summary>Creates the surface with the double-buffered paint style it needs.</summary>
     public VisualHost()
     {
@@ -262,17 +278,21 @@ public class VisualHost : System.Windows.Forms.Control
     {
         _layoutValid = false;
         _damageFull = true;
+        MarkFrameFull();
         Invalidate();
     }
 
     internal void InvalidatePaint()
     {
         _damageFull = true;
+        MarkFrameFull();
         Invalidate();
     }
 
     internal void InvalidatePaint(RectangleF damage)
     {
+        RecordFrameDamage(damage);
+
         if (_damageFull)
         {
             return;
@@ -287,6 +307,128 @@ public class VisualHost : System.Windows.Forms.Control
 
         _damage = _damage.Width == 0 ? rectangle : Rectangle.Union(_damage, rectangle);
         Invalidate(rectangle);
+    }
+
+    // 帧缓存脏区以逻辑单位累积；整帧失效后不再需要局部脏区。
+    private void MarkFrameFull()
+    {
+        _frameDamageFull = true;
+        _frameDamage = RectangleF.Empty;
+        _framePanPending = false;
+        _framePanDx = 0f;
+        _framePanDy = 0f;
+    }
+
+    private void RecordFrameDamage(RectangleF damage)
+    {
+        if (_frameDamageFull || damage.Width <= 0f || damage.Height <= 0f)
+        {
+            return;
+        }
+
+        // 已记录整树平移后再出现普通脏区，一次位移解释不了这一帧，退回整帧。
+        if (_framePanPending)
+        {
+            // 设置变换后显式调用根节点的 InvalidateVisual 会送来整块根脏区；平移本身已经覆盖整帧变化。
+            if (_frameContentStamp == _framePanStamp && IsRootSelfDamage(damage))
+            {
+                return;
+            }
+
+            MarkFrameFull();
+            return;
+        }
+
+        _frameDamage = _frameDamage.Width <= 0f ? damage : RectangleF.Union(_frameDamage, damage);
+    }
+
+    // 根节点自身没有绘制内容时，覆盖它整块包围盒的失效只可能来自变换本身。
+    private bool IsRootSelfDamage(RectangleF damage)
+    {
+        if (_rootElement is not { Background: null, BorderBrush: null } root)
+        {
+            return false;
+        }
+
+        var bounds = root.AbsoluteBounds;
+        if (bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            return false;
+        }
+
+        bounds.Inflate(3f, 3f);
+        return bounds.Contains(damage);
+    }
+
+    // 根节点的恒等线性部分只改了位移：整帧可以按像素平移复用。
+    internal void RecordRootTranslation(float dx, float dy)
+    {
+        // 窗口路径没有帧缓存，照旧整面重画。
+        _damageFull = true;
+        Invalidate();
+
+        if (_frameDamageFull || _frameDamage.Width > 0f || _frameDamage.Height > 0f)
+        {
+            MarkFrameFull();
+            return;
+        }
+
+        _framePanPending = true;
+        _framePanDx += dx;
+        _framePanDy += dy;
+        _framePanStamp = _frameContentStamp;
+    }
+
+    // 根节点自身的属性变化会整块失效；记录一笔，后续的整块脏区不能再当成平移的附带失效。
+    internal void NotifyRootContentChanged() => _frameContentStamp++;
+
+    // 布局失效：窗口路径整面重画；frameFull 决定帧缓存是否也必须整帧重来。
+    internal void NotifyArrangeInvalidated(bool frameFull)
+    {
+        _layoutValid = false;
+        _damageFull = true;
+        if (frameFull)
+        {
+            MarkFrameFull();
+        }
+
+        Invalidate();
+    }
+
+    // 画布坐标变更只移动一项：先记旧位置，排版完成后由 FlushMovedVisuals 补记新位置。
+    internal void RecordLocalMove(VisualElement element, RectangleF oldDamage)
+    {
+        RecordFrameDamage(oldDamage);
+        if (_frameDamageFull)
+        {
+            return;
+        }
+
+        // 未调用 RenderTo 的宿主不会清空列表；超过上限直接退回整帧，避免列表无限增长。
+        if (_frameMovedVisuals.Count >= 64)
+        {
+            MarkFrameFull();
+            return;
+        }
+
+        _frameMovedVisuals.Add(element);
+    }
+
+    private void FlushMovedVisuals()
+    {
+        foreach (var element in _frameMovedVisuals)
+        {
+            if (element.Surface == this && element.TryCollectMovementDamage(out var damage))
+            {
+                RecordFrameDamage(damage);
+            }
+            else
+            {
+                MarkFrameFull();
+            }
+        }
+
+        _frameMovedVisuals.Clear();
     }
 
     /// <inheritdoc />
@@ -306,12 +448,258 @@ public class VisualHost : System.Windows.Forms.Control
     /// <see cref="RenderPhysical"/> to paint a real client area at the current <see cref="DpiScale"/>.
     /// </remarks>
     public void RenderTo(Graphics graphics, Size size)
-        => RenderCore(graphics, size, new Rectangle(0, 0, size.Width, size.Height));
+    {
+        if (graphics is null) throw new ArgumentNullException(nameof(graphics));
+        if (!TryRenderCachedFrame(graphics, size))
+        {
+            RenderCore(graphics, size, new Rectangle(0, 0, size.Width, size.Height));
+        }
+    }
+
+    // 窗口路径不使用帧缓存；先失效，下一次 RenderTo 才会以整帧重建，避免贴出旧画面。
+    private void InvalidateFrameCache()
+    {
+        _frameCacheValid = false;
+        _frameMovedVisuals.Clear();
+        MarkFrameFull();
+    }
+
+    // 帧缓存只用于逻辑坐标下的导出路径：根必须是带属性通知的 VisualElement，目标不能带自定义世界变换。
+    private bool TryRenderCachedFrame(Graphics target, Size size)
+    {
+        if (_root is null || _rootElement is null || size.Width <= 0 || size.Height <= 0)
+        {
+            return false;
+        }
+
+        if (!target.Transform.IsIdentity)
+        {
+            InvalidateFrameCache();
+            return false;
+        }
+
+        // 排版会移动节点；Arrange 之后才拿到新包围盒，必须先跑完再决定重画区域。
+        EnsureLayout(size);
+        FlushMovedVisuals();
+
+        var sizeMatches = _frameCache is not null
+            && _frameCache.Width == size.Width
+            && _frameCache.Height == size.Height;
+
+        if (!sizeMatches || !_frameCacheValid || _frameDamageFull)
+        {
+            var full = new RectangleF(0f, 0f, size.Width, size.Height);
+            var graphics = EnsureFrameCache(size);
+            ClearFrameRegion(graphics, full, wholeSurface: true);
+            RenderRootInto(graphics, size, full, cull: false);
+            _frameCacheValid = true;
+            ResetFrameDamage();
+        }
+        else if (!TryShiftFrame(size))
+        {
+            // 没有整树平移就只重画累积的局部脏区；脏区为空即静态帧，缓存已是最新。
+            RenderFrameDamage(size);
+        }
+
+        AdvancePaintClock();
+        target.DrawImageUnscaled(_frameCache!, 0, 0);
+        return true;
+    }
+
+    private Graphics EnsureFrameCache(Size size)
+    {
+        if (_frameCache is null
+            || _frameCache.Width != size.Width
+            || _frameCache.Height != size.Height)
+        {
+            _frameCacheGraphics?.Dispose();
+            _frameCache?.Dispose();
+            _frameScratchGraphics?.Dispose();
+            _frameScratch?.Dispose();
+            _frameCache = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppPArgb);
+            _frameCacheGraphics = Graphics.FromImage(_frameCache);
+            _frameScratch = null;
+            _frameScratchGraphics = null;
+            _frameCacheValid = false;
+            MarkFrameFull();
+        }
+
+        return _frameCacheGraphics!;
+    }
+
+    // 把旧帧按整像素平移画进后备位图，再重画暴露的条带，最后交换两帧。
+    private bool TryShiftFrame(Size size)
+    {
+        if (!_framePanPending || _frameCache is null || _frameCacheGraphics is null)
+        {
+            return false;
+        }
+
+        // 覆盖层不受根变换影响，有内容时不能跟着一起平移。
+        if (_overlay.Children.Count > 0 || _dragGhost is not null)
+        {
+            return false;
+        }
+
+        var dx = _framePanDx;
+        var dy = _framePanDy;
+        if (Math.Abs(dx - Math.Round(dx)) > 0.001f || Math.Abs(dy - Math.Round(dy)) > 0.001f)
+        {
+            return false;
+        }
+
+        var sx = (int)Math.Round(dx);
+        var sy = (int)Math.Round(dy);
+        if (Math.Abs(sx) >= size.Width || Math.Abs(sy) >= size.Height)
+        {
+            return false;
+        }
+
+        if (sx == 0 && sy == 0)
+        {
+            ResetFrameDamage();
+            return true;
+        }
+
+        if (_frameScratch is null || _frameScratch.Width != size.Width || _frameScratch.Height != size.Height)
+        {
+            _frameScratchGraphics?.Dispose();
+            _frameScratch?.Dispose();
+            _frameScratch = new Bitmap(size.Width, size.Height, PixelFormat.Format32bppPArgb);
+            _frameScratchGraphics = Graphics.FromImage(_frameScratch);
+        }
+
+        var back = _frameCache;
+        var front = _frameScratch!;
+        var frontGraphics = _frameScratchGraphics!;
+        frontGraphics.Clear(Color.Transparent);
+        frontGraphics.DrawImageUnscaled(back, sx, sy);
+
+        if (sx > 0)
+        {
+            RenderStrip(frontGraphics, size, new RectangleF(0f, 0f, sx, size.Height));
+        }
+        else if (sx < 0)
+        {
+            RenderStrip(frontGraphics, size, new RectangleF(size.Width + sx, 0f, -sx, size.Height));
+        }
+
+        // 横向条带必须避开纵向条带已画的列；叠在一起会让半透明/抗锯齿像素二次混合。
+        var horizontalLeft = sx > 0 ? sx : 0;
+        var horizontalWidth = size.Width - Math.Abs(sx);
+        if (sy > 0)
+        {
+            RenderStrip(frontGraphics, size, new RectangleF(horizontalLeft, 0f, horizontalWidth, sy));
+        }
+        else if (sy < 0)
+        {
+            RenderStrip(frontGraphics, size, new RectangleF(horizontalLeft, size.Height + sy, horizontalWidth, -sy));
+        }
+
+        (_frameCache, _frameScratch) = (_frameScratch, _frameCache);
+        (_frameCacheGraphics, _frameScratchGraphics) = (_frameScratchGraphics, _frameCacheGraphics);
+        ResetFrameDamage();
+        return true;
+    }
+
+    private void RenderStrip(Graphics graphics, Size size, RectangleF strip)
+    {
+        var state = graphics.Save();
+        try
+        {
+            graphics.SetClip(strip);
+            RenderRootInto(graphics, size, strip, cull: true);
+        }
+        finally
+        {
+            graphics.Restore(state);
+        }
+    }
+
+    // 把累积的局部脏区从缓存里清成透明，再只重画这一块。
+    private bool RenderFrameDamage(Size size)
+    {
+        if (_frameDamage.Width <= 0f || _frameDamage.Height <= 0f || _frameCacheGraphics is null)
+        {
+            return false;
+        }
+
+        var surface = new RectangleF(0f, 0f, size.Width, size.Height);
+        var damage = RectangleF.Intersect(RectangleF.FromLTRB(
+            (float)Math.Floor(_frameDamage.Left),
+            (float)Math.Floor(_frameDamage.Top),
+            (float)Math.Ceiling(_frameDamage.Right),
+            (float)Math.Ceiling(_frameDamage.Bottom)), surface);
+        if (damage.Width <= 0f || damage.Height <= 0f)
+        {
+            ResetFrameDamage();
+            return true;
+        }
+
+        var graphics = _frameCacheGraphics;
+        ClearFrameRegion(graphics, damage, wholeSurface: false);
+        var state = graphics.Save();
+        try
+        {
+            graphics.SetClip(damage);
+            RenderRootInto(graphics, size, damage, cull: true);
+        }
+        finally
+        {
+            graphics.Restore(state);
+        }
+
+        ResetFrameDamage();
+        return true;
+    }
+
+    private void ClearFrameRegion(Graphics graphics, RectangleF region, bool wholeSurface)
+    {
+        _frameClearBrush ??= new SolidBrush(Color.Transparent);
+        if (wholeSurface)
+        {
+            graphics.Clear(Color.Transparent);
+            return;
+        }
+
+        var state = graphics.Save();
+        try
+        {
+            graphics.SetClip(region, CombineMode.Replace);
+            // SourceCopy 才能把旧像素连同 alpha 一起抹成透明。
+            graphics.CompositingMode = CompositingMode.SourceCopy;
+            graphics.FillRectangle(_frameClearBrush, region);
+        }
+        finally
+        {
+            graphics.Restore(state);
+        }
+    }
+
+    private void ResetFrameDamage()
+    {
+        _frameDamage = RectangleF.Empty;
+        _frameDamageFull = false;
+        _framePanPending = false;
+        _framePanDx = 0f;
+        _framePanDy = 0f;
+    }
+
+    private void AdvancePaintClock()
+    {
+        LastPaintTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        PaintCount++;
+        LastPaintWasClockDriven = nextPaintClockDriven;
+        nextPaintClockDriven = false;
+    }
 
     // 把逻辑树画到物理客户区：先按 DPI 缩放世界坐标，再由 RenderCore 按逻辑尺寸排版。
     internal void RenderPhysical(Graphics graphics, Rectangle deviceClip)
     {
         if (graphics is null) throw new ArgumentNullException(nameof(graphics));
+
+        // 窗口绘制不更新帧缓存，下一次 RenderTo 必须整帧重建。
+        InvalidateFrameCache();
 
         var scale = DpiScale;
         if (scale <= 0f)
@@ -420,6 +808,14 @@ public class VisualHost : System.Windows.Forms.Control
                    || clearArea.Top > 0
                    || clearArea.Right < size.Width
                    || clearArea.Bottom < size.Height;
+        EnsureLayout(size);
+        RenderRootInto(graphics, size, damage, cull);
+        AdvancePaintClock();
+    }
+
+    // 画根树与覆盖层；damage 只影响子树剔除。
+    private void RenderRootInto(Graphics graphics, Size size, RectangleF damage, bool cull)
+    {
         var previousDamage = Visual.RenderDamage;
         var previousCull = Visual.CullToDamage;
         Visual.PushRenderDamage(damage, cull);
@@ -428,13 +824,8 @@ public class VisualHost : System.Windows.Forms.Control
         try
         {
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            EnsureLayout(size);
-            _root.Render(graphics);
+            _root!.Render(graphics);
             _overlay.Render(graphics);
-            LastPaintTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
-            PaintCount++;
-            LastPaintWasClockDriven = nextPaintClockDriven;
-            nextPaintClockDriven = false;
         }
         finally
         {
@@ -1336,6 +1727,17 @@ public class VisualHost : System.Windows.Forms.Control
             IsPointerGestureActive = false;
             _motionBitmap?.Dispose();
             _motionBitmap = null;
+            _frameCacheGraphics?.Dispose();
+            _frameCacheGraphics = null;
+            _frameCache?.Dispose();
+            _frameCache = null;
+            _frameScratchGraphics?.Dispose();
+            _frameScratchGraphics = null;
+            _frameScratch?.Dispose();
+            _frameScratch = null;
+            _frameClearBrush?.Dispose();
+            _frameClearBrush = null;
+            _frameMovedVisuals.Clear();
             _rootElement?.Dispose();
             _rootElement = null;
             _root = null;

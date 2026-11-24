@@ -118,6 +118,11 @@ public abstract class Visual : WinformsObject
     private CacheKey _cacheKey;
     private Dictionary<(Font Font, int Dpi), Font>? _drawFonts;
 
+    // 包围盒换算复用的单点缓冲；每个线程独立，避免在热路径上反复分配。
+    [ThreadStatic] private static PointF[]? _transformPointBuffer;
+
+    private static PointF[] TransformPointBuffer => _transformPointBuffer ??= new PointF[1];
+
     // 当前帧的脏区（表面逻辑坐标）。只在 VisualHost 的 RenderCore 内推入，遍历结束即恢复。
     [ThreadStatic] private static RectangleF _renderDamage;
 
@@ -228,13 +233,14 @@ public abstract class Visual : WinformsObject
                 y = projected.Y;
             }
 
-            if (!current.Transform.IsIdentity)
+            if (current.Transform is { IsIdentity: false } transform)
             {
-                var e = current.Transform.Elements;
-                var tx = (x * e[0]) + (y * e[2]) + e[4];
-                var ty = (x * e[1]) + (y * e[3]) + e[5];
-                x = tx;
-                y = ty;
+                // Elements 每次返回新数组；剔除会按节点反复取包围盒，这里改用可复用的单点缓冲。
+                var buffer = TransformPointBuffer;
+                buffer[0] = new PointF(x, y);
+                transform.TransformPoints(buffer);
+                x = buffer[0].X;
+                y = buffer[0].Y;
             }
 
             x += current.Bounds.X;
