@@ -7,7 +7,6 @@
 **A XAML-first UI runtime for WinForms.**
 
 [![NuGet](https://img.shields.io/nuget/v/Easel?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Easel)
-[![NuGet](https://img.shields.io/nuget/v/Easel.Generator?logo=nuget&label=Generator)](https://www.nuget.org/packages/Easel.Generator)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE.txt)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skills-d97757)](skills/)
 
@@ -36,8 +35,8 @@ resource dictionaries and a retained visual layer without giving up the WinForms
 
 ## XAML in, controls out
 
-A view is a normal `x:Class` file. The Roslyn compiler turns `AdditionalFiles` into an
-`InitializeComponent()`; a second generator turns `[XamlProperty]` into dependency properties.
+A view is a normal `x:Class` file: the markup compiles into an `InitializeComponent()`, and
+`[XamlProperty]` becomes a dependency property.
 
 ```xml
 <StackPanel
@@ -184,13 +183,11 @@ details and the per-feature notes.
 
 ```powershell
 dotnet add package Easel
-dotnet add package Easel.Generator
 ```
 
 | Package | Targets |
 | --- | --- |
 | `Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
-| `Easel.Generator` | `netstandard2.0` (Roslyn 4.8) |
 
 The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
 `[VeloxProperty]` / `[VeloxCommand]` view models, and opts into WPF for the real `MediaPlayer` /
@@ -231,8 +228,7 @@ so Easel animations work immediately with no extra package or manual registratio
 | --- | --- |
 | [`Src/Easel/`](Src/Easel/) | The runtime: dependency properties, visual tree, controls, themes |
 | [`Src/Easel/Themes/`](Src/Easel/Themes/) | Built-in Dark+/Light+ XAML resource dictionaries |
-| [`Src/Generators/Easel.Generator/`](Src/Generators/Easel.Generator/) | The XAML compiler and dependency-property generator |
-| [`Src/Test/Unit/Easel.Test/`](Src/Test/Unit/Easel.Test/) | Unit, render and generator tests |
+| [`Src/Test/Unit/Easel.Test/`](Src/Test/Unit/Easel.Test/) | Unit and render tests |
 | [`Examples/XamlGallery/`](Examples/XamlGallery/) | The living catalogue and all scenario pages |
 | [`skills/`](skills/) | The Easel WinForms-XAML UI guide |
 
