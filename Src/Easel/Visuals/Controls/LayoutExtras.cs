@@ -132,10 +132,9 @@ public class UniformGrid : Panel
 
 /// <summary>Scales one child uniformly into the available rectangle.</summary>
 /// <remarks>
-/// The scale is a <see cref="Visual.Transform"/> on the child. Hit testing of visual elements inside a transformed
-/// child follows the transform in <see cref="Visual.HitTestVisual"/>, but
-/// <see cref="VisualElement.PointFromSurface"/> does not invert it, so interactive children under a viewbox see the
-/// unscaled pointer position. Use a viewbox for static cards.
+/// The scale is a <see cref="Visual.Transform"/> on the child. Hit testing follows it in
+/// <see cref="Visual.HitTestVisual"/>, and <see cref="VisualElement.PointFromSurface"/> inverts it with the rest of
+/// the ancestor chain; the viewbox is still intended for static cards.
 /// </remarks>
 public class Viewbox : VisualElement
 {

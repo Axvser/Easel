@@ -113,6 +113,30 @@ public sealed class VisualBackendTests
     }
 
     [TestMethod]
+    public void PointFromSurface_UndoesAncestorOffsetsBeforeTheChildTransform()
+    {
+        using var surface = CreateSurface(300, 300);
+        var outer = new VC.Canvas { Width = 300, Height = 300 };
+        var root = new VC.Canvas { Width = 200, Height = 200 };
+        VC.Canvas.SetLeft(root, 30);
+        VC.Canvas.SetTop(root, 40);
+        var child = new VC.Border { Width = 20, Height = 20 };
+        VC.Canvas.SetLeft(child, 10);
+        VC.Canvas.SetTop(child, 20);
+        child.Transform = new System.Drawing.Drawing2D.Matrix(2f, 0f, 0f, 2f, 0f, 0f);
+        root.Add(child);
+        outer.Add(root);
+        surface.Root = outer;
+        Layout(surface, 300, 300);
+
+        var surfacePoint = child.PointToSurface(new PointF(20f, 20f));
+        var local = child.PointFromSurface(surfacePoint);
+
+        Assert.AreEqual(20f, local.X, 0.01f);
+        Assert.AreEqual(20f, local.Y, 0.01f);
+    }
+
+    [TestMethod]
     public void StackPanel_StacksWithSpacingAndAlignsTheCrossAxis()
     {
         using var surface = CreateSurface(200, 100);

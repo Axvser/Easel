@@ -996,10 +996,18 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// <param name="surfacePoint">A point in the surface's client coordinates.</param>
     public PointF PointFromSurface(PointF surfacePoint)
     {
-        var point = surfacePoint;
+        // Render walks leaf → root: 3D, Transform, then Bounds. The inverse therefore has to undo the root first;
+        // doing it leaf-first scales the ancestors' Bounds translation again and drifts at every zoom.
+        var chain = new List<VisualElement>();
         for (var current = this; current is not null; current = current.ParentElement)
         {
-            // Render applies the 3D projection first, then Transform, then the Bounds translation; invert in reverse.
+            chain.Add(current);
+        }
+
+        var point = surfacePoint;
+        for (var index = chain.Count - 1; index >= 0; index--)
+        {
+            var current = chain[index];
             point.X -= current.Bounds.X;
             point.Y -= current.Bounds.Y;
             if (!current.Transform.IsIdentity)
