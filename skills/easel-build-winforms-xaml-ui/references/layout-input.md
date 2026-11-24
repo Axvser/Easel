@@ -153,8 +153,8 @@ centers. `Margin` is outside the element; `Padding` is inside its chrome.
 - While captured, `PointerMoved` goes to the captured element even outside its bounds; `PointerReleased`
   releases capture.
 - `PointerEntered`/`PointerExited` follow hover, not capture.
-- `PointerWheel`/`PointerHWheel` bubble from the element under the pointer; a `ScrollViewer` consumes the wheel
-  on its visible axis.
+- `PointerWheel` bubbles from the element under the pointer (a horizontal wheel arrives on the same event with
+  `IsHorizontal`); a `ScrollViewer` consumes the wheel on its visible axis.
 - `args.Handled = true` stops the bubble.
 - `args.GetPosition(element)` converts the surface point to an element's local coordinates.
 - Cursor: set `VisualElement.Cursor`; the host picks the deepest hovered element's cursor.
@@ -199,5 +199,5 @@ characters and IME composition reach a `TextBox`/`RichTextBox`. `VisualKeyEventA
   small and avoid per-frame transforms over huge subtrees.
 - `Visual.Clip`/`ClipToBounds` clip painting and hit-testing; use `ClipToBounds` on a stage that hosts a rotated
   visual so old frames cannot remain outside its bounds.
-- `Visual.RenderDamage` culls subtrees outside the dirty rectangle; items that draw outside their bounds should
+- Painting culls subtrees outside the dirty rectangle; a `VisualElement` that draws outside its bounds should
   override `GetInvalidationBounds` or accept conservative repaint.

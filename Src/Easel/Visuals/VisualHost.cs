@@ -107,7 +107,7 @@ public class VisualHost : System.Windows.Forms.Control
     /// </para>
     /// <para>
     /// Only the window paint path is affected: <see cref="RenderTo"/> always renders at full resolution. Values below
-    /// <c>0.1</c> are treated as <c>0.1</c>. The default is <c>0.65</c>.
+    /// <c>0.1</c> are treated as <c>0.1</c>. The default is <c>1</c>.
     /// </para>
     /// </remarks>
     public float MotionScale { get; set; } = 1f;

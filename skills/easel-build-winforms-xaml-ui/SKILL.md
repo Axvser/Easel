@@ -69,10 +69,9 @@ Everything below it is a retained visual.
 `Views/HelloView.xaml`:
 
 ```xml
-<local:UserControl
+<UserControl
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="clr-namespace:MyApp.Views"
     x:Class="MyApp.Views.HelloView"
     Background="{StaticResource Surface}"
     Padding="24">
@@ -81,12 +80,13 @@ Everything below it is a retained visual.
     <TextBox Width="320" Placeholder="Type here…" Text="{Binding Name, Mode=TwoWay}" />
     <Button Text="Run" Height="32" Command="{Binding SaveCommand}" />
   </StackPanel>
-</local:UserControl>
+</UserControl>
 ```
 
 `Views/HelloView.xaml.cs`:
 
 ```csharp
+using Easel;
 using Easel.Visuals.Controls;
 
 namespace MyApp.Views;
@@ -95,6 +95,8 @@ public sealed partial class HelloView : UserControl
 {
     public HelloView()
     {
+        // StaticResource resolves during InitializeComponent, so the theme keys must already be in this view.
+        Resources.MergedDictionaries.Add(Theme.CreateResourceDictionary(Theme.EffectiveMode));
         InitializeComponent();
     }
 }
@@ -157,7 +159,8 @@ on a multiline `TextBox` restarts per line.
 `AnimationRuntime.Animator`; without an injected `IVisualAnimator` they throw a clear
 `InvalidOperationException`. If the app accepts VeloxDev, install **`VeloxDev.WinForms`** — its module
 initializer wires its animator, but only once code in that assembly runs; an app that uses the package *only*
-for animation calls `EaselAnimationBootstrap.EnsureRegistered()` once at startup.
+for animation calls `VeloxDev.WinForms.XamlAnimation.EaselAnimationBootstrap.EnsureRegistered()` once at
+startup.
 
 ## Reference index
 
@@ -178,8 +181,8 @@ for animation calls `EaselAnimationBootstrap.EnsureRegistered()` once at startup
 
 [`Examples/XamlGallery`](../../Examples/XamlGallery/) is a complete XAML-first application: the shell, every
 card and every scenario page are XAML views with code-behind only for data and view behaviour. Its
-[README](../../Examples/XamlGallery/README.md) lists every card and the run/capture switches. Use it as the
-reference composition for a new app.
+[README](../../Examples/XamlGallery/README.md) lists the scenario pages, component groups and run/capture
+switches. Use it as the reference composition for a new app.
 
 ## Verification checklist
 

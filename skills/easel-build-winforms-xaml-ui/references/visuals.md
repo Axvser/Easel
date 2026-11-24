@@ -7,7 +7,7 @@ Two layers exist:
    layout-free decoration tree. They are cheap for bulk shapes/text and are hosted by `VisualPresenter`.
    They have no input, focus or measure.
 
-A `Visual` tree can also be the `VisualHost.Root`; a `VisualElement` is itself a `ContainerVisual`.
+A `ContainerVisual` tree can also be the `VisualHost.Root`; a `VisualElement` is itself a `ContainerVisual`.
 
 ## Brushes
 
@@ -98,8 +98,8 @@ var presenter = new VisualPresenter { Content = layer, Height = 240, ClipToBound
   `TextAlignment`, `Wrap`), `CurveBatchVisual` (`Stroke`, `Curves`, `Add`, `Clear`).
 - `VisualPresenter` gives the visual tree a layout slot; it is non-hit-testable by default. A `Visual`
   content keeps its own bounds; a `VisualElement` content is measured/arranged like a child.
-- `Visual` has `InvalidateVisual()`, `HitTestVisual(PointF)`, `HitTest(PointF)`, `InvalidateCache()`. Custom
-  visuals must call `InvalidateCache` after changing what they draw.
+- `Visual` has `HitTestVisual(PointF)`, `HitTest(PointF)` and `InvalidateCache()`. Custom visuals must call
+  `InvalidateCache` after changing what they draw.
 - `UnboundedHitTest` lets a camera host's children hit outside the container's layout box.
 
 Use the lightweight layer for decoration/charts/connectors; use a control when you need a layout slot, input,
@@ -128,6 +128,9 @@ A gradient opacity mask over a group:
         OpacityMask="{StaticResource LuminanceMask}"
         OpacityMaskMode="Luminance" />
 ```
+
+`AuroraGradient`, `FadeMask` and `LuminanceMask` are gallery demo resources (built in `GalleryTheme.Fill`),
+not part of the theme dictionary; declare equivalent brushes in your own dictionary.
 
 **Clip a transformed layer.** A visual that rotates/scales can paint outside its presenter; without
 `ClipToBounds` on the stage and presenter, invalidation leaves stale pixels. This applies to `Visual.Transform`
@@ -175,7 +178,7 @@ ties use declaration order). `VisualElement.HitTestContent` returns `IsHitTestVi
 ```csharp
 public sealed class Sparkline : Visual
 {
-    public override Brush? Stroke { get; set; } // your own API
+    public Brush? Stroke { get; set; } // your own API
     protected override void RenderContent(Graphics graphics)
     {
         using var pen = new Pen(new SolidBrush(Theme.Current.Accent), 2f);

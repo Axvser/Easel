@@ -11,7 +11,7 @@ VeloxDev.Core's `[VeloxProperty]` / `[VeloxCommand]` generators as the gallery d
 nearest `DataContext` up the visual parent chain.
 
 ```csharp
-public sealed partial class SettingsView : ThemedDockPanel
+public sealed partial class SettingsView : UserControl
 {
     public SettingsView(SettingsViewModel vm)
     {
@@ -31,8 +31,8 @@ public sealed partial class SettingsView : ThemedDockPanel
 
 ## Bindable view models
 
-A hand-written view model must implement `INotifyPropertyChanged` (or expose observable values via
-`GetObservable`). The generator path from VeloxDev.Core is the one the gallery uses:
+A hand-written view model must implement `INotifyPropertyChanged`; a view can also bind an `IObservable`
+through `element.Bind(dp, observable)`. The generator path from VeloxDev.Core is the one the gallery uses:
 
 ```csharp
 using VeloxDev.MVVM;
@@ -55,7 +55,8 @@ public sealed partial class SettingsViewModel
   `CanExecuteXxxCommand` controls enablement.
 - The class must be `partial`. Call `AddCommand.Notify()` (or the generated command's `Notify`) when a
   `CanExecute` dependency changes.
-- The XAML binds by generated property name; it has no reflection at runtime.
+- The XAML binds by the generated property name; path resolution goes through `TypeDescriptor`, so a renamed
+  property breaks the binding.
 
 Easel itself never takes a dependency on VeloxDev.Core. A project that does not use that generator can write
 `INotifyPropertyChanged` and `ICommand` manually; the binding and button paths are identical.
@@ -76,7 +77,8 @@ Easel itself never takes a dependency on VeloxDev.Core. A project that does not 
 - `Converter` (`IValueConverter`), `ConverterParameter`, `ConverterCulture`, `StringFormat`, `FallbackValue`,
   `TargetNullValue`.
 - Validation: `ValidatesOnExceptions`, `ValidatesOnNotifyDataErrors`, `ValidatesOnDataErrors`,
-  `NotifyOnValidationError`; errors surface on the target's `BindingFailure`/`ValidationError` events.
+  `NotifyOnValidationError`; a failed binding raises `VisualBindingOperations.BindingFailed`, and a validation
+  error raises `Validation.Error` when `NotifyOnValidationError` is set.
 - `Command` is a DP on `ButtonBase`; `CheckBox`/`ToggleButton`/`RadioButton` also execute it. `CommandParameter`
   is passed through.
 
@@ -107,7 +109,7 @@ For a template part, `TemplateBinding` binds the `TemplatedParent`:
 Keep code-behind to view behaviour:
 
 ```csharp
-public sealed partial class PopupCard : ThemedStackPanel
+public sealed partial class PopupCard : StackPanel
 {
     private VisualPopup? _popup;
     public PopupCard() => InitializeComponent();

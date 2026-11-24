@@ -108,7 +108,8 @@ AnimationRuntime.Animator = myAnimator;
 **If the application accepts the VeloxDev dependency, install `VeloxDev.WinForms`.** Its module initializer
 assigns `AnimationRuntime.Animator` when the first code in that assembly runs — which covers any app that uses
 its workflow surface. A module initializer fires on execution, not on reference, so an app that installs the
-package *only* for the animation backend calls `EaselAnimationBootstrap.EnsureRegistered()` once at startup:
+package *only* for the animation backend calls
+`VeloxDev.WinForms.XamlAnimation.EaselAnimationBootstrap.EnsureRegistered()` once at startup:
 it is idempotent and leaves a backend the host already supplied in place.
 
 - The adapter owns samplers, frame pacing and easing. Easel does not ship samplers for arbitrary types.

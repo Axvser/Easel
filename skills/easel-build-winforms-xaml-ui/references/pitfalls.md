@@ -36,7 +36,7 @@ DataContext.
 **DynamicResource in a setter/trigger action is rejected.** Setter values are resolved once. Put the dynamic
 reference on the element's property, or use a static resource.
 
-**A later static value gets overwritten by an older dynamic reference.** Resource references now follow the
+**A later static value gets overwritten by an older dynamic reference.** Resource references follow the
 last writer per target property; if you build your own binding via `ApplyStatic`/`BindDynamic`, pass a stable
 `targetToken` (normally the DP reference) so the newer one supersedes the older.
 
@@ -118,9 +118,9 @@ chain grows. Set `DataContext` before `InitializeComponent` for immediate resolu
 `TreeViewItem` rows in code (or as XAML children). `ListBox`/`ItemsControl`/`VirtualList` do support
 `ItemsSource`.
 
-**A `ComboBox` has no items after XAML `ItemsSource`.** Set `ItemsSource` or add to `Items` after
-`InitializeComponent`; `SelectedIndex` applied before items exist is clamped. The gallery fills combo items in
-code-behind.
+**A `ComboBox` drop-down is empty until `Items`/`ItemsSource` resolves.** `Items` is observable, so items added
+after `InitializeComponent` appear immediately, and a `SelectedIndex` set earlier resolves once the items reach
+it. The gallery fills combo items in code-behind.
 
 **A resource dictionary key is missing in a custom theme.** Copy the exact key set from
 [`Src/Easel/Themes/DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml); missing keys become transparent in

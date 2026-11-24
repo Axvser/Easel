@@ -6,7 +6,7 @@ islands are described in [runtime.md](runtime.md)).
 
 Shared visual-element properties (`Width`, `Height`, `Margin`, `Padding`, `Background`, `BorderBrush`,
 `BorderThickness`, `CornerRadius`, `Visibility`, `IsEnabled`, alignment, `Opacity`, `Transform`, `Clip`,
-`Effect`, typography, `DataContext`) are listed in [runtime.md](runtime.md#visual-element-layout-contract).
+`Effect`, typography, `DataContext`) are listed in [runtime.md](runtime.md#visualelement-layout-contract).
 This page lists each control's own properties and behaviour.
 
 ## Layout and containers
@@ -42,7 +42,7 @@ This page lists each control's own properties and behaviour.
 | Control | Key members | Notes |
 | --- | --- | --- |
 | `TextBlock` | `Text`, `Font`, `Foreground` (Brush-backed), `Wrap`, `TextAlignment` | Single line by default; `Wrap` measures wrapped height. `Foreground` accepts a Brush, including gradients. |
-| `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, selection (`Start`, `Length`, `Text`), `CaretIndex`, `Anchor` | Self-drawn editing. While focused it uses a private native editor for IME/accessibility; `UseNativeEditor=false` keeps everything visual. |
+| `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, `SelectionStart`, `SelectionLength`, `CaretIndex` | Self-drawn editing. While focused it uses a private native editor for IME/accessibility; `UseNativeEditor=false` keeps everything visual. |
 | `TextBoxContentHost` | — | The `PART_ContentHost` for a custom `ControlTemplate` on `TextBox`. |
 | `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
 | `Image` | `Source` (`System.Drawing.Image?`), `Stretch` | Draws a bitmap in the tree. `BitmapImage`/`DrawingImage` also implement `ImageSource` for brushes/hosts. |
@@ -64,7 +64,7 @@ This page lists each control's own properties and behaviour.
 
 | Control | Key members | Notes |
 | --- | --- | --- |
-| `ItemsControl` | `ItemsSource`, `ItemFactory`, `DisplayMemberPath`, `ItemTemplate`, `ItemTemplateSelector`, `ItemsPanel`, attached `ItemsHost`, `ItemsRebuilt` | Base for list-like controls. `Items` are visual children unless a template/factory provides them. `RefreshItems()` rebuilds. |
+| `ItemsControl` | `ItemsSource`, `ItemFactory`, `DisplayMemberPath`, `ItemTemplate`, `ItemTemplateSelector`, `ItemsPanel`, attached `IsItemsHost`, `ItemsRebuilt` | Base for list-like controls. `Items` are visual children unless a template/factory provides them. `RefreshItems()` rebuilds. |
 | `ListBox` | all `ItemsControl` members + `SelectedIndex`, `SelectedItem`, `SelectionChanged` | Selected row uses the theme selection brush. |
 | `VirtualList` | `ItemsSource`, `ItemHeight`, `DisplayMemberPath`, `ItemTemplate`, `SelectedIndex`, `SelectedItem`, `SelectionChanged` | Realizes only visible rows inside a `ScrollViewer`; `ItemHeight` is fixed. |
 | `TreeView` | `Items` (`ObservableCollection<TreeViewItem>`), `SelectedItem`, `Indent`, `Font`, `SelectionChanged` | **No `ItemsSource`/hierarchical template**: build `TreeViewItem`s in code or XAML children. `Reveal(item)` expands ancestors and selects. |

@@ -134,8 +134,8 @@ disposes descendants, bitmap caches, resource subscriptions and its native edito
 when you replace it, as the gallery does:
 
 ```csharp
-var previous = host.Content as VisualElement;
-host.Content = newCard;
+var previous = host.Root as VisualElement;
+host.Root = newCard;
 previous?.Dispose();
 ```
 

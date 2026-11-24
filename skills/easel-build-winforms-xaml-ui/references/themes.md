@@ -56,7 +56,8 @@ The copy contains the palette brushes, metrics and typography styles. `Theme.Cre
 
 ## Using theme resources in XAML
 
-The gallery's themed base classes merge the dictionary into each view before `InitializeComponent`:
+A themed base class merges the dictionary into each view before `InitializeComponent` (the gallery's
+`Themed*` bases do this through `GalleryTheme.Fill`):
 
 ```csharp
 protected ThemedStackPanel()

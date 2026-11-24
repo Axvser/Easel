@@ -35,7 +35,7 @@ xmlns:local="clr-namespace:MyApp.Views"
 
 | Written | Resolves to |
 | --- | --- |
-| `Foo` (no prefix) | `Easel.Visuals.Controls.Foo`, then `.Visuals.Controls.Shapes.Foo`, then `.Visuals.Foo`, then shared primitives (`Easel.Controls`) |
+| `Foo` (no prefix) | `Easel.Visuals.Controls.Foo`, then `.Visuals.Controls.Shapes.Foo`, then `.Visuals.Foo`, then `Easel.Controls.Foo`, `Easel.Controls.Shapes.Foo`, `Easel.Foo` |
 | `local:Foo` | the `clr-namespace` type |
 | `v:Foo` | legacy alias for the Easel visual namespaces |
 | `native:Foo` / `System.Windows.Forms` | rejected; visual parents accept `VisualElement` only |
@@ -52,11 +52,12 @@ never silently accepted.
   `Grid.RowSpan="2"`, or the property-element form `<Grid.Row>1</Grid.Row>`.
 - Children follow the parent:
   - A panel/collection container: `.Add(child)` for visual children, or `.Items.Add` when the parent exposes an
-    items collection (`Items`, `DropDownItems`).
-  - A single-content control: `.Content = child` (e.g. `ContentControl`, `ScrollViewer`, `GroupBox`,
-    `Expander`, `TabItem`); `Border` uses `.Child`.
+    items collection (`Items`).
+  - A single-content control: `.Content = child` (e.g. `ContentControl`, `ScrollViewer`, `Expander`,
+    `TabItem`); `Border`/`GroupBox` use `.Child`.
   - A visual parent rejects non-visual children.
-- Text content: `<TextBlock>text</TextBlock>` projects into `Text`; an explicit `Text="…"` overrides it.
+- Text content: `<TextBlock>text</TextBlock>` projects into `Text`; it is written after attributes, so do not
+  combine it with a `Text`/`Content` attribute.
 - `x:Name` declares a private field and writes `VisualElement.Name`; names are namescope-local in templates.
 
 ```xml
@@ -74,10 +75,9 @@ never silently accepted.
 
 Supported literal parsers include: `string`, all integer/float/double/decimal types, `bool`, enums (name or
 number), `System.Drawing.Color` (`#RGB`, `#RRGGBB`, `#AARRGGBB`, known names), `Padding`, `Thickness`,
-`GridLength` (`Auto`, `*`, `2*`, pixels), `Size`, `SizeF`, `Point`, `PointF`, `PointF[]`,
-`RectangleF` (`x,y,w,h`), `Rectangle`, `TimeSpan`. `DateTime` has no XAML literal; use code-behind.
-`Brush`, `Geometry`, `ImageSource` and `PointF[]` are runtime-converted from their string forms
-(`#FF…`, SVG path data, a file path).
+`GridLength` (`Auto`, `*`, `2*`, pixels), `Size`, `SizeF`, `Point`, `PointF`, `TimeSpan`. `DateTime` has no
+XAML literal; use code-behind. `Brush`, `Geometry`, `ImageSource`, `PointF[]`, `RectangleF` (`x,y,w,h`) and
+`Rectangle` are runtime-converted from their string forms (`#FF…`, SVG path data, a file path).
 
 Markup extensions: `{StaticResource Key}`, `{DynamicResource Key}`, `{Binding …}`,
 `{TemplateBinding …}`, `{x:Null}`, `{x:Static Member}`, `{x:Type TypeName}` where a type is expected.
@@ -173,7 +173,8 @@ Resources["Accent"] = new SolidColorBrush(newColor); // the border updates
 - An implicit style has `TargetType` and no `x:Key`. It applies to matching descendants when declared on a
   visual element's resources/styles (`Style="{StaticResource …}"` for explicit).
 - `Style.BasedOn` accepts `{StaticResource Key}` to merge a base style.
-- `Trigger` watches one DP; `DataTrigger` watches a binding path; `MultiTrigger` requires all conditions.
+- `Trigger` compares one DP of the styled element. `DataTrigger` and `MultiTrigger` are not supported on the
+  visual backend (`EASEL_XAML004`); bind or convert in the view model instead.
 - `<Trigger.EnterAction>` / `<Trigger.ExitAction>` run a `TransitionAction`, `KeyFrameAnimation`,
   `TriggerActionGroup`, or a custom `VisualTriggerAction` derived type. In a template trigger the action target is
   the same `TargetName` part as the setters.
@@ -220,10 +221,11 @@ one-way-to-source, `Converter`/`ConverterParameter`/`ConverterCulture`, `StringF
 
 `DataContext` is inherited; a local `DataContext` cuts inheritance for that subtree. Bindings attached before
 parenting re-resolve when the element joins a DataContext chain. `VisualBindingOperations.Bind(element, dp,
-binding)` is the code path; `element.SetBinding(...)` and `element.Bind(...)` are the fluent forms.
+binding)` is the code path; `element.SetBinding(dp, binding)` is the fluent form.
 
-Validation failures are surfaced through `BindingFailureEventArgs`/`ValidationErrorEventArgs` on the target and
-are not silently swallowed.
+A failed binding raises the static `VisualBindingOperations.BindingFailed` event (`BindingFailureEventArgs`);
+a validation error raises `Validation.Error` (`ValidationErrorEventArgs`) when the binding sets
+`NotifyOnValidationError`. Neither is silently swallowed.
 
 ## Events
 
@@ -245,7 +247,7 @@ The handler must be unambiguous and match the event's delegate signature. Pointe
 | ID | Meaning |
 | --- | --- |
 | `EASEL_XAML001` | unknown XAML type |
-| `EASEL_XAML002` | unknown property/event member (Error) |
+| `EASEL_XAML002` | unknown property/event member |
 | `EASEL_XAML003` | value cannot be converted |
 | `EASEL_XAML004` | unsupported construct |
 | `EASEL_XAML005` | missing `x:Class` |
@@ -254,7 +256,7 @@ The handler must be unambiguous and match the event's delegate signature. Pointe
 | `EASEL_XAML008` | missing event handler |
 | `EASEL_XAML009` | `x:Class` type not partial |
 | `EASEL_XAML010` | unsupported resource |
-| `EASEL_XAML011` | root not assignable from owner |
+| `EASEL_XAML011` | owner is not a visual type, or the root is not assignable from the owner |
 | `EASEL_XAML012` | XML parse error |
 | `EASEL_XAML013` | unknown attached property |
 | `EASEL_XAML014` | invalid style `TargetType` |
@@ -265,13 +267,15 @@ The handler must be unambiguous and match the event's delegate signature. Pointe
 | `EASEL_XAML019` | unprefixed type is not an Easel type |
 | `EASEL_XAMLP001`–`005` | property generator: non-partial, wrong owner, invalid attached accessors, name conflict, missing default value |
 
-Warnings do not stop the build; the element/attribute is skipped where the compiler says so. Treat
-`EASEL_XAML001/002/005/006/009/012/014/015/018/019` and `EASEL_XAMLP*` as errors in practice.
+`EASEL_XAML003/004/007/008/010/011/013/016/017` are warnings: the element/attribute is skipped and the build
+continues. Every other `EASEL_XAML*` ID and `EASEL_XAMLP*` is an error. Treat the warning IDs as errors in
+practice.
 
 ## Not supported
 
 - Runtime XAML loading/`Source` URIs, designer, hot reload.
 - `{DynamicResource}` in style/trigger setter values or trigger-action properties.
+- `DataTrigger`/`MultiTrigger` (use a `Trigger` on a DP, or convert in the view model).
 - Elements from non-Easel assemblies without a `clr-namespace` prefix; unprefixed local types.
 - WinForms controls as visual children (`NativeControlHost` only).
 - Native controls inside transformed/clipped/blended subtrees.
