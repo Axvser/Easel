@@ -274,8 +274,11 @@ jobs:
         run: |
           $file = Join-Path "artifacts" "Easel.Generator.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
+          # No --skip-duplicate: it turns every 409 into the same "already exists" warning and
+          # reports success, whatever the server actually said. A 409 must fail this step and
+          # surface nuget.org's reason phrase instead of starting the wait below.
           dotnet nuget push $file --api-key $env:NUGET_API_KEY `
-            --source https://api.nuget.org/v3/index.json --skip-duplicate
+            --source https://api.nuget.org/v3/index.json
           if ($LASTEXITCODE -ne 0) { throw "push failed: Easel.Generator" }
 
           $url = "https://api.nuget.org/v3-flatcontainer/easel.generator/${env:VERSION}/easel.generator.${env:VERSION}.nupkg"
