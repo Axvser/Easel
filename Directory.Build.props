@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
 	<PropertyGroup>
 		<!-- false: the demo and other local projects consume the Easel source projects.
 		     true: they consume the packed WinForms.Easel / WinForms.Easel.Generator packages from artifacts/packages.
@@ -15,5 +15,9 @@
 		<VeloxDevCoreProject Condition="'$(VeloxDevCoreProject)' == '' and Exists('$(MSBuildThisFileDirectory)..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj')">$(MSBuildThisFileDirectory)..\Src\Core\VeloxDev.Core\VeloxDev.Core.csproj</VeloxDevCoreProject>
 		<VeloxDevCoreGeneratorProject Condition="Exists('$(MSBuildThisFileDirectory)..\VeloxDev\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj')">$(MSBuildThisFileDirectory)..\VeloxDev\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj</VeloxDevCoreGeneratorProject>
 		<VeloxDevCoreGeneratorProject Condition="'$(VeloxDevCoreGeneratorProject)' == '' and Exists('$(MSBuildThisFileDirectory)..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj')">$(MSBuildThisFileDirectory)..\Src\Generators\VeloxDev.Core.Generator\VeloxDev.Core.Generator.csproj</VeloxDevCoreGeneratorProject>
+
+		<!-- The gallery's animation cards run on VeloxDev.WinForms' transition engine; resolved the same way. -->
+		<VeloxDevWinFormsProject Condition="Exists('$(MSBuildThisFileDirectory)..\VeloxDev\Src\Adapters\VeloxDev.WinForms\VeloxDev.WinForms.csproj')">$(MSBuildThisFileDirectory)..\VeloxDev\Src\Adapters\VeloxDev.WinForms\VeloxDev.WinForms.csproj</VeloxDevWinFormsProject>
+		<VeloxDevWinFormsProject Condition="'$(VeloxDevWinFormsProject)' == '' and Exists('$(MSBuildThisFileDirectory)..\Src\Adapters\VeloxDev.WinForms\VeloxDev.WinForms.csproj')">$(MSBuildThisFileDirectory)..\Src\Adapters\VeloxDev.WinForms\VeloxDev.WinForms.csproj</VeloxDevWinFormsProject>
 	</PropertyGroup>
 </Project>

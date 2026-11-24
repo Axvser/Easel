@@ -1,0 +1,78 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.AnimationTransitionCard"
+    Spacing="12">
+
+  <local:ThemedStackPanel.Resources>
+    <Style x:Key="AnimatedSurface" TargetType="Border">
+      <Style.Setters>
+        <Setter Property="Background" Value="{StaticResource AuroraGradient}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Opacity" Value="1" />
+      </Style.Setters>
+      <Style.Triggers>
+        <Trigger Property="IsEnabled" Value="False">
+          <Trigger.EnterAction>
+            <TriggerActionGroup>
+              <TransitionAction Property="Opacity" To="0.3" Duration="0:0:0.35" Ease="CubicOut" />
+              <TransitionAction Property="CornerRadius" To="30" Duration="0:0:0.35" Ease="CubicOut" />
+            </TriggerActionGroup>
+          </Trigger.EnterAction>
+          <Trigger.ExitAction>
+            <TriggerActionGroup>
+              <TransitionAction Property="Opacity" To="1" Duration="0:0:0.35" Ease="CubicOut" />
+              <TransitionAction Property="CornerRadius" To="10" Duration="0:0:0.35" Ease="CubicOut" />
+            </TriggerActionGroup>
+          </Trigger.ExitAction>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </local:ThemedStackPanel.Resources>
+
+  <TextBlock Text="A trigger starts one TransitionAction per property it names; the exit action animates the values back. Start runs it, Reset plays it back."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <Border Height="190"
+          Background="{StaticResource SurfaceAlt}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="10">
+    <Grid>
+      <Border x:Name="surface"
+              Width="200"
+              Height="110"
+              Margin="24,0,0,0"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Center"
+              Style="{StaticResource AnimatedSurface}" />
+    </Grid>
+  </Border>
+
+  <StackPanel Orientation="Horizontal" Spacing="8">
+    <Button Text="Start" Height="30" Click="OnStart" />
+    <Button Text="Reset" Height="30" Click="OnReset" />
+    <TextBlock Text="Opacity 1 → 0.3 · CornerRadius 10 → 30 · 350 ms CubicOut"
+               VerticalAlignment="Center"
+               Foreground="{StaticResource Muted}"
+               FontSize="9" />
+  </StackPanel>
+
+  <Border Width="560"
+          Background="{StaticResource Raised}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="10"
+          Padding="14">
+    <StackPanel Spacing="3">
+      <TextBlock Text="MARKUP" Foreground="{StaticResource Accent}" FontSize="8" />
+      <TextBlock Text="&lt;Trigger Property=&quot;IsEnabled&quot; Value=&quot;False&quot;&gt;&#10;  &lt;Trigger.EnterAction&gt;&#10;    &lt;TriggerActionGroup&gt;&#10;      &lt;TransitionAction Property=&quot;Opacity&quot; To=&quot;0.3&quot; Duration=&quot;0:0:0.35&quot; Ease=&quot;CubicOut&quot; /&gt;&#10;      &lt;TransitionAction Property=&quot;CornerRadius&quot; To=&quot;30&quot; Duration=&quot;0:0:0.35&quot; Ease=&quot;CubicOut&quot; /&gt;&#10;    &lt;/TriggerActionGroup&gt;&#10;  &lt;/Trigger.EnterAction&gt;&#10;  &lt;Trigger.ExitAction&gt; … animates back … &lt;/Trigger.ExitAction&gt;&#10;&lt;/Trigger&gt;"
+                 Foreground="{StaticResource Text}"
+                 FontSize="10"
+                 Wrap="True" />
+    </StackPanel>
+  </Border>
+
+</local:ThemedStackPanel>

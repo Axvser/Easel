@@ -71,6 +71,13 @@ internal static class GalleryTheme
         radial.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x00, 0xD2, 0xFF), 0d));
         radial.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x7B, 0x2F, 0xF7), 1d));
         resources["RadialGlow"] = radial;
+
+        // 半径 1.1 的径向渐变铺满整个矩形（GDI+ 的 PathGradientBrush 只画椭圆内部），
+        // 这样它与线性渐变做交叉淡化时，边缘不会出现椭圆形状的硬边。
+        var radialCover = new RadialGradientBrush { Center = new PointF(0.5f, 0.5f), Radius = 1.1f };
+        radialCover.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x7B, 0x2F, 0xF7), 0d));
+        radialCover.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x00, 0xD2, 0xFF), 1d));
+        resources["RadialCover"] = radialCover;
     }
 
     /// <summary>Builds a left-to-right or diagonal gradient from colour stops.</summary>

@@ -1,0 +1,89 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Cards.AnimationBrushCard"
+    Spacing="12">
+
+  <local:ThemedStackPanel.Resources>
+    <Style x:Key="StructuralSurface" TargetType="Border">
+      <Style.Setters>
+        <Setter Property="Background" Value="{StaticResource AuroraGradient}" />
+        <Setter Property="CornerRadius" Value="12" />
+      </Style.Setters>
+      <Style.Triggers>
+        <Trigger Property="IsEnabled" Value="False">
+          <Trigger.EnterAction>
+            <TransitionAction Property="Background" To="{StaticResource SunsetGradient}" Duration="0:0:1.2" Ease="CubicInOut" />
+          </Trigger.EnterAction>
+          <Trigger.ExitAction>
+            <TransitionAction Property="Background" To="{StaticResource AuroraGradient}" Duration="0:0:1.2" Ease="CubicInOut" />
+          </Trigger.ExitAction>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ComposedSurface" TargetType="Border">
+      <Style.Setters>
+        <Setter Property="Background" Value="{StaticResource AuroraGradient}" />
+        <Setter Property="CornerRadius" Value="12" />
+      </Style.Setters>
+      <Style.Triggers>
+        <Trigger Property="IsEnabled" Value="False">
+          <Trigger.EnterAction>
+            <TransitionAction Property="Background" To="{StaticResource RadialCover}" Duration="0:0:1.2" Ease="CubicInOut" />
+          </Trigger.EnterAction>
+          <Trigger.ExitAction>
+            <TransitionAction Property="Background" To="{StaticResource AuroraGradient}" Duration="0:0:1.2" Ease="CubicInOut" />
+          </Trigger.ExitAction>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </local:ThemedStackPanel.Resources>
+
+  <TextBlock Text="Brush endpoints interpolate by structure: two linear gradients lerp their stops, geometry and opacity, so the gradient keeps its shape while it moves."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <Border Height="150"
+          Background="{StaticResource SurfaceAlt}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="10">
+    <StackPanel Orientation="Horizontal"
+                Spacing="18"
+                Margin="24,0,0,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center">
+      <Border x:Name="structural" Width="180" Height="110" Style="{StaticResource StructuralSurface}" />
+      <Border x:Name="composed" Width="180" Height="110" Style="{StaticResource ComposedSurface}" />
+    </StackPanel>
+  </Border>
+
+  <StackPanel Orientation="Horizontal" Spacing="8">
+    <Button Text="Start" Height="30" Click="OnStart" />
+    <Button Text="Reset" Height="30" Click="OnReset" />
+    <TextBlock Text="Left: linear → linear (3 stops → 2 stops). Right: linear → radial that also covers the surface, so the brush composes a cross-fade of two layers."
+               VerticalAlignment="Center"
+               Foreground="{StaticResource Muted}"
+               FontSize="9"
+               Wrap="True"
+               MaxWidth="420" />
+  </StackPanel>
+
+  <Border Width="600"
+          Background="{StaticResource Raised}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="10"
+          Padding="14">
+    <StackPanel Spacing="3">
+      <TextBlock Text="MARKUP" Foreground="{StaticResource Accent}" FontSize="8" />
+      <TextBlock Text="&lt;TransitionAction Property=&quot;Background&quot;&#10;                  To=&quot;{StaticResource SunsetGradient}&quot;&#10;                  Duration=&quot;0:0:1.2&quot; Ease=&quot;CubicInOut&quot; /&gt;&#10;&#10;&lt;!-- no shared structure: the same markup, a different endpoint --&gt;&#10;&lt;TransitionAction Property=&quot;Background&quot;&#10;                  To=&quot;{StaticResource RadialCover}&quot; ... /&gt;"
+                 Foreground="{StaticResource Text}"
+                 FontSize="10"
+                 Wrap="True" />
+    </StackPanel>
+  </Border>
+
+</local:ThemedStackPanel>

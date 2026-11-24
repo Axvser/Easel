@@ -10,6 +10,14 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
+        // VeloxDev.WinForms 用模块初始化器把过渡引擎注入 Easel，而模块初始化器只在程序集真正被加载时运行。
+        // 引用它不等于加载它，所以先按名字碰一下；没装适配器的独立 checkout 里这一句什么也不做，
+        // 动画请求会按 Easel 的契约直接抛异常，而不是静默空转。
+#if VELOXDEV_WINFORMS
+        // 模块初始化器只在模块里有代码执行时才跑；gallery 只用了适配器的动画后端，这里显式登记一次。
+        VeloxDev.WinForms.XamlAnimation.EaselAnimationBootstrap.EnsureRegistered();
+#endif
+
         // WinForms 的原生暗色在句柄创建时决定；--light / --contrast 让整个进程从一开始就用那套调色板。
         var mode = args.Contains("--system", StringComparer.OrdinalIgnoreCase)
             ? ThemeMode.System

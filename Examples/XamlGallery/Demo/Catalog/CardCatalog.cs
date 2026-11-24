@@ -21,6 +21,7 @@ internal static class CardCatalog
         cards.AddRange(BindingCards.Create(model));
         cards.AddRange(ThemeCards.Create(theme));
         cards.AddRange(VisualsCards.Create());
+        cards.AddRange(AnimationCards.Create());
         return cards;
     }
 }

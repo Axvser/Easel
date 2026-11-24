@@ -31,7 +31,7 @@
          scripts/pack-local.ps1 to consume the packed WinForms.Easel/WinForms.Easel.Generator packages instead. -->
     <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj"
                       Condition="'$(UseEaselPackage)' != 'true'" />
-    <PackageReference Include="Easel" Version="$(EaselPackageVersion)"
+    <PackageReference Include="WinForms.Easel" Version="$(EaselPackageVersion)"
                       Condition="'$(UseEaselPackage)' == 'true'" />
     <ProjectReference Include="..\..\..\Src\Generators\Easel.Generator\Easel.Generator.csproj"
                       OutputItemType="Analyzer"
@@ -57,6 +57,20 @@
     <PackageReference Include="VeloxDev.Core.Generator" Version="12.0.0"
                       Condition="'$(VeloxDevCoreGeneratorProject)' == ''" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- The animation cards need a real IVisualAnimator: VeloxDev.WinForms' module initializer supplies it.
+         Only the local checkout is used; there is no package fallback because the adapter is released against
+         the Easel package, and a standalone clone is expected to build the gallery without the Animation group
+         running. -->
+    <ProjectReference Include="$(VeloxDevWinFormsProject)"
+                      Condition="'$(VeloxDevWinFormsProject)' != ''" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(VeloxDevWinFormsProject)' != ''">
+    <!-- Lets Program call the adapter's registration hook only when the adapter is actually referenced. -->
+    <DefineConstants>$(DefineConstants);VELOXDEV_WINFORMS</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <AdditionalFiles Include="**/*.xaml" />
