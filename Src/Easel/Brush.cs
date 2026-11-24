@@ -79,6 +79,23 @@ public abstract class Brush
     /// <remarks>The caller owns the returned brush and must dispose it.</remarks>
     internal virtual System.Drawing.Brush? CreateNativeBrush(RectangleF bounds) => null;
 
+    /// <summary>
+    /// Creates or borrows a native brush for one paint; dispose it only when <paramref name="owns"/> is true.
+    /// </summary>
+    /// <param name="bounds">The rectangle the brush is mapped to.</param>
+    /// <param name="owns">Whether the caller owns the returned brush.</param>
+    /// <returns>The brush, or <see langword="null"/> when this brush paints nothing.</returns>
+    /// <remarks>
+    /// A solid colour is borrowed from <see cref="NativeBrushPool"/>; every other brush keeps the one-shot contract
+    /// of <see cref="CreateNativeBrush"/>. Per-frame fills therefore stop allocating a GDI+ brush each time.
+    /// </remarks>
+    internal virtual System.Drawing.Brush? AcquireNativeBrush(RectangleF bounds, out bool owns)
+    {
+        var brush = CreateNativeBrush(bounds);
+        owns = brush is not null;
+        return brush;
+    }
+
     /// <summary>Creates a solid brush from a <see cref="System.Drawing.Color"/>.</summary>
     /// <param name="color">The colour to paint.</param>
     public static implicit operator Brush(Color color) => new SolidColorBrush(color);
@@ -159,6 +176,19 @@ public class SolidColorBrush : Brush
     }
 
     /// <inheritdoc />
+    internal override System.Drawing.Brush? AcquireNativeBrush(RectangleF bounds, out bool owns)
+    {
+        var color = ApplyOpacity(Color);
+        if (color.A <= 0)
+        {
+            owns = false;
+            return null;
+        }
+
+        return NativeBrushPool.Get(color, out owns);
+    }
+
+    /// <inheritdoc />
     public override void Paint(Graphics graphics, RectangleF bounds)
     {
         if (bounds.Width <= 0f || bounds.Height <= 0f)
@@ -172,8 +202,18 @@ public class SolidColorBrush : Brush
             return;
         }
 
-        using var brush = new SolidBrush(color);
-        graphics.FillRectangle(brush, bounds);
+        var brush = NativeBrushPool.Get(color, out var owns);
+        try
+        {
+            graphics.FillRectangle(brush, bounds);
+        }
+        finally
+        {
+            if (owns)
+            {
+                brush.Dispose();
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -185,8 +225,18 @@ public class SolidColorBrush : Brush
             return;
         }
 
-        using var brush = new SolidBrush(color);
-        graphics.FillPath(brush, path);
+        var brush = NativeBrushPool.Get(color, out var owns);
+        try
+        {
+            graphics.FillPath(brush, path);
+        }
+        finally
+        {
+            if (owns)
+            {
+                brush.Dispose();
+            }
+        }
     }
 }
 

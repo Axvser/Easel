@@ -374,23 +374,22 @@ public class TextBlock : VisualElement
             return;
         }
 
-        var brush = GetValue(ForegroundProperty) as Easel.Brush
-                    ?? new SolidColorBrush(Theme.Current.Foreground);
         var horizontal = TextAlignment switch
         {
             XamlTextAlignment.Center => StringAlignment.Center,
             XamlTextAlignment.Right => StringAlignment.Far,
             _ => StringAlignment.Near,
         };
-        VisualText.Draw(this,
-            graphics,
-            Text,
-            Font,
-            brush,
-            bounds,
-            Wrap,
-            horizontal,
-            Wrap ? StringAlignment.Near : StringAlignment.Center);
+        var vertical = Wrap ? StringAlignment.Near : StringAlignment.Center;
+        // 没有显式笔刷时走纯色重载：每帧新建一个 SolidColorBrush 包装只为取色，属于纯浪费。
+        if (GetValue(ForegroundProperty) is Easel.Brush brush)
+        {
+            VisualText.Draw(this, graphics, Text, Font, brush, bounds, Wrap, horizontal, vertical);
+        }
+        else
+        {
+            VisualText.Draw(this, graphics, Text, Font, Theme.Current.Foreground, bounds, Wrap, horizontal, vertical);
+        }
     }
 }
 

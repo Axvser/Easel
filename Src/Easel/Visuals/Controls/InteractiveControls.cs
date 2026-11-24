@@ -174,16 +174,16 @@ public class Button : ButtonBase
         var foreground = Foreground.IsEmpty
             ? (IsEnabled ? theme.Foreground : theme.DisabledForeground)
             : Foreground;
-        var brush = GetValue(ForegroundProperty) as XamlBrush ?? new SolidColorBrush(foreground);
-        VisualText.Draw(this,
-            graphics,
-            Text,
-            Font,
-            brush,
-            content,
-            wrap: false,
-            StringAlignment.Center,
-            StringAlignment.Center);
+        if (GetValue(ForegroundProperty) is XamlBrush brush)
+        {
+            VisualText.Draw(this, graphics, Text, Font, brush, content,
+                wrap: false, StringAlignment.Center, StringAlignment.Center);
+        }
+        else
+        {
+            VisualText.Draw(this, graphics, Text, Font, foreground, content,
+                wrap: false, StringAlignment.Center, StringAlignment.Center);
+        }
     }
 
     /// <inheritdoc />

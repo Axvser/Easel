@@ -63,7 +63,10 @@ public interface IWinformsObject
 /// <summary>The WPF-named base implementation of <see cref="IWinformsObject"/> for the visual backend.</summary>
 public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
 {
-    private readonly Dictionary<DependencyProperty, SortedDictionary<BindingPriority, object?>> _values = [];
+    // 每属性一张优先级表。不再用 SortedDictionary：它枚举时会给 TreeSet 的枚举器分配一个对象，
+    // 而 GetValue 在渲染期每帧要读很多次（文本、前景色、边距……），那点分配会堆成整帧的 GC 压力。
+    // 取「数值最小」的优先级与 SortedDictionary 升序取首个等价（Animation=-1 > LocalValue=0 > …）。
+    private readonly Dictionary<DependencyProperty, Dictionary<BindingPriority, object?>> _values = [];
     private PropertyChangedEventHandler? _clrPropertyChanged;
 
     /// <summary>Raised after the effective value of a property changes.</summary>
@@ -82,9 +85,24 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
         if (property is null) throw new ArgumentNullException(nameof(property));
         if (_values.TryGetValue(property, out var layers) && layers.Count > 0)
         {
+            var best = BindingPriority.Template;
+            object? top = null;
+            var found = false;
             foreach (var layer in layers)
             {
-                return layer.Value;
+                if (found && layer.Key >= best)
+                {
+                    continue;
+                }
+
+                best = layer.Key;
+                top = layer.Value;
+                found = true;
+            }
+
+            if (found)
+            {
+                return top;
             }
         }
 

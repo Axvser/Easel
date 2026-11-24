@@ -96,22 +96,31 @@ public class TextVisual : Visual
             return;
         }
 
-        using var format = new StringFormat
-        {
-            Alignment = TextAlignment switch
+        var format = VisualText.Format(
+            Wrap,
+            TextAlignment switch
             {
                 VisualTextAlignment.Center => StringAlignment.Center,
                 VisualTextAlignment.Right => StringAlignment.Far,
                 _ => StringAlignment.Near,
             },
-            LineAlignment = StringAlignment.Near,
-            Trimming = StringTrimming.EllipsisCharacter,
-            FormatFlags = Wrap ? 0 : StringFormatFlags.NoWrap,
-        };
+            StringAlignment.Near,
+            ellipsisWhenWrapped: true);
         graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
         // 点位字体要先折回 96 DPI；渐变/图片笔刷直接交给 DrawString，不再压成单一颜色。
         var bounds = new RectangleF(0f, 0f, Bounds.Width, Bounds.Height);
-        var native = Foreground?.CreateNativeBrush(bounds) ?? new SolidBrush(Foreground?.ApproximateColor ?? Theme.Current.TextVisualForeground);
+        bool owns = false;
+        System.Drawing.Brush? native = null;
+        if (Foreground is not null)
+        {
+            native = Foreground.AcquireNativeBrush(bounds, out owns);
+        }
+
+        if (native is null)
+        {
+            native = NativeBrushPool.Get(Foreground?.ApproximateColor ?? Theme.Current.TextVisualForeground, out owns);
+        }
+
         try
         {
             graphics.DrawString(
@@ -123,7 +132,10 @@ public class TextVisual : Visual
         }
         finally
         {
-            native.Dispose();
+            if (owns)
+            {
+                native.Dispose();
+            }
         }
     }
 }

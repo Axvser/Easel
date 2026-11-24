@@ -53,17 +53,15 @@ internal static class XamlDrawing
         Color borderBrush,
         Thickness borderThickness,
         float cornerRadius)
-    {
-        using var backgroundBrush = background.A > 0 ? new System.Drawing.SolidBrush(background) : null;
-        using var strokeBrush = borderBrush.A > 0 ? new System.Drawing.SolidBrush(borderBrush) : null;
-        PaintChromeCore(
+        => PaintChromeCore(
             graphics,
             bounds,
             borderThickness,
             cornerRadius,
-            backgroundBrush is null ? null : path => graphics.FillPath(backgroundBrush, path),
-            strokeBrush is null ? null : path => graphics.FillPath(strokeBrush, path));
-    }
+            background.A > 0 ? background : null,
+            borderBrush.A > 0 ? borderBrush : null,
+            fillBrush: null,
+            strokeBrush: null);
 
     // Brush 版单独命名：Brush 与 Color 之间有双向隐式转换，同名重载会二义。
     public static void PaintChromeWithBrushes(
@@ -73,23 +71,26 @@ internal static class XamlDrawing
         Brush? borderBrush,
         Thickness borderThickness,
         float cornerRadius)
-    {
-        PaintChromeCore(
+        => PaintChromeCore(
             graphics,
             bounds,
             borderThickness,
             cornerRadius,
-            background is { } fill && fill.ApproximateColor.A > 0 ? path => fill.FillPath(graphics, path) : null,
-            borderBrush is { } stroke && stroke.ApproximateColor.A > 0 ? path => stroke.FillPath(graphics, path) : null);
-    }
+            fillColor: null,
+            strokeColor: null,
+            fillBrush: background is { ApproximateColor.A: > 0 } fill ? fill : null,
+            strokeBrush: borderBrush is { ApproximateColor.A: > 0 } stroke ? stroke : null);
 
+    // 纯色走线程内的画笔池，非纯色笔刷交给它自己的 FillPath；两条路都不为每次绘制建委托。
     private static void PaintChromeCore(
         Graphics graphics,
         Rectangle bounds,
         Thickness borderThickness,
         float cornerRadius,
-        Action<GraphicsPath>? fillBackground,
-        Action<GraphicsPath>? fillBorder)
+        Color? fillColor,
+        Color? strokeColor,
+        Brush? fillBrush,
+        Brush? strokeBrush)
     {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -101,13 +102,13 @@ internal static class XamlDrawing
         // bounds 可能不是从 (0,0) 开始（勾选块/开关轨道要在控件内居中），偏移也必须带上。
         var body = new RectangleF(bounds.X - 0.5f, bounds.Y - 0.5f, bounds.Width, bounds.Height);
         using var path = RoundedRectangle(body, cornerRadius);
-        fillBackground?.Invoke(path);
+        FillPath(graphics, path, fillColor, fillBrush);
 
         var left = Math.Max(0f, borderThickness.Left);
         var top = Math.Max(0f, borderThickness.Top);
         var right = Math.Max(0f, borderThickness.Right);
         var bottom = Math.Max(0f, borderThickness.Bottom);
-        if (fillBorder is null || (left <= 0f && top <= 0f && right <= 0f && bottom <= 0f))
+        if ((strokeColor is null && strokeBrush is null) || (left <= 0f && top <= 0f && right <= 0f && bottom <= 0f))
         {
             return;
         }
@@ -119,7 +120,7 @@ internal static class XamlDrawing
             body.Height - top - bottom);
         if (inner.Width <= 0f || inner.Height <= 0f)
         {
-            fillBorder(path);
+            FillPath(graphics, path, strokeColor, strokeBrush);
             return;
         }
 
@@ -127,6 +128,32 @@ internal static class XamlDrawing
         using var innerPath = RoundedRectangle(inner, Math.Max(0f, cornerRadius - inset));
         path.FillMode = FillMode.Alternate;
         path.AddPath(innerPath, connect: false);
-        fillBorder(path);
+        FillPath(graphics, path, strokeColor, strokeBrush);
+    }
+
+    private static void FillPath(Graphics graphics, GraphicsPath path, Color? color, Brush? brush)
+    {
+        if (color is { } solid)
+        {
+            var native = NativeBrushPool.Get(solid, out var owns);
+            try
+            {
+                graphics.FillPath(native, path);
+            }
+            finally
+            {
+                if (owns)
+                {
+                    native.Dispose();
+                }
+            }
+
+            return;
+        }
+
+        if (brush is not null)
+        {
+            brush.FillPath(graphics, path);
+        }
     }
 }
