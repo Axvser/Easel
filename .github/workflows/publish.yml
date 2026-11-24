@@ -12,7 +12,7 @@ name: publish
 #   Repository      Easel
 #   Workflow File   publish.yml
 #   Environment     (blank)
-#   Glob Patterns   Easel*
+#   Glob Patterns   WinForms.Easel*
 #
 # Versioning:
 #   Every package is published at the <Version> written in its own csproj. The workflow checks one
@@ -20,12 +20,12 @@ name: publish
 #   packed and pushed; a package whose version is already there is skipped. A run that failed
 #   halfway can therefore be retried without repacking what already landed.
 #
-#   Easel.csproj's Release reference takes its generator version from EaselGeneratorPackageVersion
-#   in Directory.Build.props; it must match Easel.Generator's own <Version>. The version job fails
+#   WinForms.Easel's Release reference takes its generator version from EaselGeneratorPackageVersion
+#   in Directory.Build.props; it must match WinForms.Easel.Generator's own <Version>. The version job fails
 #   early when the two disagree.
 #
 # Release order:
-#   Easel.Generator -> Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The pre-publish
+#   WinForms.Easel.Generator -> WinForms.Easel, mirroring VeloxDev.Core.Generator -> VeloxDev.Core. The pre-publish
 #   test job builds in Debug against the local generator project. The publish job restores,
 #   Release-builds, packs and pushes the generator, polls flatcontainer until NuGet serves it, and
 #   only then restores, Release-builds and tests the runtime before packing and pushing it. The
@@ -114,8 +114,8 @@ jobs:
         shell: pwsh
         run: |
           $projects = @(
-            @{ Id = "Easel.Generator"; Kind = "generator"; Path = "Src/Generators/Easel.Generator/Easel.Generator.csproj" },
-            @{ Id = "Easel"; Kind = "runtime"; Path = "Src/Easel/Easel.csproj" }
+            @{ Id = "WinForms.Easel.Generator"; Kind = "generator"; Path = "Src/Generators/Easel.Generator/Easel.Generator.csproj" },
+            @{ Id = "WinForms.Easel"; Kind = "runtime"; Path = "Src/Easel/Easel.csproj" }
           )
 
           foreach ($project in $projects) {
@@ -130,7 +130,7 @@ jobs:
           if (-not $propsMatch.Success) { throw "no EaselGeneratorPackageVersion in Directory.Build.props" }
           $generatorVersion = ($projects | Where-Object { $_.Kind -eq 'generator' } | Select-Object -First 1).Version
           if ($propsMatch.Groups[1].Value -ne $generatorVersion) {
-            throw "EaselGeneratorPackageVersion $($propsMatch.Groups[1].Value) does not match Easel.Generator <Version> $generatorVersion"
+            throw "EaselGeneratorPackageVersion $($propsMatch.Groups[1].Value) does not match WinForms.Easel.Generator <Version> $generatorVersion"
           }
 
           # force keeps the old meaning: pretend nothing is published and run the whole pipeline
@@ -246,7 +246,7 @@ jobs:
 
           # IncludeBuildOutput=false leaves that custom None as the only carrier of the analyzer;
           # an empty analyzers folder would publish a generator that does nothing.
-          $file = Join-Path "artifacts" "Easel.Generator.${env:VERSION}.nupkg"
+          $file = Join-Path "artifacts" "WinForms.Easel.Generator.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [IO.Compression.ZipFile]::OpenRead($file)
@@ -272,16 +272,16 @@ jobs:
           VERSION: ${{ needs.version.outputs.generator_version }}
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
-          $file = Join-Path "artifacts" "Easel.Generator.${env:VERSION}.nupkg"
+          $file = Join-Path "artifacts" "WinForms.Easel.Generator.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
           # No --skip-duplicate: it turns every 409 into the same "already exists" warning and
           # reports success, whatever the server actually said. A 409 must fail this step and
           # surface nuget.org's reason phrase instead of starting the wait below.
           dotnet nuget push $file --api-key $env:NUGET_API_KEY `
             --source https://api.nuget.org/v3/index.json
-          if ($LASTEXITCODE -ne 0) { throw "push failed: Easel.Generator" }
+          if ($LASTEXITCODE -ne 0) { throw "push failed: WinForms.Easel.Generator" }
 
-          $url = "https://api.nuget.org/v3-flatcontainer/easel.generator/${env:VERSION}/easel.generator.${env:VERSION}.nupkg"
+          $url = "https://api.nuget.org/v3-flatcontainer/winforms.easel.generator/${env:VERSION}/winforms.easel.generator.${env:VERSION}.nupkg"
           # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
           $delay = 300
           while ($true) {
@@ -302,7 +302,7 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.generator_version }}
         run: |
-          $url = "https://api.nuget.org/v3-flatcontainer/easel.generator/${env:VERSION}/easel.generator.${env:VERSION}.nupkg"
+          $url = "https://api.nuget.org/v3-flatcontainer/winforms.easel.generator/${env:VERSION}/winforms.easel.generator.${env:VERSION}.nupkg"
           # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
           $delay = 300
           while ($true) {
@@ -343,7 +343,7 @@ jobs:
 
           # scripts/pack-local.ps1 builds net8.0-windows only. This is the one place where the
           # older target frameworks are proven to be in the package before it is published.
-          $file = Join-Path "artifacts" "Easel.${env:VERSION}.nupkg"
+          $file = Join-Path "artifacts" "WinForms.Easel.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $zip = [IO.Compression.ZipFile]::OpenRead($file)
@@ -351,7 +351,7 @@ jobs:
           $zip.Dispose()
           foreach ($tfm in @("net461", "net5.0-windows", "netcoreapp3.0", "net8.0-windows")) {
             if (-not ($entries | Where-Object { $_ -like "lib/$tfm*/*.dll" })) {
-              throw "Easel nupkg has no lib/$tfm* assembly; refusing to publish it."
+              throw "WinForms.Easel nupkg has no lib/$tfm* assembly; refusing to publish it."
             }
           }
 
@@ -375,13 +375,13 @@ jobs:
           VERSION: ${{ needs.version.outputs.easel_version }}
           NUGET_API_KEY: ${{ steps.login2.outputs.NUGET_API_KEY }}
         run: |
-          $file = Join-Path "artifacts" "Easel.${env:VERSION}.nupkg"
+          $file = Join-Path "artifacts" "WinForms.Easel.${env:VERSION}.nupkg"
           if (-not (Test-Path $file)) { throw "missing $file" }
           dotnet nuget push $file --api-key $env:NUGET_API_KEY `
             --source https://api.nuget.org/v3/index.json --skip-duplicate
-          if ($LASTEXITCODE -ne 0) { throw "push failed: Easel" }
+          if ($LASTEXITCODE -ne 0) { throw "push failed: WinForms.Easel" }
 
-          $url = "https://api.nuget.org/v3-flatcontainer/easel/${env:VERSION}/easel.${env:VERSION}.nupkg"
+          $url = "https://api.nuget.org/v3-flatcontainer/winforms.easel/${env:VERSION}/winforms.easel.${env:VERSION}.nupkg"
           # Ingestion time varies too much to cap the wait: sleep 5 minutes, then poll every minute.
           $delay = 300
           while ($true) {

@@ -28,7 +28,7 @@
 
   <ItemGroup>
     <!-- The demo consumes the source projects by default. Pass -p:UseEaselPackage=true after
-         scripts/pack-local.ps1 to consume the packed Easel/Easel.Generator packages instead. -->
+         scripts/pack-local.ps1 to consume the packed WinForms.Easel/WinForms.Easel.Generator packages instead. -->
     <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj"
                       Condition="'$(UseEaselPackage)' != 'true'" />
     <PackageReference Include="Easel" Version="$(EaselPackageVersion)"
@@ -37,7 +37,7 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
                       Condition="'$(UseEaselPackage)' != 'true'" />
-    <PackageReference Include="Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
+    <PackageReference Include="WinForms.Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
                       Condition="'$(UseEaselPackage)' == 'true'" />
   </ItemGroup>
 

@@ -16,17 +16,17 @@ model and point here for the WinForms XAML surface. Easel itself does not refere
 ## Packages and targets
 
 ```powershell
-dotnet add package Easel
-dotnet add package Easel.Generator
+dotnet add package WinForms.Easel
+dotnet add package WinForms.Easel.Generator
 ```
 
 | Package | Contains |
 | --- | --- |
-| `Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation contract |
-| `Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
+| `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation contract |
+| `WinForms.Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
 
-`Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
-`Easel.Generator` targets `netstandard2.0` (Roslyn 4.8). A host uses `net8.0-windows` or later for
+`WinForms.Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
+`WinForms.Easel.Generator` targets `netstandard2.0` (Roslyn 4.8). A host uses `net8.0-windows` or later for
 `dotnet run` development; the library is compiled for all four Easel targets.
 
 Reference the generator as an analyzer and mark every `.xaml` as an `AdditionalFile`:
@@ -36,7 +36,7 @@ Reference the generator as an analyzer and mark every `.xaml` as an `AdditionalF
   <AdditionalFiles Include="**/*.xaml" />
 </ItemGroup>
 <ItemGroup>
-  <PackageReference Include="Easel.Generator" Version="…" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  <PackageReference Include="WinForms.Easel.Generator" Version="…" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 </ItemGroup>
 ```
 

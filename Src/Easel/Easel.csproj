@@ -19,7 +19,7 @@
 		     the same code is warning-free on net5/net8. -->
 		<NoWarn Condition="'$(TargetFramework)' == 'netframework4.6.1' Or '$(TargetFramework)' == 'netcoreapp3.0'">$(NoWarn);CS8600;CS8602;CS8603;CS8604</NoWarn>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-		<PackageId>Easel</PackageId>
+		<PackageId>WinForms.Easel</PackageId>
 		<Title>Easel</Title>
 		<Version>1.0.0</Version>
 		<Authors>Axvser</Authors>
@@ -51,7 +51,7 @@
 		                  OutputItemType="Analyzer"
 		                  ReferenceOutputAssembly="false"
 		                  Condition="'$(Configuration)' == 'Debug'" />
-		<PackageReference Include="Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
+		<PackageReference Include="WinForms.Easel.Generator" Version="$(EaselGeneratorPackageVersion)"
 		                  Condition="'$(Configuration)' != 'Debug'" />
 	</ItemGroup>
 

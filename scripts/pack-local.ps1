@@ -16,8 +16,8 @@ dotnet build (Join-Path $root 'Src/Easel/Easel.csproj') -c Release -p:EaselLocal
 if ($LASTEXITCODE -ne 0) { throw 'Building Easel failed.' }
 
 Get-ChildItem (Join-Path $root 'Src/Easel/bin/Release') -Filter 'Easel.*.nupkg' | Copy-Item -Destination $out
-Get-ChildItem (Join-Path $root 'Src/Generators/Easel.Generator/bin/Release') -Filter 'Easel.Generator.*.nupkg' | Copy-Item -Destination $out
+Get-ChildItem (Join-Path $root 'Src/Generators/Easel.Generator/bin/Release') -Filter 'WinForms.Easel.Generator.*.nupkg' | Copy-Item -Destination $out
 
-Write-Host "Packed Easel and Easel.Generator into $out"
+Write-Host "Packed WinForms.Easel and WinForms.Easel.Generator into $out"
 Write-Host 'Build the demo against the packages with:'
 Write-Host '  dotnet build Examples/XamlGallery/Demo/Demo.csproj -p:UseEaselPackage=true'

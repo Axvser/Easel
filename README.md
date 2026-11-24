@@ -6,7 +6,7 @@
 
 **A XAML-first UI runtime for WinForms.**
 
-[![NuGet](https://img.shields.io/nuget/v/Easel?logo=nuget&label=NuGet)](https://www.nuget.org/packages/Easel)
+[![NuGet](https://img.shields.io/nuget/v/WinForms.Easel?logo=nuget&label=NuGet)](https://www.nuget.org/packages/WinForms.Easel)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE.txt)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-skills-d97757)](skills/)
 
@@ -182,12 +182,12 @@ details and the per-feature notes.
 ## Packages
 
 ```powershell
-dotnet add package Easel
+dotnet add package WinForms.Easel
 ```
 
 | Package | Targets |
 | --- | --- |
-| `Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
+| `WinForms.Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
 
 The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
 `[VeloxProperty]` / `[VeloxCommand]` view models, and opts into WPF for the real `MediaPlayer` /

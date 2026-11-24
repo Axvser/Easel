@@ -1,7 +1,7 @@
 <Project>
 	<PropertyGroup>
 		<!-- false: the demo and other local projects consume the Easel source projects.
-		     true: they consume the packed Easel / Easel.Generator packages from artifacts/packages.
+		     true: they consume the packed WinForms.Easel / WinForms.Easel.Generator packages from artifacts/packages.
 		     Run scripts/pack-local.ps1 before switching to true. -->
 		<UseEaselPackage Condition="'$(UseEaselPackage)' == ''">false</UseEaselPackage>
 		<EaselPackageVersion Condition="'$(EaselPackageVersion)' == ''">1.0.0</EaselPackageVersion>

@@ -1,6 +1,6 @@
 # Recipes
 
-Copy these as starting points. They assume a project referencing `Easel` + `Easel.Generator`, and a palette
+Copy these as starting points. They assume a project referencing `WinForms.Easel` + `WinForms.Easel.Generator`, and a palette
 available through `{StaticResource …}` (see [themes.md](themes.md)).
 
 ## 1. Application shell
