@@ -227,6 +227,8 @@ Resources["Accent"] = new SolidColorBrush(newColor); // the border updates
 - A keyed `<DataTemplate>` compiles to a `DataTemplate` factory; `VisualTemplateSelector`/`DataTemplateSelector`
   chooses at runtime.
 - `ItemsPanelTemplate` must have one `Panel` root.
+- `DataGridColumn.CellTemplate` / `CellFactory` turns a visible cell into a visual element (the row item is its
+  `DataContext`); columns without one keep the self-drawn `Text`/`Badge`/`Check`/`Progress` rendering.
 
 ## Bindings
 
