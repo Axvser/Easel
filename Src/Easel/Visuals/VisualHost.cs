@@ -957,6 +957,13 @@ public class VisualHost : System.Windows.Forms.Control
     /// <returns><see langword="true"/> when an element handled the event.</returns>
     public bool ProcessPointerDown(PointF point, MouseButtons button, int clickCount = 1)
     {
+        // 宿主先拿到 WinForms 焦点：原生编辑器是宿主的子 HWND，宿主没焦点时 _editor.Focus() 会失败，
+        // 第一次点击就只打开编辑器、光标不进编辑器，得再点一次。
+        if (IsHandleCreated && CanFocus && !Focused)
+        {
+            Focus();
+        }
+
         // 鼠标点击只转移焦点，不显示键盘焦点环；否则 Gallery 里每个 Toggle/Button 点一下都会多一圈蓝框。
         _focusVisible = false;
         _focused?.SetFocusVisible(false);
