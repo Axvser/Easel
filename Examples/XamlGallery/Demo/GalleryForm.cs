@@ -109,7 +109,15 @@ public sealed class GalleryForm : Form
         base.Dispose(disposing);
     }
 
-    private void OnThemeChanged(object? sender, EventArgs e) => RebuildShell();
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        BackColor = Theme.Current.WindowBackground;
+        Surface.BackColor = Theme.Current.WindowBackground;
+        Demo.Views.GalleryTheme.RefreshPalette();
+        _shell.RefreshTheme();
+        Surface.InvalidateSurface();
+        ApplyTitleBarTheme();
+    }
 
     private void RebuildShell()
     {

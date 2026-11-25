@@ -391,9 +391,29 @@ public abstract class TemplatedControl : Panel
 // 前景刷按颜色比较：触发器写成 "#RRGGBB" 或 Color 时，存储值仍是刷子，但等价判断按代表性颜色进行。
 internal sealed class ColorBrush : SolidColorBrush
 {
+    private SolidColorBrush? _source;
+
     internal ColorBrush(Color color)
         : base(color)
     {
+    }
+
+    // StaticResource Foreground 会被 DP 强转成 ColorBrush；链接回共享主题笔刷，
+    // 主题切换原地改色时文字才能跟着变，而不是冻结构造时的颜色。
+    internal ColorBrush(SolidColorBrush source)
+        : base(source.Color)
+    {
+        _source = source;
+    }
+
+    public override Color Color
+    {
+        get => _source?.Color ?? base.Color;
+        set
+        {
+            _source = null;
+            base.Color = value;
+        }
     }
 
     public override bool Equals(object? obj)
@@ -432,7 +452,7 @@ internal static class ColorBrushCoercion
         {
             null => null,
             ColorBrush => value,
-            SolidColorBrush solid => new ColorBrush(solid.Color),
+            SolidColorBrush solid => new ColorBrush(solid),
             Color color => new ColorBrush(color),
             _ => value,
         };

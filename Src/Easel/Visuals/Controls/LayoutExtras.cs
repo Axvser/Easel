@@ -523,7 +523,6 @@ public class GridSplitter : VisualElement
     {
         IsHitTestVisible = true;
         Focusable = false;
-        Background = Theme.Current.SurfaceAlt;
         Cursor = Cursors.SizeWE;
     }
 
@@ -539,6 +538,19 @@ public class GridSplitter : VisualElement
     {
         get => (Orientation)GetValue(OrientationProperty)!;
         set => SetValue(OrientationProperty, value);
+    }
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
+        if (Background is not null)
+        {
+            base.OnRender(graphics);
+            return;
+        }
+
+        using var brush = new SolidBrush(Theme.Current.SurfaceAlt);
+        graphics.FillRectangle(brush, 0, 0, Bounds.Width, Bounds.Height);
     }
 
     /// <inheritdoc />

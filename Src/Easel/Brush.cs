@@ -163,7 +163,7 @@ public class SolidColorBrush : Brush
     }
 
     /// <summary>The colour this brush paints.</summary>
-    public Color Color { get; set; } = Color.Black;
+    public virtual Color Color { get; set; } = Color.Black;
 
     /// <inheritdoc />
     public override Color ApproximateColor => Color;

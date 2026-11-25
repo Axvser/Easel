@@ -13,16 +13,58 @@ namespace Demo.Views;
 internal static class GalleryTheme
 {
     private static ResourceDictionary? _custom;
+    private static readonly List<WeakReference<ResourceDictionary>> Sources = [];
+
+    /// <summary>Whether the demo-owned override dictionary is active.</summary>
+    public static bool HasCustom => _custom is not null;
+
+    /// <summary>Mutates every view's palette brushes in place; no shell rebuild is needed for a palette switch.</summary>
+    public static void RefreshPalette()
+    {
+        var fresh = _custom ?? Theme.CreateResourceDictionary(Theme.EffectiveMode);
+        for (var index = Sources.Count - 1; index >= 0; index--)
+        {
+            if (!Sources[index].TryGetTarget(out var source))
+            {
+                Sources.RemoveAt(index);
+                continue;
+            }
+
+            foreach (var pair in fresh)
+            {
+                if (source.TryGetValue(pair.Key, out var existing)
+                    && existing is SolidColorBrush oldBrush
+                    && pair.Value is SolidColorBrush newBrush)
+                {
+                    oldBrush.Color = newBrush.Color;
+                }
+            }
+        }
+    }
 
     /// <summary>Uses a demo-owned override dictionary instead of the built-in theme resources.</summary>
     /// <param name="resources">The custom dictionary, or <see langword="null"/> for the built-in resources.</param>
     public static void UseCustom(ResourceDictionary? resources) => _custom = resources;
 
+    private static ResourceDictionary Clone(ResourceDictionary source)
+    {
+        var copy = new ResourceDictionary();
+        foreach (var pair in source)
+        {
+            copy[pair.Key] = pair.Value is SolidColorBrush brush
+                ? new SolidColorBrush(brush.Color)
+                : pair.Value;
+        }
+
+        return copy;
+    }
+
     /// <summary>Adds the current palette and the demo gradients to <paramref name="resources"/>.</summary>
     public static void Fill(ResourceDictionary resources)
     {
-        var source = _custom ?? Theme.CreateResourceDictionary(Theme.EffectiveMode);
+        var source = Clone(_custom ?? Theme.CreateResourceDictionary(Theme.EffectiveMode));
         resources.MergedDictionaries.Add(source);
+        Sources.Add(new WeakReference<ResourceDictionary>(source));
 
         var theme = Theme.Current;
 

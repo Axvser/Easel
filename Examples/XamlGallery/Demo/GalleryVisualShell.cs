@@ -18,7 +18,7 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     private readonly GalleryShellViewModel _vm;
     private readonly GalleryCardCatalog _catalog;
     private readonly Dictionary<VC.TreeViewItem, string> _entryItems = [];
-    private readonly GalleryVisualInspector _inspector = new();
+    private GalleryVisualInspector _inspector = new();
     private bool _syncingSelection;
 
     /// <summary>Builds the shell for an existing view model and selection.</summary>
@@ -182,6 +182,28 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         finally
         {
             _syncingSelection = false;
+        }
+    }
+
+    /// <summary>Updates theme-driven code-built parts without rebuilding the shell.</summary>
+    public void RefreshTheme()
+    {
+        var previousInspector = _inspector;
+        _inspector = new GalleryVisualInspector();
+        InspectorHost.Content = _inspector.Root;
+        previousInspector.Root.Dispose();
+
+        if (_vm.SelectedCard is { } card)
+        {
+            var previous = PreviewHost.Content as VisualElement;
+            var next = _catalog.Find(card.Id)?.Create(_model);
+            PreviewHost.Content = next;
+            previous?.Dispose();
+            _inspector.SetTarget(next);
+        }
+        else
+        {
+            _inspector.SetTarget(null);
         }
     }
 

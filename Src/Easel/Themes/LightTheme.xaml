@@ -60,7 +60,6 @@
         <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
         <Setter Property="FontSize" Value="19" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource Text}" />
       </Style.Setters>
     </Style>
     <Style x:Key="Subheading" TargetType="TextBlock">
@@ -68,7 +67,6 @@
         <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource Text}" />
       </Style.Setters>
     </Style>
     <Style x:Key="Body" TargetType="TextBlock">
@@ -76,7 +74,6 @@
         <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
         <Setter Property="FontSize" Value="10" />
         <Setter Property="FontWeight" Value="Normal" />
-        <Setter Property="Foreground" Value="{StaticResource Text}" />
       </Style.Setters>
     </Style>
     <Style x:Key="Caption" TargetType="TextBlock">
@@ -84,7 +81,7 @@
         <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
         <Setter Property="FontSize" Value="9" />
         <Setter Property="FontWeight" Value="Normal" />
-        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        <Setter Property="Opacity" Value="0.65" />
       </Style.Setters>
     </Style>
 
