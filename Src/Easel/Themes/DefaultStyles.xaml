@@ -15,6 +15,9 @@
     <defaults:RangeDefaults />
     <defaults:ItemsDefaults />
     <defaults:DataGridDefaults />
+    <defaults:CalendarDefaults />
+    <defaults:MenuDefaults />
+    <defaults:MiscDefaults />
   </ResourceDictionary.MergedDictionaries>
 
 </ResourceDictionary>
