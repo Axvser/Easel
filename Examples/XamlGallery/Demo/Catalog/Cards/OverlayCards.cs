@@ -29,6 +29,13 @@ internal static class OverlayCards
             "A detached menu opened at a surface point.",
             "<VisualContextMenu>…</VisualContextMenu>",
             _ => new ContextMenuCard()),
+        Card(
+            "overlay.dialog",
+            "Overlay",
+            "Dialogs",
+            "A modal scrim and centred card with async message, confirm and prompt results.",
+            "await DialogService.MessageAsync(Surface, \"Saved\", \"…\");",
+            _ => new DialogCard()),
     ];
 
     private static GalleryCard Card(

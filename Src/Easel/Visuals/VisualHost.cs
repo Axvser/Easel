@@ -42,10 +42,12 @@ public class VisualHost : System.Windows.Forms.Control
     private bool _rendering;
     private readonly Dictionary<System.Windows.Forms.Control, (int Width, int Height, float Radius, Rectangle? Clip, Rectangle[] Cuts)> _nativeRegionStates = [];
     private int _nativeOrderCounter;
+    private int _nativeSuppressionCount;
     private readonly VisualStyleCollection _styles = new();
     private readonly ResourceDictionary _resources = new();
     private readonly OverlayLayer _overlay = new();
     private readonly List<VisualPopup> _openPopups = [];
+    private readonly List<Dialogs.VisualDialog> _openDialogs = [];
     private Rectangle _damage;
     private bool _damageFull = true;
     private MouseButtons _buttons;
@@ -180,6 +182,7 @@ public class VisualHost : System.Windows.Forms.Control
             _focused = null;
             _capture = null;
             _hoverChain.Clear();
+            CloseAllDialogs();
             CloseAllPopups();
             ClearNativeChildren();
             _rootElement?.SetSurfaceRoot(null);
@@ -1523,6 +1526,17 @@ public class VisualHost : System.Windows.Forms.Control
 
     private void ApplyNativePlacement(NativeElement owner, System.Windows.Forms.Control child, Rectangle physical, bool show, RectangleF visible)
     {
+        // 模态对话期间原生岛整块收起：子 HWND 永远压在视觉覆盖层之上，不摘掉就会盖住遮罩。
+        if (_nativeSuppressionCount > 0)
+        {
+            if (child.Visible)
+            {
+                child.Visible = false;
+            }
+
+            return;
+        }
+
         if (!show)
         {
             child.Visible = false;
@@ -2020,6 +2034,7 @@ public class VisualHost : System.Windows.Forms.Control
         {
             // 主题是静态状态；不摘订阅，静态事件会把宿主钉在内存里。
             Theme.Changed -= OnThemeChanged;
+            CloseAllDialogs();
             CloseAllPopups();
             ClearNativeChildren();
             _focused = null;
@@ -2084,6 +2099,76 @@ public class VisualHost : System.Windows.Forms.Control
         }
     }
 
+    // 对话按打开顺序叠放：后注册的在覆盖层末尾，绘制与命中都在最上层。
+    internal void RegisterDialog(Dialogs.VisualDialog dialog)
+    {
+        if (_openDialogs.Contains(dialog))
+        {
+            return;
+        }
+
+        _openDialogs.Add(dialog);
+        if (_openDialogs.Count == 1)
+        {
+            HideNativeIslands();
+        }
+
+        InvalidateSurface();
+    }
+
+    internal void UnregisterDialog(Dialogs.VisualDialog dialog)
+    {
+        if (!_openDialogs.Remove(dialog))
+        {
+            return;
+        }
+
+        if (_openDialogs.Count == 0)
+        {
+            RestoreNativeIslands();
+        }
+
+        InvalidateSurface();
+    }
+
+    // 最新的对话接收焦点与按键；栈里更低的对话只负责留在原位。
+    internal Dialogs.VisualDialog? ActiveDialog
+        => _openDialogs.Count == 0 ? null : _openDialogs[_openDialogs.Count - 1];
+
+    private void HideNativeIslands()
+    {
+        _nativeSuppressionCount++;
+        foreach (var child in _nativeChildren.Values)
+        {
+            if (child.Visible)
+            {
+                child.Visible = false;
+            }
+        }
+    }
+
+    private void RestoreNativeIslands()
+    {
+        if (_nativeSuppressionCount == 0)
+        {
+            return;
+        }
+
+        if (--_nativeSuppressionCount > 0 || IsDisposed)
+        {
+            return;
+        }
+
+        // 隐藏期间布局可能变过；恢复时按元素当前排列矩形重新摆放，而不是沿用旧 Bounds。
+        foreach (var pair in _nativeChildren.ToArray())
+        {
+            PlaceNative(pair.Key, pair.Value, Rectangle.Round(pair.Key.AbsoluteBounds));
+        }
+
+        RefreshNativeRegions();
+        InvalidateSurface();
+    }
+
     private void CloseAllPopups()
     {
         foreach (var popup in _openPopups.ToArray())
@@ -2092,6 +2177,16 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         _openPopups.Clear();
+    }
+
+    private void CloseAllDialogs()
+    {
+        foreach (var dialog in _openDialogs.ToArray())
+        {
+            dialog.Close(Dialogs.DialogResult.Cancel);
+        }
+
+        _openDialogs.Clear();
     }
 
     // 点击落在弹层或它的 PlacementTarget 里时保持打开；其余位置按 StaysOpen 关闭。
@@ -2215,6 +2310,11 @@ public class VisualHost : System.Windows.Forms.Control
             popup.Reposition();
         }
 
+        foreach (var dialog in _openDialogs.ToArray())
+        {
+            dialog.Reposition(size);
+        }
+
         // A host that was collapsed or removed from the tree never reaches ArrangeOverride, so its HWND would stay
         // floating above the surface. Anything not visited by this pass is detached — unless it is still live in this
         // tree and merely skipped the pass because its arranged size did not change.
@@ -2260,7 +2360,13 @@ public class VisualHost : System.Windows.Forms.Control
     private void MoveFocus(bool forward)
     {
         var order = new List<VisualElement>();
-        if (_rootElement is not null)
+
+        // 模态对话打开时 Tab 只在最上层对话内部循环，不能走回被遮住的根树。
+        if (ActiveDialog is { } dialog)
+        {
+            dialog.CollectFocusOrder(order);
+        }
+        else if (_rootElement is not null)
         {
             CollectFocusable(_rootElement, order);
         }
@@ -2299,7 +2405,7 @@ public class VisualHost : System.Windows.Forms.Control
         FocusElement(ranked[next].Element);
     }
 
-    private static void CollectFocusable(VisualElement element, List<VisualElement> order)
+    internal static void CollectFocusable(VisualElement element, List<VisualElement> order)
     {
         // 禁用的容器连子树一起跳过：里面的控件即使本地是启用态也不能被 Tab 到。
         if (!element.IsVisible || !element.IsEffectivelyEnabled)

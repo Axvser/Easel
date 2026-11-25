@@ -1,0 +1,22 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.DialogCard"
+    Spacing="10">
+
+  <TextBlock Text="In-surface dialogs" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+  <TextBlock
+      Text="A modal scrim and a centred card in the surface overlay: focus trap, Escape, async result. No native window."
+      Wrap="True"
+      Foreground="{StaticResource Muted}" />
+
+  <StackPanel Orientation="Horizontal" Spacing="8">
+    <Button x:Name="messageButton" Text="Message" Height="32" Click="OnMessageClick" />
+    <Button x:Name="confirmButton" Text="Confirm" Height="32" Click="OnConfirmClick" />
+    <Button x:Name="promptButton" Text="Prompt" Height="32" Click="OnPromptClick" />
+  </StackPanel>
+
+  <TextBlock x:Name="status" Text="No dialog yet" Foreground="{StaticResource Muted}" />
+
+</local:ThemedStackPanel>
