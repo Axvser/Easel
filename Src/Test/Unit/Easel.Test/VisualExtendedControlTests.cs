@@ -120,6 +120,46 @@ public sealed class VisualExtendedControlTests
     }
 
     [TestMethod]
+    public void Calendar_HoveringADayPaintsAHoverWash()
+    {
+        var today = DateTime.Today;
+        var firstOfMonth = new DateTime(today.Year, today.Month, 1);
+        var offset = ((int)firstOfMonth.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var hoverDay = today.Day == 1 ? 2 : 1;
+        var hoverIndex = offset + hoverDay - 1;
+        var hoverX = 6 + ((hoverIndex % 7) * 34);
+        var hoverY = 62 + ((hoverIndex / 7) * 28);
+        var selectedIndex = offset + today.Day - 1;
+        var selectedX = 6 + ((selectedIndex % 7) * 34);
+        var selectedY = 62 + ((selectedIndex / 7) * 28);
+
+        using var surface = new VisualHost { Size = new Size(250, 226) };
+        using var calendar = new VC.Calendar { Width = 250f, Height = 226f, SelectedDate = today };
+        surface.Root = calendar;
+
+        using var before = Render(surface, 250, 226);
+        surface.ProcessPointerMove(new PointF(hoverX + 6f, hoverY + 6f));
+        using var hovered = Render(surface, 250, 226);
+
+        var beforePixel = before.GetPixel(hoverX + 6, hoverY + 6);
+        var hoverPixel = hovered.GetPixel(hoverX + 6, hoverY + 6);
+        Assert.AreNotEqual(beforePixel.ToArgb(), hoverPixel.ToArgb(), "hovering a day paints a wash");
+        Assert.IsGreaterThan(0, beforePixel.B);
+        Assert.IsGreaterThan(beforePixel.B, hoverPixel.B, "the wash leans toward the accent colour");
+        Assert.AreEqual(
+            Theme.Current.Accent.ToArgb(),
+            hovered.GetPixel(selectedX + 17, selectedY + 24).ToArgb(),
+            "the selected day keeps the solid accent");
+
+        surface.ProcessPointerMove(new PointF(249f, 225f));
+        using var left = Render(surface, 250, 226);
+        Assert.AreEqual(
+            beforePixel.ToArgb(),
+            left.GetPixel(hoverX + 6, hoverY + 6).ToArgb(),
+            "leaving the day clears the wash");
+    }
+
+    [TestMethod]
     public void DatePicker_OpensCalendarSelectsAndCloses()
     {
         using var surface = new VisualHost { Size = new Size(320, 280) };
@@ -289,6 +329,14 @@ public sealed class VisualExtendedControlTests
         Assert.IsEmpty(surface.Controls);
         Assert.IsGreaterThanOrEqualTo(40, polygon.DesiredSize.Width);
         Assert.IsGreaterThanOrEqualTo(20, path.DesiredSize.Height);
+    }
+
+    private static Bitmap Render(VisualHost surface, int width, int height)
+    {
+        var bitmap = new Bitmap(width, height);
+        using var graphics = Graphics.FromImage(bitmap);
+        surface.RenderTo(graphics, new Size(width, height));
+        return bitmap;
     }
 
     private static PointF Center(RectangleF bounds)

@@ -26,6 +26,7 @@ public class CalendarItem : VisualElement
     private readonly List<(RectangleF Bounds, DateTime Date)> _cells = [];
     private RectangleF _previous;
     private RectangleF _next;
+    private DateTime? _hoverDate;
 
     /// <summary>Creates a hit-testable month grid with theme padding.</summary>
     public CalendarItem()
@@ -131,9 +132,10 @@ public class CalendarItem : VisualElement
             var date = new DateTime(firstOfMonth.Year, firstOfMonth.Month, dayNumber);
             _cells.Add((cell, date));
             var selected = owner.SelectedDate is { } selectedDate && selectedDate.Date == date;
-            if (selected)
+            var hovered = !selected && _hoverDate is { } hover && hover.Date == date;
+            if (hovered || selected)
             {
-                using var fill = new SolidBrush(theme.Accent);
+                using var fill = new SolidBrush(selected ? theme.Accent : Color.FromArgb(36, theme.Accent));
                 using var path = XamlDrawing.RoundedRectangle(
                     new RectangleF(cell.X + 3f, cell.Y + 2f, cell.Width - 6f, cell.Height - 4f),
                     4f);
@@ -150,6 +152,44 @@ public class CalendarItem : VisualElement
                 StringAlignment.Center,
                 StringAlignment.Center);
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerMoved(VisualPointerEventArgs args)
+    {
+        base.OnPointerMoved(args);
+        SetHover(IsEnabled ? DateAt(args.GetPosition(this)) : null);
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(VisualPointerEventArgs args)
+    {
+        base.OnPointerExited(args);
+        SetHover(null);
+    }
+
+    private DateTime? DateAt(PointF point)
+    {
+        foreach (var (bounds, date) in _cells)
+        {
+            if (bounds.Contains(point))
+            {
+                return date;
+            }
+        }
+
+        return null;
+    }
+
+    private void SetHover(DateTime? date)
+    {
+        if (_hoverDate == date)
+        {
+            return;
+        }
+
+        _hoverDate = date;
+        InvalidateVisual();
     }
 
     /// <inheritdoc />
@@ -228,6 +268,7 @@ public class Calendar : TemplatedControl
         });
 
     private CalendarItem? _calendarItem;
+    private DateTime? _hoverDate;
 
     /// <summary>Creates a focusable calendar showing the current month.</summary>
     public Calendar()
@@ -386,9 +427,10 @@ public class Calendar : TemplatedControl
 
             var date = new DateTime(firstOfMonth.Year, firstOfMonth.Month, dayNumber);
             var selected = SelectedDate is { } selectedDate && selectedDate.Date == date;
-            if (selected)
+            var hovered = !selected && _hoverDate is { } hover && hover.Date == date;
+            if (hovered || selected)
             {
-                using var fill = new SolidBrush(theme.Accent);
+                using var fill = new SolidBrush(selected ? theme.Accent : Color.FromArgb(36, theme.Accent));
                 using var path = XamlDrawing.RoundedRectangle(
                     new RectangleF(cell.X + 3f, cell.Y + 2f, cell.Width - 6f, cell.Height - 4f),
                     4f);
@@ -405,6 +447,62 @@ public class Calendar : TemplatedControl
                 StringAlignment.Center,
                 StringAlignment.Center);
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerMoved(VisualPointerEventArgs args)
+    {
+        base.OnPointerMoved(args);
+        if (IsTemplated)
+        {
+            return;
+        }
+
+        SetHover(IsEnabled ? DateAt(args.GetPosition(this)) : null);
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(VisualPointerEventArgs args)
+    {
+        base.OnPointerExited(args);
+        SetHover(null);
+    }
+
+    private DateTime? DateAt(PointF point)
+    {
+        var left = Padding.Left;
+        var top = Padding.Top;
+        var firstWeekDay = (int)FirstDayOfWeek;
+        var firstOfMonth = DisplayMonth;
+        var offset = ((int)firstOfMonth.DayOfWeek - firstWeekDay + 7) % 7;
+        var days = DateTime.DaysInMonth(firstOfMonth.Year, firstOfMonth.Month);
+        var gridTop = top + CalendarItem.HeaderHeight + CalendarItem.WeekHeaderHeight;
+        for (var index = 0; index < 42; index++)
+        {
+            var cell = new RectangleF(
+                left + (((index % 7) * CalendarItem.CellWidth)),
+                gridTop + ((index / 7) * CalendarItem.CellHeight),
+                CalendarItem.CellWidth,
+                CalendarItem.CellHeight);
+            var dayNumber = index - offset + 1;
+            if (dayNumber >= 1 && dayNumber <= days && cell.Contains(point))
+            {
+                return new DateTime(firstOfMonth.Year, firstOfMonth.Month, dayNumber);
+            }
+        }
+
+        return null;
+    }
+
+    private void SetHover(DateTime? date)
+    {
+        if (_hoverDate == date)
+        {
+            return;
+        }
+
+        _hoverDate = date;
+        InvalidateVisual();
     }
 
     /// <inheritdoc />
