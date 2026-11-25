@@ -1,0 +1,59 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="Easel.Themes.Defaults.TextInputDefaults">
+
+  <!-- Built-in fallback appearance for TextBox and RichTextBox; added to the implicit style table by Theme.DefaultStyles. -->
+<Style TargetType="RichTextBox">
+    <Style.Template>
+      <ControlTemplate TargetType="RichTextBox">
+        <Grid>
+          <Border Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Opacity="0" />
+          <Border Padding="{TemplateBinding Padding}">
+            <RichTextContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsFocused" Value="True">
+            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+<Style TargetType="TextBox">
+    <Style.Template>
+      <ControlTemplate TargetType="TextBox">
+        <Grid>
+          <Border Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Opacity="0" />
+          <Border Padding="{TemplateBinding Padding}">
+            <TextBoxContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsFocused" Value="True">
+            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+</ResourceDictionary>
