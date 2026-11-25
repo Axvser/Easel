@@ -503,6 +503,26 @@ public sealed class WindowChromeTests
         }
     }
 
+    [TestMethod]
+    public void AutoAttachedChromeKeepsTheSnapStylesAfterTheFormIsShown()
+    {
+        var form = CreateForm(out var host, out var bar);
+        using (form)
+        using (host)
+        using (bar)
+        {
+            form.Show();
+            Application.DoEvents();
+            Thread.Sleep(80);
+            Application.DoEvents();
+
+            var style = GetWindowLongPtr(form.Handle, -16).ToInt64();
+            Assert.AreNotEqual(0L, style & 0x00040000L, "WS_THICKFRAME survives the show sequence");
+            Assert.AreNotEqual(0L, style & 0x00020000L, "WS_MINIMIZEBOX survives the show sequence");
+            Assert.AreNotEqual(0L, style & 0x00010000L, "WS_MAXIMIZEBOX survives the show sequence");
+        }
+    }
+
     private static Form CreateForm(out VisualHost host, out VC.VisualTitleBar bar, bool autoAttach = true)
     {
         var form = new Form
@@ -658,6 +678,15 @@ public sealed class WindowChromeTests
 
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong32(IntPtr hwnd, int index);
+
+    private static IntPtr GetWindowLongPtr(IntPtr hwnd, int index)
+        => IntPtr.Size == 8 ? GetWindowLongPtr64(hwnd, index) : new IntPtr(GetWindowLong32(hwnd, index));
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);

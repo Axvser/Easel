@@ -187,6 +187,7 @@ public static class WindowChrome
             form.Disposed += OnFormDisposed;
             form.HandleCreated += OnFormHandleCreated;
             form.HandleDestroyed += OnFormHandleDestroyed;
+            form.Shown += OnFormShown;
             form.ControlAdded += OnFormControlChanged;
             form.ControlRemoved += OnFormControlChanged;
             Theme.Changed += OnThemeChanged;
@@ -260,6 +261,8 @@ public static class WindowChrome
 
                 case WM_NCHITTEST:
                 {
+                    // 命中测试时顺手补一次：任何一次窗口样式重算都不该让吸附失效。
+                    ApplySnapStyles();
                     var hit = ComputeHitTest(PointFromLParam(m.LParam));
                     m.Result = (IntPtr)hit;
                     return true;
@@ -319,6 +322,7 @@ public static class WindowChrome
             _form.Disposed -= OnFormDisposed;
             _form.HandleCreated -= OnFormHandleCreated;
             _form.HandleDestroyed -= OnFormHandleDestroyed;
+            _form.Shown -= OnFormShown;
             _form.ControlAdded -= OnFormControlChanged;
             _form.ControlRemoved -= OnFormControlChanged;
 
@@ -381,6 +385,14 @@ public static class WindowChrome
             ApplySnapStyles();
             InstallFormHook();
             RefreshHosts();
+            ApplyDwm();
+        }
+
+        // WinForms 在窗体显示阶段还会按 FormBorderStyle 重算一次窗口样式；
+        // 那一步会抹掉为本机吸附补的 WS_THICKFRAME，显示完再补一次。
+        private void OnFormShown(object? sender, EventArgs e)
+        {
+            ApplySnapStyles();
             ApplyDwm();
         }
 
