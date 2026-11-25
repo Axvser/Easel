@@ -119,7 +119,7 @@ island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElemen
 ⚙ **Native layout is the same layout.** `Margin`, `Width`/`Height`, `Min`/`Max`, alignment, `Grid.Row`,
 `DockPanel.Dock`, `Canvas.Left`, `Panel.ZIndex` and `Visibility` on a `native:` element are routed to the
 wrapper and participate in the normal measure/arrange pass. Every other attribute goes to the native control
-(`Text`, `BackColor`, `Padding`, events). A native CLR property binds through a generated proxy property; `Mode=TwoWay` reports back through `INotifyPropertyChanged`, `XxxChanged`, or an idle/200 ms fallback; native `Enter`/`Leave` raise the wrapper's logical focus events, so `LostFocus` triggers behave like a visual target.
+(`Text`, `BackColor`, `Padding`, events). A native CLR property binds through a generated proxy property; `Mode=TwoWay` reports back through `INotifyPropertyChanged` or `XxxChanged`, and a control with neither calls `NativePropertyBinding.NotifyChanged` (no polling); native `Enter`/`Leave` raise the wrapper's logical focus events, so `LostFocus` triggers behave like a visual target.
 
 ⚙ **A native container hosts visual content.** Put a visual panel inside it (`<native:GroupBox>
 <StackPanel>…</StackPanel></native:GroupBox>`); the runtime paints that content through a nested `VisualHost`

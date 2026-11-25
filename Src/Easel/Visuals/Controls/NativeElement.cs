@@ -816,6 +816,23 @@ public class NativeElement : VisualElement
         native.Leave -= OnNativeLeave;
     }
 
+    /// <summary>Pushes a native property's current value into the two-way binding registered on this wrapper.</summary>
+    /// <param name="propertyName">The native property name, for example <c>nameof(TextBox.Text)</c>.</param>
+    /// <remarks>
+    /// Use it from a control that exposes neither <see cref="System.ComponentModel.INotifyPropertyChanged"/> nor a
+    /// conventional <c>XxxChanged</c> event; the value reaches the proxy dependency property and the binding updates
+    /// its source. Controls that expose those notifications do not need the call.
+    /// </remarks>
+    public void NotifyNativePropertyChanged(string propertyName)
+    {
+        if (_native is null)
+        {
+            return;
+        }
+
+        NativePropertyBinding.NotifyChanged(_native, propertyName);
+    }
+
     internal void TrackTwoWay(string propertyName, DependencyProperty property)
     {
         if (_twoWayBindings.Exists(binding => ReferenceEquals(binding.Property, property)))

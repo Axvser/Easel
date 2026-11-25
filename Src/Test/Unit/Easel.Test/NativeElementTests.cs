@@ -399,7 +399,7 @@ public sealed class NativeElementTests
     }
 
     [TestMethod]
-    public void ANativePropertyWithoutAChangeEventFallsBackToPolling()
+    public void ANativePropertyWithoutAChangeEventWaitsForExplicitNotification()
     {
         using var surface = CreateSurface(300, 200);
         using var control = new EventlessControl();
@@ -419,8 +419,10 @@ public sealed class NativeElementTests
         Assert.AreEqual("initial", control.Caption);
 
         control.Caption = "edited";
-        VC.NativePropertyBinding.PollAll();
-        Assert.AreEqual("edited", source.Name, "polling covers properties with neither INotifyPropertyChanged nor a Changed event");
+        Assert.AreEqual("initial", source.Name, "without a notification the source does not move");
+
+        VC.NativePropertyBinding.NotifyChanged(control, nameof(EventlessControl.Caption));
+        Assert.AreEqual("edited", source.Name, "NotifyChanged pushes the native value into the binding");
     }
 
     [TestMethod]

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 
 namespace Easel.Visuals.Controls;
@@ -13,20 +14,17 @@ namespace Easel.Visuals.Controls;
 /// value to the control, and the binding engine keeps its usual source/update semantics.
 /// </para>
 /// <para>
-/// A two-way binding also needs the control to report its own changes. <see cref="TrackTwoWay"/> subscribes to the
-/// conventional <c>XxxChanged</c> event (for example <c>Text</c> → <c>TextChanged</c>); when the control changes, the
-/// proxy property is written and the binding updates its source. A property without a matching
-/// <see cref="EventHandler"/> stays one-way.
+/// A two-way binding also needs the control to report its own changes. <see cref="TrackTwoWay"/> subscribes to
+/// <see cref="INotifyPropertyChanged"/> or the conventional <c>XxxChanged</c> event when the control exposes one.
+/// A control that exposes neither reports its changes through <see cref="NotifyChanged"/>; the call reads the native
+/// property and writes the proxy dependency property, so the binding updates its source. Nothing polls.
 /// </para>
 /// </remarks>
 public static class NativePropertyBinding
 {
     private static readonly object Gate = new();
     private static readonly Dictionary<(Type Type, string Name), DependencyProperty> Cache = [];
-    private static readonly object PollGate = new();
-    private static readonly List<PolledBinding> Polled = [];
-    private static System.Windows.Forms.Timer? _pollTimer;
-    private static bool _idleHooked;
+    private static readonly ConditionalWeakTable<Control, Dictionary<string, List<NativeTarget>>> Targets = new();
 
     /// <summary>Returns the proxy dependency property for <paramref name="propertyName"/> on <paramref name="nativeType"/>.</summary>
     /// <param name="nativeType">The native control type, for example <c>typeof(System.Windows.Forms.Button)</c>.</param>
@@ -75,13 +73,15 @@ public static class NativePropertyBinding
         }
     }
 
-    /// <summary>Subscribes to the native <c>XxxChanged</c> event so a two-way binding can update its source.</summary>
+    /// <summary>Subscribes to the native change notifications available for a two-way binding.</summary>
     /// <param name="element">The wrapper whose proxy property receives the native value.</param>
     /// <param name="property">The proxy property returned by <see cref="For"/>.</param>
     /// <param name="propertyName">The native property name.</param>
     /// <remarks>
     /// The subscription follows the element's current native control and is replaced when that control is replaced;
-    /// it is released when the element is disposed.
+    /// it is released when the element is disposed. When the control exposes neither
+    /// <see cref="INotifyPropertyChanged"/> nor a conventional <c>XxxChanged</c> event, the binding stays registered
+    /// and waits for <see cref="NotifyChanged"/> instead of polling.
     /// </remarks>
     public static void TrackTwoWay(NativeElement element, DependencyProperty property, string propertyName)
     {
@@ -90,6 +90,51 @@ public static class NativePropertyBinding
         if (string.IsNullOrEmpty(propertyName)) throw new ArgumentException("A native binding needs a property name.", nameof(propertyName));
 
         element.TrackTwoWay(propertyName, property);
+    }
+
+    /// <summary>Pushes the current native value of <paramref name="propertyName"/> into every two-way binding on <paramref name="native"/>.</summary>
+    /// <param name="native">The native control whose property changed.</param>
+    /// <param name="propertyName">The native property name, for example <c>nameof(TextBox.Text)</c>.</param>
+    /// <remarks>
+    /// Call this after changing a native property from a control that exposes neither
+    /// <see cref="INotifyPropertyChanged"/> nor a conventional <c>XxxChanged</c> event. The value is written to the
+    /// proxy dependency property and the binding updates its source; an unbound or unchanged value is a no-op.
+    /// Controls that do expose those notifications do not need the call.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="native"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="propertyName"/> is empty.</exception>
+    public static void NotifyChanged(Control native, string propertyName)
+    {
+        if (native is null) throw new ArgumentNullException(nameof(native));
+        if (string.IsNullOrEmpty(propertyName)) throw new ArgumentException("A native binding needs a property name.", nameof(propertyName));
+        if (native.IsDisposed)
+        {
+            return;
+        }
+
+        if (!Targets.TryGetValue(native, out var byName)
+            || !byName.TryGetValue(propertyName, out var targets))
+        {
+            return;
+        }
+
+        NativeTarget[] snapshot;
+        lock (byName)
+        {
+            snapshot = [.. targets];
+        }
+
+        foreach (var target in snapshot)
+        {
+            if (target.Element.TryGetTarget(out var element)
+                && ReferenceEquals(element.Native, native))
+            {
+                WriteBack(element, native, propertyName, target.Property);
+                continue;
+            }
+
+            UnregisterTarget(native, propertyName, target);
+        }
     }
 
     internal static void Apply(IWinformsObject target, string propertyName, DependencyPropertyChangedEventArgs e)
@@ -137,7 +182,10 @@ public static class NativePropertyBinding
             return null;
         }
 
-        // 原生控件的三种回报渠道，按可靠性从高到低。
+        var target = RegisterTarget(native, propertyName, element, property);
+        IDisposable? notification = null;
+
+        // 原生控件的两种自动回报渠道，按可靠性从高到低。
         if (native is INotifyPropertyChanged notifier)
         {
             void OnNotified(object? sender, PropertyChangedEventArgs e)
@@ -152,32 +200,61 @@ public static class NativePropertyBinding
             }
 
             notifier.PropertyChanged += OnNotified;
-            return new Subscription(() => notifier.PropertyChanged -= OnNotified);
+            notification = new Subscription(() => notifier.PropertyChanged -= OnNotified);
         }
-
-        var eventInfo = native.GetType().GetEvent(propertyName + "Changed", BindingFlags.Public | BindingFlags.Instance);
-        if (eventInfo?.EventHandlerType == typeof(EventHandler))
+        else
         {
-            EventHandler handler = (_, _) => WriteBack(element, native, propertyName, property);
-            eventInfo.AddEventHandler(native, handler);
-            return new Subscription(() => eventInfo.RemoveEventHandler(native, handler));
+            var eventInfo = native.GetType().GetEvent(propertyName + "Changed", BindingFlags.Public | BindingFlags.Instance);
+            if (eventInfo?.EventHandlerType == typeof(EventHandler))
+            {
+                EventHandler handler = (_, _) => WriteBack(element, native, propertyName, property);
+                eventInfo.AddEventHandler(native, handler);
+                notification = new Subscription(() => eventInfo.RemoveEventHandler(native, handler));
+            }
         }
 
-        // 既没有 INotifyPropertyChanged 也没有 XxxChanged：用共享定时器轮询，消灭“只能单向”的语义差。
-        return StartPolling(element, native, propertyName, property);
+        // 没有事件也不轮询：宿主在值变化后调用 NotifyChanged 显式上报。
+        return new Subscription(() =>
+        {
+            notification?.Dispose();
+            UnregisterTarget(native, propertyName, target);
+        });
     }
 
-    internal static void PollAll()
+    private static NativeTarget RegisterTarget(Control native, string propertyName, NativeElement element, DependencyProperty property)
     {
-        PolledBinding[] snapshot;
-        lock (PollGate)
+        var target = new NativeTarget(element, property);
+        var byName = Targets.GetOrCreateValue(native);
+        lock (byName)
         {
-            snapshot = [.. Polled];
+            if (!byName.TryGetValue(propertyName, out var list))
+            {
+                byName[propertyName] = list = [];
+            }
+
+            list.Add(target);
         }
 
-        foreach (var binding in snapshot)
+        return target;
+    }
+
+    private static void UnregisterTarget(Control native, string propertyName, NativeTarget target)
+    {
+        if (!Targets.TryGetValue(native, out var byName))
         {
-            binding.Poll();
+            return;
+        }
+
+        lock (byName)
+        {
+            if (byName.TryGetValue(propertyName, out var list))
+            {
+                list.Remove(target);
+                if (list.Count == 0)
+                {
+                    byName.Remove(propertyName);
+                }
+            }
         }
     }
 
@@ -213,87 +290,11 @@ public static class NativePropertyBinding
         element.SetValue(property, value);
     }
 
-    private static IDisposable StartPolling(NativeElement element, Control native, string propertyName, DependencyProperty property)
+    private sealed class NativeTarget(NativeElement element, DependencyProperty property)
     {
-        var binding = new PolledBinding(element, native, propertyName, property);
-        lock (PollGate)
-        {
-            Polled.Add(binding);
-        }
+        internal WeakReference<NativeElement> Element { get; } = new(element);
 
-        EnsurePollTimer();
-        return new Subscription(() =>
-        {
-            lock (PollGate)
-            {
-                Polled.Remove(binding);
-            }
-
-            StopPollTimerIfEmpty();
-        });
-    }
-
-    private static void EnsurePollTimer()
-    {
-        if (_pollTimer is not null)
-        {
-            if (!_pollTimer.Enabled)
-            {
-                _pollTimer.Start();
-            }
-        }
-        else
-        {
-            // 兜底：没有窗口消息的静默赋值在这个周期内被读到。
-            _pollTimer = new System.Windows.Forms.Timer { Interval = 200 };
-            _pollTimer.Tick += (_, _) => PollAll();
-            _pollTimer.Start();
-        }
-
-        if (!_idleHooked)
-        {
-            // UI 驱动的变化在消息队列一空就同步回读，不再等定时器。
-            Application.Idle += OnApplicationIdle;
-            _idleHooked = true;
-        }
-    }
-
-    private static void OnApplicationIdle(object? sender, EventArgs e) => PollAll();
-
-    private static void StopPollTimerIfEmpty()
-    {
-        if (_pollTimer is null)
-        {
-            return;
-        }
-
-        lock (PollGate)
-        {
-            if (Polled.Count > 0)
-            {
-                return;
-            }
-        }
-
-        _pollTimer.Stop();
-        if (_idleHooked)
-        {
-            Application.Idle -= OnApplicationIdle;
-            _idleHooked = false;
-        }
-    }
-
-    private sealed class PolledBinding(NativeElement element, Control native, string propertyName, DependencyProperty property)
-    {
-        public void Poll()
-        {
-            if (native.IsDisposed)
-            {
-                return;
-            }
-
-            WriteBack(element, native, propertyName, property);
-        }
+        internal DependencyProperty Property { get; } = property;
     }
 
     private sealed class Subscription(Action unsubscribe) : IDisposable
