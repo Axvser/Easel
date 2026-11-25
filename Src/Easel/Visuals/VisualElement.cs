@@ -396,9 +396,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     internal void MarkTemplateContent()
     {
         IsTemplateContent = true;
-        foreach (var child in Children)
+        // Children 是 IList<Visual>；按索引走，避免 foreach 装箱结构体枚举器。
+        var children = Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element)
+            if (children[index] is VisualElement element)
             {
                 element.MarkTemplateContent();
             }
@@ -593,6 +595,9 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// </remarks>
     public ResourceDictionary Resources => _resources ??= new ResourceDictionary();
 
+    // 非创建访问器：资源探测不应给每个模板元素永久挂上空字典。
+    internal ResourceDictionary? ResourcesOrNull => _resources;
+
     /// <summary>The size this element wants inside <paramref name="availableSize"/>.</summary>
     public Size DesiredSize => _desiredSize;
 
@@ -612,6 +617,33 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// <summary>Raised after this element is attached to or detached from a parent.</summary>
     public event EventHandler? ParentChanged;
 
+    // 资源绑定在每个父链元素上挂一次观察；共享列表代替多播事件，避免增删时重建委托数组。
+    private List<Action>? _parentChangedObservers;
+
+    internal void AddParentChangedObserver(Action observer)
+        => (_parentChangedObservers ??= new List<Action>()).Add(observer);
+
+    internal void RemoveParentChangedObserver(Action observer)
+        => _parentChangedObservers?.Remove(observer);
+
+    private void RaiseParentChangedObservers()
+    {
+        var observers = _parentChangedObservers;
+        if (observers is null)
+        {
+            return;
+        }
+
+        // 观察者在回调里可能增删链上其它元素（不一定是本元素）的订阅；倒序并复查边界。
+        for (var index = observers.Count - 1; index >= 0; index--)
+        {
+            if (index < observers.Count)
+            {
+                observers[index]();
+            }
+        }
+    }
+
     /// <summary>The element that owns this one, or <see langword="null"/> for a root.</summary>
     public VisualElement? ParentElement => Parent as VisualElement;
 
@@ -620,6 +652,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     {
         base.OnParentChanged(oldParent, newParent);
         ParentChanged?.Invoke(this, EventArgs.Empty);
+        RaiseParentChangedObservers();
 
         // 换父级会让整个子树重新继承 DataContext；绑定只监听本元素的 DataContext 变化，
         // 预构造的子树（x:Class 视图里绑在嵌套面板上的按钮就是这种）挂到有上下文的父级后，
@@ -1138,9 +1171,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
 
         if (visual is ContainerVisual container)
         {
-            foreach (var child in container.Children)
+            var children = container.Children;
+            for (var index = 0; index < children.Count; index++)
             {
-                if (child is not null && HasUnboundedDrawing(child))
+                if (children[index] is { } child && HasUnboundedDrawing(child))
                 {
                     return true;
                 }
@@ -1158,8 +1192,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             return bounds;
         }
 
-        foreach (var child in container.Children)
+        var children = container.Children;
+        for (var index = 0; index < children.Count; index++)
         {
+            var child = children[index];
             if (child is null || AccumulateSubtreeBounds(child) is not { } childBounds)
             {
                 continue;
@@ -1243,7 +1279,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         // 主题是静态事件；不摘订阅，切换主题时会把已释放的元素留在内存里。
         if (_themeMetricsSubscribed)
         {
-            Theme.Changed -= OnThemeMetricsChanged;
+            UnregisterThemeMetrics();
             _themeMetricsSubscribed = false;
         }
 
@@ -1269,8 +1305,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         _identityTransform?.Dispose();
         _identityTransform = null;
 
-        foreach (var child in Children.ToArray())
+        // 倒序按索引走：Dispose 不会移除兄弟节点，倒序还能容忍子树在释放时改动本层集合。
+        var children = Children;
+        for (var index = children.Count - 1; index >= 0; index--)
         {
+            var child = children[index];
             if (child is VisualElement element)
             {
                 element.Dispose();
@@ -1427,9 +1466,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     // 子元素自己写了 DataContext 就截断继承；其余后代要收到 inherited 变更，绑定在祖先切换时才能重读。
     private static void NotifyDataContextDescendants(VisualElement parent, object? oldValue, object? newValue)
     {
-        foreach (var child in parent.Children)
+        var children = parent.Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is not VisualElement element || element.IsSet(DataContextProperty))
+            if (children[index] is not VisualElement element || element.IsSet(DataContextProperty))
             {
                 continue;
             }
@@ -1446,9 +1486,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         object? oldValue,
         object? newValue)
     {
-        foreach (var child in parent.Children)
+        var children = parent.Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element && !element.IsSet(property))
+            if (children[index] is VisualElement element && !element.IsSet(property))
             {
                 element.RaisePropertyChanged(property, oldValue, newValue, BindingPriority.Inherited);
             }
@@ -1460,10 +1501,37 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         _surface = surface;
         // 表面资源是资源链的最后一站；根挂到 VisualHost（或从它摘下）时延迟解析要重试一次。
         SurfaceChanged?.Invoke(this, EventArgs.Empty);
+        RaiseSurfaceChangedObservers();
         NotifySurfaceRootChanged();
     }
 
     internal event EventHandler? SurfaceChanged;
+
+    // 与 ParentChanged 同理：资源绑定的 SurfaceChanged 订阅走共享列表。
+    private List<Action>? _surfaceChangedObservers;
+
+    internal void AddSurfaceChangedObserver(Action observer)
+        => (_surfaceChangedObservers ??= new List<Action>()).Add(observer);
+
+    internal void RemoveSurfaceChangedObserver(Action observer)
+        => _surfaceChangedObservers?.Remove(observer);
+
+    private void RaiseSurfaceChangedObservers()
+    {
+        var observers = _surfaceChangedObservers;
+        if (observers is null)
+        {
+            return;
+        }
+
+        for (var index = observers.Count - 1; index >= 0; index--)
+        {
+            if (index < observers.Count)
+            {
+                observers[index]();
+            }
+        }
+    }
 
     // 根换表面时整棵子树都要知道；标题栏靠它在挂上宿主后才解析出 Form。
     internal event EventHandler? SurfaceRootChanged;
@@ -1471,9 +1539,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private void NotifySurfaceRootChanged()
     {
         SurfaceRootChanged?.Invoke(this, EventArgs.Empty);
-        foreach (var child in Children)
+        var children = Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element)
+            if (children[index] is VisualElement element)
             {
                 element.NotifySurfaceRootChanged();
             }
@@ -1490,9 +1559,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             TemplatedParent = parent;
         }
 
-        foreach (var child in Children)
+        var children = Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element)
+            if (children[index] is VisualElement element)
             {
                 element.SetTemplatedParentRecursive(parent);
             }
@@ -1593,9 +1663,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     internal void RefreshImplicitStyles()
     {
         SetImplicitStyle(ResolveImplicitStyle());
-        foreach (var child in Children)
+        var children = Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element)
+            if (children[index] is VisualElement element)
             {
                 element.RefreshImplicitStyles();
             }
@@ -1644,21 +1715,53 @@ public abstract class VisualElement : ContainerVisual, IDisposable
 
         if (!_themeMetricsSubscribed)
         {
-            _themeMetricsSubscribed = true;
-            Theme.Changed += OnThemeMetricsChanged;
+            RegisterThemeMetrics();
         }
 
         SetValue(property, select(Theme.Current), ThemeMetricPriority);
     }
 
-    private void OnThemeMetricsChanged(object? sender, EventArgs e)
+    // Theme.Changed 是静态事件；只挂一个静态处理器，元素进出登记表，避免逐个摘订阅时重建多播数组。
+    private static readonly List<VisualElement> s_themeMetricElements = [];
+    private static bool s_themeMetricHookInstalled;
+
+    private void RegisterThemeMetrics()
+    {
+        if (!s_themeMetricHookInstalled)
+        {
+            s_themeMetricHookInstalled = true;
+            Theme.Changed += OnAnyThemeChanged;
+        }
+
+        if (!s_themeMetricElements.Contains(this))
+        {
+            s_themeMetricElements.Add(this);
+        }
+
+        _themeMetricsSubscribed = true;
+    }
+
+    private void UnregisterThemeMetrics()
+    {
+        s_themeMetricElements.Remove(this);
+    }
+
+    private static void OnAnyThemeChanged(object? sender, EventArgs e)
+    {
+        var palette = Theme.Current;
+        for (var index = s_themeMetricElements.Count - 1; index >= 0; index--)
+        {
+            s_themeMetricElements[index].ApplyThemeMetrics(palette);
+        }
+    }
+
+    private void ApplyThemeMetrics(ThemePalette palette)
     {
         if (_themeMetrics is null)
         {
             return;
         }
 
-        var palette = Theme.Current;
         foreach (var metric in _themeMetrics)
         {
             SetValue(metric.Property, metric.Select(palette), ThemeMetricPriority);

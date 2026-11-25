@@ -69,7 +69,7 @@ public static class VisualResourceLookup
 
         for (var current = element; current is not null; current = current.ParentElement)
         {
-            if (current.Resources.TryGetValue(key, out value))
+            if (current.ResourcesOrNull is { } resources && resources.TryGetValue(key, out value))
             {
                 return true;
             }
@@ -198,6 +198,9 @@ internal sealed class ResourceBinding : IDisposable
     private readonly object? _targetToken;
     private readonly List<VisualElement> _chain = [];
     private readonly List<ResourceDictionary> _dictionaries = [];
+    // 订阅/退订复用同一个委托实例，避免每次链变化都新分配一个方法组委托。
+    private readonly Action _chainObserver;
+    private readonly Action<object?> _dictionaryChangedHandler;
     private VisualElement? _surfaceRoot;
     private ResourceDictionary? _rootResources;
     private ResourceDictionary? _surfaceResources;
@@ -219,6 +222,8 @@ internal sealed class ResourceBinding : IDisposable
         _dynamic = dynamic;
         _targetToken = targetToken;
         _onMissing = onMissing;
+        _chainObserver = OnChainChangedObserver;
+        _dictionaryChangedHandler = OnDictionaryChanged;
     }
 
     internal ResourceBinding Start()
@@ -300,7 +305,7 @@ internal sealed class ResourceBinding : IDisposable
 
         for (var tail = _chain.Count - 1; tail >= index; tail--)
         {
-            _chain[tail].ParentChanged -= OnChainChanged;
+            _chain[tail].RemoveParentChangedObserver(_chainObserver);
         }
 
         if (index < _chain.Count)
@@ -311,7 +316,7 @@ internal sealed class ResourceBinding : IDisposable
         while (current is not null)
         {
             _chain.Add(current);
-            current.ParentChanged += OnChainChanged;
+            current.AddParentChangedObserver(_chainObserver);
             current = current.ParentElement;
         }
     }
@@ -326,13 +331,13 @@ internal sealed class ResourceBinding : IDisposable
 
         if (_surfaceRoot is not null)
         {
-            _surfaceRoot.SurfaceChanged -= OnChainChanged;
+            _surfaceRoot.RemoveSurfaceChangedObserver(_chainObserver);
         }
 
         _surfaceRoot = root;
         if (root is not null)
         {
-            root.SurfaceChanged += OnChainChanged;
+            root.AddSurfaceChangedObserver(_chainObserver);
         }
     }
 
@@ -341,7 +346,8 @@ internal sealed class ResourceBinding : IDisposable
     {
         for (var current = _element; current is not null; current = current.ParentElement)
         {
-            if (current.Resources.TryFindSource(_key, out value, out source))
+            if (current.ResourcesOrNull is { } resources
+                && resources.TryFindSource(_key, out value, out source))
             {
                 return true;
             }
@@ -363,6 +369,7 @@ internal sealed class ResourceBinding : IDisposable
     private void SyncDictionarySubscriptions(VisualHost? surface, ResourceDictionary? source)
     {
         var root = _chain.Count > 0 ? _chain[_chain.Count - 1] : null;
+        // 订阅必须拿到实例：元素/链根还没有字典时先建出来，之后加键才能通知到；读取路径仍走 ResourcesOrNull。
         var rootResources = root?.Resources;
         var surfaceResources = surface?.Resources;
         if (ReferenceEquals(rootResources, _rootResources)
@@ -425,14 +432,14 @@ internal sealed class ResourceBinding : IDisposable
         }
 
         _dictionaries.Add(dictionary);
-        dictionary.Changed += OnDictionaryChanged;
+        dictionary.AddChangedObserver(_dictionaryChangedHandler);
     }
 
     private void RemoveDictionary(ResourceDictionary dictionary)
     {
         if (_dictionaries.Remove(dictionary))
         {
-            dictionary.Changed -= OnDictionaryChanged;
+            dictionary.RemoveChangedObserver(_dictionaryChangedHandler);
         }
     }
 
@@ -440,20 +447,20 @@ internal sealed class ResourceBinding : IDisposable
     {
         foreach (var current in _chain)
         {
-            current.ParentChanged -= OnChainChanged;
+            current.RemoveParentChangedObserver(_chainObserver);
         }
 
         _chain.Clear();
 
         if (_surfaceRoot is not null)
         {
-            _surfaceRoot.SurfaceChanged -= OnChainChanged;
+            _surfaceRoot.RemoveSurfaceChangedObserver(_chainObserver);
             _surfaceRoot = null;
         }
 
         foreach (var dictionary in _dictionaries)
         {
-            dictionary.Changed -= OnDictionaryChanged;
+            dictionary.RemoveChangedObserver(_dictionaryChangedHandler);
         }
 
         _dictionaries.Clear();
@@ -462,7 +469,7 @@ internal sealed class ResourceBinding : IDisposable
         _source = null;
     }
 
-    private void OnChainChanged(object? sender, EventArgs e) => Refresh();
+    private void OnChainChangedObserver() => Refresh();
 
     private void OnDictionaryChanged(object? changedKey)
     {

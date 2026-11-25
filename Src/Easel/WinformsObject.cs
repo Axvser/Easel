@@ -63,10 +63,17 @@ public interface IWinformsObject
 /// <summary>The WPF-named base implementation of <see cref="IWinformsObject"/> for the visual backend.</summary>
 public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
 {
-    // 每属性一张优先级表。不再用 SortedDictionary：它枚举时会给 TreeSet 的枚举器分配一个对象，
-    // 而 GetValue 在渲染期每帧要读很多次（文本、前景色、边距……），那点分配会堆成整帧的 GC 压力。
-    // 取「数值最小」的优先级与 SortedDictionary 升序取首个等价（Animation=-1 > LocalValue=0 > …）。
-    private readonly Dictionary<DependencyProperty, Dictionary<BindingPriority, object?>> _values = [];
+    // 每属性一张优先级表。不用 SortedDictionary：它枚举时会给 TreeSet 的枚举器分配对象，
+    // 而 GetValue 渲染期每帧要读很多次。取「数值最小」的优先级与升序取首个等价。
+    // 多数属性只有一个来源；单层内联进结构体，叠层时才分配额外字典。预分配省掉首次扩容。
+    private readonly Dictionary<DependencyProperty, LayerValue> _values = new(4);
+
+    private struct LayerValue
+    {
+        public BindingPriority Priority;
+        public object? Value;
+        public Dictionary<BindingPriority, object?>? Extra;
+    }
     private PropertyChangedEventHandler? _clrPropertyChanged;
 
     /// <summary>Raised after the effective value of a property changes.</summary>
@@ -83,27 +90,23 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
     public object? GetValue(DependencyProperty property)
     {
         if (property is null) throw new ArgumentNullException(nameof(property));
-        if (_values.TryGetValue(property, out var layers) && layers.Count > 0)
+        if (_values.TryGetValue(property, out var layers))
         {
-            var best = BindingPriority.Template;
-            object? top = null;
-            var found = false;
-            foreach (var layer in layers)
+            var best = layers.Priority;
+            var top = layers.Value;
+            if (layers.Extra is { } extra)
             {
-                if (found && layer.Key >= best)
+                foreach (var layer in extra)
                 {
-                    continue;
+                    if (layer.Key < best)
+                    {
+                        best = layer.Key;
+                        top = layer.Value;
+                    }
                 }
-
-                best = layer.Key;
-                top = layer.Value;
-                found = true;
             }
 
-            if (found)
-            {
-                return top;
-            }
+            return top;
         }
 
         if (property.Metadata.Inherits && GetInheritedValue(property) is { } inherited)
@@ -123,11 +126,30 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
 
         if (!_values.TryGetValue(property, out var layers))
         {
-            layers = [];
+            _values[property] = new LayerValue { Priority = priority, Value = value };
+        }
+        else
+        {
+            if (layers.Priority == priority)
+            {
+                layers.Value = value;
+            }
+            else if (layers.Extra is { } extra)
+            {
+                extra[priority] = value;
+            }
+            else
+            {
+                // Extra 只存「除主层以外」的层；主层永远留在内联槽位，避免同一个优先级出现两份。
+                layers.Extra = new Dictionary<BindingPriority, object?>
+                {
+                    [priority] = value,
+                };
+            }
+
             _values[property] = layers;
         }
 
-        layers[priority] = value;
         var newValue = GetValue(property);
         if (!Equals(oldValue, newValue))
         {
@@ -139,16 +161,64 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
     public void ClearValue(DependencyProperty property, BindingPriority priority = BindingPriority.LocalValue)
     {
         if (property is null) throw new ArgumentNullException(nameof(property));
-        if (!_values.TryGetValue(property, out var layers) || !layers.ContainsKey(priority))
+        if (!_values.TryGetValue(property, out var layers))
+        {
+            return;
+        }
+
+        var extra = layers.Extra;
+        if (layers.Priority != priority && (extra is null || !extra.ContainsKey(priority)))
         {
             return;
         }
 
         var oldValue = GetValue(property);
-        layers.Remove(priority);
-        if (layers.Count == 0)
+        if (extra is null)
         {
             _values.Remove(property);
+        }
+        else if (layers.Priority != priority)
+        {
+            extra.Remove(priority);
+            if (extra.Count == 0)
+            {
+                layers.Extra = null;
+            }
+
+            _values[property] = layers;
+        }
+        else
+        {
+            // 内联层被清掉后，从 Extra 里挑最小优先级顶上，保持「一个主层 + 可选 Extra」的不变式。
+            var promoted = false;
+            var bestPriority = default(BindingPriority);
+            object? bestValue = null;
+            foreach (var layer in extra)
+            {
+                if (!promoted || layer.Key < bestPriority)
+                {
+                    bestPriority = layer.Key;
+                    bestValue = layer.Value;
+                    promoted = true;
+                }
+            }
+
+            if (promoted)
+            {
+                extra.Remove(bestPriority);
+                layers.Priority = bestPriority;
+                layers.Value = bestValue;
+                if (extra.Count == 0)
+                {
+                    layers.Extra = null;
+                }
+
+                _values[property] = layers;
+            }
+            else
+            {
+                _values.Remove(property);
+            }
         }
 
         var newValue = GetValue(property);
@@ -162,7 +232,7 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
     public bool IsSet(DependencyProperty property)
     {
         if (property is null) throw new ArgumentNullException(nameof(property));
-        return _values.TryGetValue(property, out var layers) && layers.Count > 0;
+        return _values.ContainsKey(property);
     }
 
     /// <inheritdoc />

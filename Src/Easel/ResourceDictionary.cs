@@ -25,6 +25,34 @@ public class ResourceDictionary : IDictionary<object, object?>
     /// <summary>Raised after a key is added, replaced or removed; <see langword="null"/> means the dictionary was cleared.</summary>
     public event Action<object?>? Changed;
 
+    // 共享字典上会有大量动态资源订阅；内部观察者走列表，避免多播事件逐个增删时重建委托数组。
+    private List<Action<object?>>? _changedObservers;
+
+    internal void AddChangedObserver(Action<object?> observer)
+        => (_changedObservers ??= new List<Action<object?>>()).Add(observer);
+
+    internal void RemoveChangedObserver(Action<object?> observer)
+        => _changedObservers?.Remove(observer);
+
+    private void RaiseChanged(object? key)
+    {
+        Changed?.Invoke(key);
+        var observers = _changedObservers;
+        if (observers is null)
+        {
+            return;
+        }
+
+        // 观察者可能在回调里增删订阅；倒序并复查边界。
+        for (var index = observers.Count - 1; index >= 0; index--)
+        {
+            if (index < observers.Count)
+            {
+                observers[index](key);
+            }
+        }
+    }
+
     /// <summary>The dictionaries consulted after this one when a key is not found locally.</summary>
     /// <remarks>Merged entries are searched last added first, matching WPF's fallback order.</remarks>
     public IList<ResourceDictionary> MergedDictionaries { get; }
@@ -36,7 +64,7 @@ public class ResourceDictionary : IDictionary<object, object?>
         set
         {
             _items[key] = value;
-            Changed?.Invoke(key);
+            RaiseChanged(key);
         }
     }
 
@@ -56,7 +84,7 @@ public class ResourceDictionary : IDictionary<object, object?>
     public void Add(object key, object? value)
     {
         _items.Add(key, value);
-        Changed?.Invoke(key);
+        RaiseChanged(key);
     }
 
     /// <inheritdoc />
@@ -68,7 +96,7 @@ public class ResourceDictionary : IDictionary<object, object?>
         var removed = _items.Remove(key);
         if (removed)
         {
-            Changed?.Invoke(key);
+            RaiseChanged(key);
         }
 
         return removed;
@@ -76,16 +104,13 @@ public class ResourceDictionary : IDictionary<object, object?>
 
     /// <inheritdoc />
     /// <remarks>Falls back to <see cref="MergedDictionaries"/> when the key is not stored locally.</remarks>
-    public bool TryGetValue(object key, out object? value) => TryFindSource(key, visited: null, out value, out _);
+    public bool TryGetValue(object key, out object? value) => TryFindSource(key, out value, out _);
+
+    // visited 集合按线程复用：只有走进合并字典才需要它，本地命中仍走短路径。
+    [ThreadStatic] private static HashSet<ResourceDictionary>? t_visited;
+    [ThreadStatic] private static int t_visitedDepth;
 
     internal bool TryFindSource(object key, out object? value, out ResourceDictionary? source)
-        => TryFindSource(key, visited: null, out value, out source);
-
-    private bool TryFindSource(
-        object key,
-        HashSet<ResourceDictionary>? visited,
-        out object? value,
-        out ResourceDictionary? source)
     {
         if (_items.TryGetValue(key, out value))
         {
@@ -100,7 +125,40 @@ public class ResourceDictionary : IDictionary<object, object?>
             return false;
         }
 
-        visited ??= new HashSet<ResourceDictionary>();
+        var visited = t_visited ??= new HashSet<ResourceDictionary>();
+        var top = t_visitedDepth == 0;
+        if (top)
+        {
+            visited.Clear();
+        }
+
+        t_visitedDepth++;
+        try
+        {
+            return TryFindSourceCore(key, visited, out value, out source);
+        }
+        finally
+        {
+            t_visitedDepth--;
+            if (top)
+            {
+                visited.Clear();
+            }
+        }
+    }
+
+    private bool TryFindSourceCore(
+        object key,
+        HashSet<ResourceDictionary> visited,
+        out object? value,
+        out ResourceDictionary? source)
+    {
+        if (_items.TryGetValue(key, out value))
+        {
+            source = this;
+            return true;
+        }
+
         if (!visited.Add(this))
         {
             // 合并链可能成环；已访问过的字典不再展开。
@@ -112,7 +170,7 @@ public class ResourceDictionary : IDictionary<object, object?>
         for (var index = MergedDictionaries.Count - 1; index >= 0; index--)
         {
             var merged = MergedDictionaries[index];
-            if (merged is not null && merged.TryFindSource(key, visited, out value, out source))
+            if (merged is not null && merged.TryFindSourceCore(key, visited, out value, out source))
             {
                 return true;
             }
@@ -127,7 +185,7 @@ public class ResourceDictionary : IDictionary<object, object?>
     public void Clear()
     {
         _items.Clear();
-        Changed?.Invoke(null);
+        RaiseChanged(null);
     }
 
     void ICollection<KeyValuePair<object, object?>>.Add(KeyValuePair<object, object?> item)
@@ -144,7 +202,7 @@ public class ResourceDictionary : IDictionary<object, object?>
         var removed = ((ICollection<KeyValuePair<object, object?>>)_items).Remove(item);
         if (removed)
         {
-            Changed?.Invoke(item.Key);
+            RaiseChanged(item.Key);
         }
 
         return removed;
@@ -155,10 +213,10 @@ public class ResourceDictionary : IDictionary<object, object?>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private void OnMergedChanged(object? changedKey) => Changed?.Invoke(changedKey);
+    private void OnMergedChanged(object? changedKey) => RaiseChanged(changedKey);
 
     /// <summary>A request to raise <see cref="Changed"/> with <see langword="null"/>, used by the merged list.</summary>
-    private void NotifyMergedListChanged() => Changed?.Invoke(null);
+    private void NotifyMergedListChanged() => RaiseChanged(null);
 
     /// <summary>The mutable merged list; it forwards each dictionary's own change signal through its owner.</summary>
     private sealed class MergedDictionaryCollection : Collection<ResourceDictionary>

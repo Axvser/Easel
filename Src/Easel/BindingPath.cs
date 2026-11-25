@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Globalization;
 
@@ -10,8 +11,14 @@ namespace Easel;
 /// </summary>
 internal sealed class BindingPath
 {
+    // 每次更新都重解析路径，TypeDescriptor 会重复新建描述符集合；按 (类型, 段名) 缓存。
+    private static readonly ConcurrentDictionary<(Type Type, string Name), PropertyDescriptor?> s_descriptors = new();
+
     private readonly string[] _segments;
     private readonly CompiledBindingReader? _compiled;
+    private BindingLeaf? _leaf;
+    private object? _leafInstance;
+    private PropertyDescriptor? _leafDescriptor;
 
     public BindingPath(string? path, CompiledBindingReader? compiled = null)
     {
@@ -93,7 +100,7 @@ internal sealed class BindingPath
 
             if (name.Length > 0)
             {
-                var descriptor = TypeDescriptor.GetProperties(current).Find(name, ignoreCase: false);
+                var descriptor = FindDescriptor(current, name);
                 if (descriptor is null)
                 {
                     return false;
@@ -102,10 +109,21 @@ internal sealed class BindingPath
                 if (!hasIndex && index == _segments.Length - 1)
                 {
                     value = descriptor.GetValue(current);
-                    leaf = new BindingLeaf(
-                        descriptor.PropertyType,
-                        descriptor.IsReadOnly ? null : () => descriptor.GetValue(current),
-                        descriptor.IsReadOnly ? null : newValue => descriptor.SetValue(current, newValue));
+                    // 同一目标对象上的重复解析复用同一个叶子；源对象换了才新建。
+                    if (_leaf is not null
+                        && ReferenceEquals(_leafInstance, current)
+                        && ReferenceEquals(_leafDescriptor, descriptor))
+                    {
+                        leaf = _leaf;
+                    }
+                    else
+                    {
+                        leaf = new BindingLeaf(descriptor, current);
+                        _leaf = leaf;
+                        _leafInstance = current;
+                        _leafDescriptor = descriptor;
+                    }
+
                     return true;
                 }
 
@@ -146,6 +164,26 @@ internal sealed class BindingPath
         }
 
         return false;
+    }
+
+    // 实现 ICustomTypeDescriptor 的对象可能按实例给出不同属性集，这类不缓存；其余按类型缓存。
+    private static PropertyDescriptor? FindDescriptor(object target, string name)
+    {
+        var type = target.GetType();
+        if (typeof(ICustomTypeDescriptor).IsAssignableFrom(type))
+        {
+            return TypeDescriptor.GetProperties(target).Find(name, ignoreCase: false);
+        }
+
+        var key = (type, name);
+        if (s_descriptors.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var descriptor = TypeDescriptor.GetProperties(type).Find(name, ignoreCase: false);
+        s_descriptors[key] = descriptor;
+        return descriptor;
     }
 
     private static bool TryParseSegment(string segment, out string name, out string indexText, out bool hasIndex)
@@ -227,6 +265,8 @@ internal sealed class BindingLeaf
 {
     private readonly Func<object?>? _getter;
     private readonly Action<object?>? _setter;
+    private readonly PropertyDescriptor? _descriptor;
+    private readonly object? _instance;
 
     public BindingLeaf(Type valueType, Func<object?>? getter, Action<object?>? setter)
     {
@@ -235,11 +275,34 @@ internal sealed class BindingLeaf
         _setter = setter;
     }
 
+    // 普通属性叶子直接持有描述符与目标，读写不经过闭包。
+    public BindingLeaf(PropertyDescriptor descriptor, object instance)
+    {
+        ValueType = descriptor.PropertyType;
+        _descriptor = descriptor;
+        _instance = instance;
+    }
+
     public Type ValueType { get; }
 
-    public bool CanWrite => _setter is not null;
+    public bool CanWrite => _descriptor is not null ? !_descriptor.IsReadOnly : _setter is not null;
 
-    public object? GetValue() => _getter?.Invoke();
+    public object? GetValue() => _descriptor is not null
+        ? _descriptor.GetValue(_instance)
+        : _getter?.Invoke();
 
-    public void SetValue(object? value) => _setter?.Invoke(value);
+    public void SetValue(object? value)
+    {
+        if (_descriptor is not null)
+        {
+            if (!_descriptor.IsReadOnly)
+            {
+                _descriptor.SetValue(_instance, value);
+            }
+
+            return;
+        }
+
+        _setter?.Invoke(value);
+    }
 }
