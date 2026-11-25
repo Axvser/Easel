@@ -44,4 +44,8 @@
   <ItemGroup>
     <AdditionalFiles Include="**/*.xaml" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Easel.Test" />
+  </ItemGroup>
 </Project>

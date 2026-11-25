@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Easel\Easel.csproj" />
+    <!-- The gallery's inspector/shell tests reach internal Demo helpers; Demo stays an example, not a runtime dependency. -->
+    <ProjectReference Include="..\..\..\..\Examples\XamlGallery\Demo\Demo.csproj" />
     <!-- 同时作为 analyzer（测生成产物）与普通引用（driver 测试要 new 生成器）：保留 ReferenceOutputAssembly。 -->
     <ProjectReference Include="..\..\..\Generators\Easel.Generator\Easel.Generator.csproj"
                       OutputItemType="Analyzer" />

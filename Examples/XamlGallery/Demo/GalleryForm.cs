@@ -14,6 +14,7 @@ public sealed class GalleryForm : Form
     private readonly GalleryCardCatalog _catalog;
     private readonly GalleryShellViewModel _vm;
     private GalleryVisualShell _shell;
+    private static int _mediaWarmupStarted;
 
     /// <summary>Creates the window and docks the single visual surface into it.</summary>
     /// <param name="args">Command-line arguments forwarded from <see cref="Program"/>.</param>
@@ -90,6 +91,7 @@ public sealed class GalleryForm : Form
     {
         base.OnShown(e);
         ApplyTitleBarTheme();
+        WarmUpMediaStack();
         Surface.InvalidateSurface();
         BeginInvoke(new Action(() =>
         {
@@ -111,6 +113,42 @@ public sealed class GalleryForm : Form
         }
 
         base.Dispose(disposing);
+    }
+
+    // 第一次创建 WPF 媒体宿主会初始化一次性的互操作/媒体栈（约 200ms）；放到后台 STA 线程预热，换页不再付这笔钱。
+    private static void WarmUpMediaStack()
+    {
+        if (Interlocked.Exchange(ref _mediaWarmupStarted, 1) != 0)
+        {
+            return;
+        }
+
+        var thread = new Thread(static () =>
+        {
+            try
+            {
+                var media = new System.Windows.Controls.MediaElement
+                {
+                    LoadedBehavior = System.Windows.Controls.MediaState.Manual,
+                    UnloadedBehavior = System.Windows.Controls.MediaState.Manual,
+                };
+                using var host = new System.Windows.Forms.Integration.ElementHost { Child = media };
+                var player = new System.Windows.Media.MediaPlayer();
+                player.Close();
+                host.Child = null;
+                media.Close();
+            }
+            catch (Exception)
+            {
+                // 预热失败只影响速度；页面仍会在自己的线程上完成初始化。
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "Easel media warmup",
+        };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
     }
 
     private void OnThemeChanged(object? sender, EventArgs e)

@@ -19,6 +19,8 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     private readonly GalleryCardCatalog _catalog;
     private readonly Dictionary<VC.TreeViewItem, string> _entryItems = [];
     private GalleryVisualInspector _inspector;
+    private readonly List<VisualElement> _pendingDispose = [];
+    private System.Windows.Forms.Timer? _disposeTimer;
     private bool _syncingSelection;
 
     /// <summary>Builds the shell for an existing view model and selection.</summary>
@@ -132,6 +134,15 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         {
             _vm.CatalogChanged -= OnCatalogChanged;
             _vm.PreviewChanged -= OnPreviewChanged;
+            if (_disposeTimer is { } timer)
+            {
+                timer.Stop();
+                timer.Tick -= OnDisposeTimerTick;
+                timer.Dispose();
+                _disposeTimer = null;
+            }
+
+            FlushPendingDisposals();
         }
 
         base.Dispose(disposing);
@@ -207,9 +218,9 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
             && PreviewHost.Content is VisualElement current
             && current is Demo.Views.DynamicResourceCard or Demo.Views.Cards.CompositionLabView)
         {
-            var next = _catalog.Find(_vm.SelectedCard.Id)?.Create(_model);
+            var next = IsolatePreviewDataContext(_catalog.Find(_vm.SelectedCard.Id)?.Create(_model));
             PreviewHost.Content = next;
-            current.Dispose();
+            DeferDispose(current);
             _inspector.SetTarget(next);
         }
     }
@@ -221,10 +232,62 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         PreviewScroll.VerticalOffset = 0;
 
         var previous = PreviewHost.Content as VisualElement;
-        var next = _catalog.Find(info.Id)?.Create(_model);
+        var next = IsolatePreviewDataContext(_catalog.Find(info.Id)?.Create(_model));
         PreviewHost.Content = next;
-        previous?.Dispose();
+        DeferDispose(previous);
         _inspector.SetTarget(next);
+    }
+
+    // 预览卡片各有自己的 DataContext；挂载前把未设置的值钉成本地空层，继承通知就不会在整棵预览子树上重复下传。
+    internal static VisualElement? IsolatePreviewDataContext(VisualElement? preview)
+    {
+        if (preview is not null && !preview.IsSet(VisualElement.DataContextProperty))
+        {
+            preview.DataContext = null;
+        }
+
+        return preview;
+    }
+
+    // 旧卡片已经离开可视树；下一帧画完后再释放，媒体/原生控件拆解的时间就不落在换页上。
+    private void DeferDispose(VisualElement? previous)
+    {
+        if (previous is null)
+        {
+            return;
+        }
+
+        _pendingDispose.Add(previous);
+        if (_disposeTimer is null)
+        {
+            _disposeTimer = new System.Windows.Forms.Timer { Interval = 30 };
+            _disposeTimer.Tick += OnDisposeTimerTick;
+        }
+
+        // 重启计时：从最后一次换页起算一帧，连续换页只释放一轮。
+        _disposeTimer.Stop();
+        _disposeTimer.Start();
+    }
+
+    private void OnDisposeTimerTick(object? sender, EventArgs e)
+    {
+        _disposeTimer?.Stop();
+        FlushPendingDisposals();
+    }
+
+    private void FlushPendingDisposals()
+    {
+        if (_pendingDispose.Count == 0)
+        {
+            return;
+        }
+
+        var pending = _pendingDispose.ToArray();
+        _pendingDispose.Clear();
+        foreach (var element in pending)
+        {
+            element.Dispose();
+        }
     }
 
     private void ClearPreview()
@@ -236,6 +299,6 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
 
         var previous = PreviewHost.Content as VisualElement;
         PreviewHost.Content = null;
-        previous?.Dispose();
+        DeferDispose(previous);
     }
 }

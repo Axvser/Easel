@@ -10,12 +10,13 @@ namespace Demo.Views.Cards;
 /// <summary>A real video page: WPF MediaElement hosted in the single native island, XAML transport controls.</summary>
 public sealed partial class VideoPlayerView : ThemedDockPanel
 {
-    private readonly Timer _timer = new() { Interval = 200 };
+    private readonly Timer _timer = new() { Interval = 60 };
     private ElementHost? _elementHost;
     private MediaElement? _video;
     private bool _updatingFromVideo;
+    private bool _mediaStarted;
 
-    /// <summary>Creates the page, opens the embedded clip and starts polling playback state.</summary>
+    /// <summary>Creates the page, schedules the embedded clip and starts polling playback state.</summary>
     public VideoPlayerView()
     {
         InitializeComponent();
@@ -35,11 +36,23 @@ public sealed partial class VideoPlayerView : ThemedDockPanel
         // NativeControlHost positions the child explicitly; a Dock style would make it fill the VisualHost.
         _elementHost = new ElementHost { Child = _video };
         videoHost.Child = _elementHost;
-        _video.Source = new Uri(MediaAssets.Resolve("aurora-drift.mp4"));
-        // With LoadedBehavior.Manual the clip does not open until the first Play; start it here.
-        _video.Play();
         _timer.Tick += OnTimerTick;
         _timer.Start();
+    }
+
+    // 媒体管线启动会把页面首帧拖慢；第一次 Tick 在页面画出后打开媒体，宿主先就位。
+    private void StartMedia()
+    {
+        _mediaStarted = true;
+        _timer.Interval = 200;
+        if (_video is not { } video)
+        {
+            return;
+        }
+
+        video.Source = new Uri(MediaAssets.Resolve("aurora-drift.mp4"));
+        // With LoadedBehavior.Manual the clip does not open until the first Play; start it here.
+        video.Play();
     }
 
     /// <inheritdoc />
@@ -135,6 +148,12 @@ public sealed partial class VideoPlayerView : ThemedDockPanel
 
     private void OnTimerTick(object? sender, EventArgs e)
     {
+        if (!_mediaStarted)
+        {
+            StartMedia();
+            return;
+        }
+
         if (_video is not { NaturalDuration.HasTimeSpan: true } video)
         {
             return;
