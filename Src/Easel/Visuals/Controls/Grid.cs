@@ -140,7 +140,11 @@ public class Grid : Panel
     private double[] _starWidths = [];
     private double[] _starHeights = [];
     private Size _tracksContent;
+    private Size _resolvedContent;
     private bool _tracksResolved;
+    private int _trackGeneration = -1;
+    private bool _measuredUnboundedWidth;
+    private bool _measuredUnboundedHeight;
 
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
@@ -149,7 +153,7 @@ public class Grid : Panel
         var content = new Size(
             Math.Max(0, availableSize.Width - (int)Math.Ceiling(padding.Horizontal)),
             Math.Max(0, availableSize.Height - (int)Math.Ceiling(padding.Vertical)));
-        var (widths, heights) = ResolveTracks(content);
+        var (widths, heights) = ResolveTracks(content, fromMeasure: true);
         return new Size(
             (int)Math.Ceiling(Sum(widths) + padding.Horizontal),
             (int)Math.Ceiling(Sum(heights) + padding.Vertical));
@@ -163,18 +167,31 @@ public class Grid : Panel
             Math.Max(0, finalSize.Width - (int)Math.Ceiling(padding.Horizontal)),
             Math.Max(0, finalSize.Height - (int)Math.Ceiling(padding.Vertical)));
 
-        // 布局管线在同一次布局里先 Measure 后 Arrange；尺寸没变时轨道结果仍然有效，
-        // 再走一遍 ResolveTracks 会把每个子项重新量一遍（那正是上一轮刚做过的事）。
+        // 布局管线先 Measure 后 Arrange；尺寸没变就复用轨道结果，变了也未必需要重量：
+        // 只有「按有限可用尺寸测量、排列时又变窄」的星号轨道会改变子项期望尺寸，见 CanRedistribute。
         double[] widths;
         double[] heights;
-        if (_tracksResolved && IsMeasureValid && _tracksContent == content)
+        if (_tracksResolved && IsMeasureValid)
         {
-            widths = _widths;
-            heights = _heights;
+            if (_resolvedContent == content)
+            {
+                widths = _widths;
+                heights = _heights;
+            }
+            else if (CanRedistribute(content))
+            {
+                RedistributeStars(content);
+                widths = _widths;
+                heights = _heights;
+            }
+            else
+            {
+                (widths, heights) = ResolveTracks(content, fromMeasure: false);
+            }
         }
         else
         {
-            (widths, heights) = ResolveTracks(content);
+            (widths, heights) = ResolveTracks(content, fromMeasure: false);
         }
 
         var columnOffsets = Offsets(widths, padding.Left);
@@ -222,8 +239,12 @@ public class Grid : Panel
     }
 
     // 测一次子项得到自然尺寸，再按定义分到像素/自动/星号三种轨道。
-    private (double[] Widths, double[] Heights) ResolveTracks(Size content)
+    private (double[] Widths, double[] Heights) ResolveTracks(Size content, bool fromMeasure)
     {
+        if (fromMeasure)
+        {
+            RecordMeasureContent(content);
+        }
         // 没有定义的网格等价于一整行星号轨道；不再为这个默认轨道 new 定义对象。
         var columnCount = ColumnDefinitions.Count;
         var rowCount = RowDefinitions.Count;
@@ -346,9 +367,61 @@ public class Grid : Panel
         }
 
         _tracksContent = content;
+        _resolvedContent = content;
         _tracksResolved = true;
         return (_widths, _heights);
     }
+
+    // 星号轨道按新可用尺寸重新分配：固定/自动轨道保持 Measure 时的尺寸，
+    // 星号轨道用当时记下的固有内容尺寸（只写星号单元，可重复调用）。
+    private void RedistributeStars(Size content)
+    {
+        DistributeStars(_columnLengths, _widths, content.Width, _starWidths);
+        DistributeStars(_rowLengths, _heights, content.Height, _starHeights);
+        _resolvedContent = content;
+    }
+
+    // 记下这一趟布局里本网格有没有被不设限地量过；子项的固有尺寸就是在那种约束下得到的。
+    private void RecordMeasureContent(Size content)
+    {
+        var generation = VisualHost.LayoutGeneration;
+        if (_trackGeneration != generation)
+        {
+            _trackGeneration = generation;
+            _measuredUnboundedWidth = false;
+            _measuredUnboundedHeight = false;
+        }
+
+        _measuredUnboundedWidth |= IsUnbounded(content.Width);
+        _measuredUnboundedHeight |= IsUnbounded(content.Height);
+    }
+
+    // 变动的轴上，要么这一趟测量本来就不设限，要么没有星号轨道（像素/自动轨道与可用尺寸无关）。
+    // 满足时 Arrange 只重算星号分配 —— 目录行那种「测量高 0、排列高 29」的嵌套网格靠这条省掉整行重测。
+    private bool CanRedistribute(Size content)
+    {
+        var widthChanged = content.Width != _tracksContent.Width;
+        var heightChanged = content.Height != _tracksContent.Height;
+        if (widthChanged
+            && !_measuredUnboundedWidth
+            && !IsUnbounded(_tracksContent.Width)
+            && HasStar(_columnLengths, 0, _columnLengths.Length))
+        {
+            return false;
+        }
+
+        if (heightChanged
+            && !_measuredUnboundedHeight
+            && !IsUnbounded(_tracksContent.Height)
+            && HasStar(_rowLengths, 0, _rowLengths.Length))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsUnbounded(double value) => value >= int.MaxValue / 2d;
 
     // 星号轨道平分扣除像素与自动轨道后的剩余；最后一格吃掉取整误差，保证总宽等于可用宽。
     private static void DistributeStars(XamlGridLength[] lengths, double[] sizes, double available, double[] contentSizes)

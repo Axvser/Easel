@@ -272,6 +272,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private Size _measureAvailable;
     private Size _desiredSize;
 
+    // ScrollContentPresenter 用这个有限宽探测可横向滚动的内容（其私有常量是 100_000）。
+    // 内容原样报回该宽会被当成“填满”而按视口重测；按不设限处理，星号轨道就退回内容尺寸。
+    internal const int UnboundedMeasureProbe = 100_000;
+
     /// <summary>When true, layout changes inside this element stop here; its parent slot is assumed fixed.</summary>
     public bool IsLayoutBoundary { get; set; }
 

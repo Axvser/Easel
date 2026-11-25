@@ -627,17 +627,27 @@ public class TreeView : TemplatedControl
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
+        // 横向滚动的 ScrollViewer 会先用一个很大的有限宽探测内容。按不设限来量：否则模板里的
+        // 星号轨道会把这个宽度原样报回去，ScrollViewer 按视口宽重测，整棵树跟着被量很多遍。
+        var unboundedWidth = availableSize.Width >= UnboundedMeasureProbe;
+        var unboundedHeight = availableSize.Height >= UnboundedMeasureProbe;
+        var measureSize = unboundedWidth || unboundedHeight
+            ? new Size(
+                unboundedWidth ? int.MaxValue : availableSize.Width,
+                unboundedHeight ? int.MaxValue : availableSize.Height)
+            : availableSize;
+
         if (IsTemplated)
         {
             EnsureItemsHost();
-            return MeasureTemplate(availableSize);
+            return MeasureTemplate(measureSize);
         }
 
         var width = 0;
         var height = 0;
         foreach (var row in _rows)
         {
-            var measured = row.Measure(new Size(availableSize.Width, 0));
+            var measured = row.Measure(new Size(measureSize.Width, 0));
             width = Math.Max(width, measured.Width);
             height += measured.Height;
         }

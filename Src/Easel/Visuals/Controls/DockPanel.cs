@@ -67,20 +67,25 @@ public class DockPanel : Panel
         var width = 0;
         var height = 0;
 
+        // 逐个按“剩余空间”测量，与 Arrange 传给每个子项的尺寸完全一致。
+        // 两者若用不同约束，同一子项每趟布局都会在这两个尺寸之间来回重测（嵌套 DockPanel 会层层放大）。
+        var remaining = content;
         foreach (var child in ArrangedChildren())
         {
-            var measured = child.Measure(content);
+            var measured = child.Measure(remaining);
             switch (GetDock(child))
             {
                 case XamlDockPlacement.Left:
                 case XamlDockPlacement.Right:
                     width += measured.Width;
                     height = Math.Max(height, measured.Height);
+                    remaining.Width = Math.Max(0, remaining.Width - measured.Width);
                     break;
                 case XamlDockPlacement.Top:
                 case XamlDockPlacement.Bottom:
                     width = Math.Max(width, measured.Width);
                     height += measured.Height;
+                    remaining.Height = Math.Max(0, remaining.Height - measured.Height);
                     break;
                 default:
                     width = Math.Max(width, measured.Width);
@@ -114,9 +119,9 @@ public class DockPanel : Panel
                 continue;
             }
 
-            var measured = child.Measure(new Size(
-                (int)Math.Ceiling(remaining.Width),
-                (int)Math.Ceiling(remaining.Height)));
+            // Measure 阶段已经按同一“剩余空间”量过了，这里直接用缓存结果。
+            // 再调一次 Measure 只会让子项（以及嵌套的 DockPanel）在两种约束间重新排一遍。
+            var measured = child.DesiredSize;
             var dock = GetDock(child);
             RectangleF slot;
             switch (dock)

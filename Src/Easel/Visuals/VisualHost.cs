@@ -53,7 +53,12 @@ public class VisualHost : System.Windows.Forms.Control
     private bool _damageFull = true;
     private MouseButtons _buttons;
     private bool _layoutValid;
+    private bool _layoutInProgress;
+    private bool _paintingFullDamage;
     private Size _layoutSize;
+
+    // 每开始一趟布局递增。Grid 用它区分「同一趟里被父级第二遍收紧」与「下一趟换了约束」。
+    internal static int LayoutGeneration { get; private set; }
     private float _dpiScale;
     private bool _dpiScaleValid;
     private float _dpiScaleOverride;
@@ -315,6 +320,13 @@ public class VisualHost : System.Windows.Forms.Control
 
     internal void InvalidatePaint()
     {
+        // 排版过程中的重画请求（滚动条在布局里改 ViewportSize/LargeChange 就会走这里）：
+        // 这一帧本来就是整面绘制，而且绘制在排版之后才发生，不需要再排一帧。
+        if (_layoutInProgress && _paintingFullDamage)
+        {
+            return;
+        }
+
         _damageFull = true;
         MarkFrameFull();
         Invalidate();
@@ -1646,20 +1658,22 @@ public class VisualHost : System.Windows.Forms.Control
         ApplyNativeRegion(owner, child, clip);
     }
 
-    private void FlushNativePlacements()
+    private bool FlushNativePlacements()
     {
         if (_pendingPlacements.Count == 0)
         {
-            return;
+            return false;
         }
 
         var pending = _pendingPlacements.ToArray();
         _pendingPlacements.Clear();
+        var applied = false;
         foreach (var pair in pending)
         {
             if (_nativeChildren.TryGetValue(pair.Key, out var current)
                 && ReferenceEquals(current, pair.Value.Child))
             {
+                applied = true;
                 ApplyNativePlacement(
                     pair.Key,
                     pair.Value.Child,
@@ -1668,6 +1682,8 @@ public class VisualHost : System.Windows.Forms.Control
                     pair.Value.Visible);
             }
         }
+
+        return applied;
     }
 
     // 弹层画在主表面的覆盖层里，子 HWND 永远盖在它上面；把弹层的物理矩形从岛的窗口区域里挖掉，
@@ -1837,6 +1853,7 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         _rendering = true;
+        _paintingFullDamage = _damageFull;
         try
         {
             RenderPhysical(e.Graphics, damage);
@@ -1844,13 +1861,15 @@ public class VisualHost : System.Windows.Forms.Control
         finally
         {
             _rendering = false;
+            _paintingFullDamage = false;
         }
 
         // WinForms 在 OnPaint 返回后才把这一帧贴到屏幕；子 HWND 必须赶在那一刻之前落位。
-        FlushNativePlacements();
+        var placedNative = FlushNativePlacements();
 
         // 拖动期间等合成器提交这一帧，子 HWND 的位置和父窗口的新画面才会一起上屏。
-        if (IsPointerGestureActive)
+        // 没有子 HWND 落位时没有需要同步的对象，等待只会把每一帧拖长。
+        if (placedNative && IsPointerGestureActive)
         {
             _ = DwmFlush();
         }
@@ -2363,6 +2382,20 @@ public class VisualHost : System.Windows.Forms.Control
             return;
         }
 
+        LayoutGeneration++;
+        _layoutInProgress = true;
+        try
+        {
+            EnsureLayoutCore(size);
+        }
+        finally
+        {
+            _layoutInProgress = false;
+        }
+    }
+
+    private void EnsureLayoutCore(Size size)
+    {
         if (_layoutValid && _layoutSize == size)
         {
             if (_dirtyLayoutBoundaries.Count == 0)
