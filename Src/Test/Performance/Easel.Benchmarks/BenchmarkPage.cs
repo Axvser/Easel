@@ -29,6 +29,9 @@ internal static class BenchmarkPage
 
         var content = new VC.ScrollViewer { Width = 1, Height = Height - 20 };
         var stack = new VC.StackPanel { Spacing = 6, Padding = new Easel.Controls.Thickness(12) };
+        // Keep one slider inside the initial viewport: the scenario must paint the control it measures,
+        // not only the fixed full-frame blit below the scroll offset.
+        stack.Add(new VC.Slider { Height = 26, Minimum = 0, Maximum = 100, Value = 42 });
         for (var i = 0; i < 20; i++) stack.Add(new VC.Button { Text = "Action " + i, Height = 28 });
         for (var i = 0; i < 8; i++) stack.Add(new VC.TextBox { Text = "Field " + i, Height = 28, UseNativeEditor = false });
         for (var i = 0; i < 5; i++) stack.Add(new VC.Slider { Height = 26, Minimum = 0, Maximum = 100, Value = 42 });
