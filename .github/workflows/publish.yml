@@ -31,6 +31,10 @@ name: publish
 #   runtime's Release graph references the generator package, so the order keeps the runtime from
 #   being restored, packed or published before the compiler it depends on is downloadable.
 #
+#   WinForms.Easel.Templates is independent: nothing depends on it, it depends on no other Easel
+#   package, and it is packed and pushed after the runtime (or alone when only its version is
+#   missing). Its nupkg is checked for every item before the push.
+#
 # Target frameworks:
 #   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
 #   test and publish jobs install the older SDKs for their Windows Desktop reference packs.
@@ -104,6 +108,8 @@ jobs:
       generator_version: ${{ steps.read.outputs.generator_version }}
       easel_missing: ${{ steps.read.outputs.easel_missing }}
       easel_version: ${{ steps.read.outputs.easel_version }}
+      templates_missing: ${{ steps.read.outputs.templates_missing }}
+      templates_version: ${{ steps.read.outputs.templates_version }}
       missing: ${{ steps.read.outputs.missing }}
     steps:
       - uses: actions/checkout@v7
@@ -114,7 +120,8 @@ jobs:
         run: |
           $projects = @(
             @{ Id = "WinForms.Easel.Generator"; Kind = "generator"; Path = "Src/Generators/Easel.Generator/Easel.Generator.csproj" },
-            @{ Id = "WinForms.Easel"; Kind = "runtime"; Path = "Src/Easel/Easel.csproj" }
+            @{ Id = "WinForms.Easel"; Kind = "runtime"; Path = "Src/Easel/Easel.csproj" },
+            @{ Id = "WinForms.Easel.Templates"; Kind = "templates"; Path = "Src/Templates/Easel.Templates/working/Easel.Templates.csproj" }
           )
 
           foreach ($project in $projects) {
@@ -166,6 +173,8 @@ jobs:
           "generator_version=$(Get-Version 'generator')" >> $env:GITHUB_OUTPUT
           "easel_missing=$(To-Bool (Is-Missing 'runtime'))" >> $env:GITHUB_OUTPUT
           "easel_version=$(Get-Version 'runtime')" >> $env:GITHUB_OUTPUT
+          "templates_missing=$(To-Bool (Is-Missing 'templates'))" >> $env:GITHUB_OUTPUT
+          "templates_version=$(Get-Version 'templates')" >> $env:GITHUB_OUTPUT
           "missing=$missingJson" >> $env:GITHUB_OUTPUT
 
   test:
@@ -354,6 +363,30 @@ jobs:
             }
           }
 
+      - name: Build and pack the templates
+        if: needs.version.outputs.templates_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.templates_version }}
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          dotnet pack "Src/Templates/Easel.Templates/working/Easel.Templates.csproj" -c Release -o artifacts
+          if ($LASTEXITCODE -ne 0) { throw "pack failed: WinForms.Easel.Templates" }
+
+          # Every item must survive packing: a missing template.json would publish a package whose
+          # short name resolves to nothing.
+          $file = Join-Path "artifacts" "WinForms.Easel.Templates.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($file)
+          $entries = @($zip.Entries | ForEach-Object FullName)
+          $zip.Dispose()
+          foreach ($shortName in @("e-usercontrol", "e-resource", "e-theme", "e-style", "e-controltemplate", "e-datatemplate")) {
+            if (-not ($entries -contains "content/$shortName/.template.config/template.json")) {
+              throw "WinForms.Easel.Templates nupkg has no content/$shortName/.template.config/template.json; refusing to publish it."
+            }
+          }
+
       - uses: actions/upload-artifact@v7
         with:
           name: easel-${{ github.run_number }}
@@ -392,6 +425,21 @@ jobs:
               $delay = 60
             }
           }
+
+      - name: Push the templates
+        if: needs.version.outputs.templates_missing == 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.templates_version }}
+          NUGET_API_KEY: ${{ steps.login2.outputs.NUGET_API_KEY }}
+        run: |
+          $file = Join-Path "artifacts" "WinForms.Easel.Templates.${env:VERSION}.nupkg"
+          if (-not (Test-Path $file)) { throw "missing $file" }
+          # No package depends on the templates and they depend on no other Easel package, so the
+          # push needs no flatcontainer wait.
+          dotnet nuget push $file --api-key $env:NUGET_API_KEY `
+            --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { throw "push failed: WinForms.Easel.Templates" }
 
       - name: Unlist older patches of each pushed package's own line
         shell: pwsh
