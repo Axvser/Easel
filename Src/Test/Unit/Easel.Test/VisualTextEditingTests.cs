@@ -137,7 +137,7 @@ public sealed class VisualTextEditingTests
         Application.DoEvents();
 
         var root = new VC.StackPanel();
-        var text = new VC.TextBox { Width = 260, Height = 34 };
+        var text = new VC.TextBox { Width = 260, Height = 34, UseNativeEditor = true };
         var button = new VC.Button { Width = 260, Height = 34, Text = "Other" };
         root.Add(text);
         root.Add(button);
@@ -164,7 +164,7 @@ public sealed class VisualTextEditingTests
         _ = surface.Handle;
         Application.DoEvents();
 
-        var text = new VC.TextBox { Width = 260, Height = 34 };
+        var text = new VC.TextBox { Width = 260, Height = 34, UseNativeEditor = true };
         surface.Root = text;
         Layout(surface, 320, 160);
 
@@ -220,7 +220,7 @@ public sealed class VisualTextEditingTests
         var scroll = new VC.ScrollViewer { Width = 200, Height = 100 };
         var content = new VC.StackPanel { Width = 150 };
         content.Add(new VC.Border { Height = 190 });
-        var text = new VC.TextBox { Width = 150, Height = 34 };
+        var text = new VC.TextBox { Width = 150, Height = 34, UseNativeEditor = true };
         content.Add(text);
         scroll.Content = content;
         surface.Root = scroll;
@@ -260,7 +260,7 @@ public sealed class VisualTextEditingTests
         Application.DoEvents();
 
         var sheet = new VC.Border { Background = new SolidColorBrush(Color.FromArgb(255, 13, 17, 23)) };
-        var text = new VC.TextBox { Width = 160, Height = 32, Background = Brush.Empty };
+        var text = new VC.TextBox { Width = 160, Height = 32, Background = Brush.Empty, UseNativeEditor = true };
         sheet.Add(text);
         surface.Root = sheet;
         Layout(surface, 220, 120);
@@ -303,7 +303,7 @@ public sealed class VisualTextEditingTests
         _ = surface.Handle;
         Application.DoEvents();
 
-        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "abcdefghij" };
+        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "abcdefghij", UseNativeEditor = true };
         surface.Root = text;
         Layout(surface, 240, 80);
         Application.DoEvents();
@@ -329,7 +329,7 @@ public sealed class VisualTextEditingTests
         };
         using var surface = new VisualHost { Dock = DockStyle.Fill };
         form.Controls.Add(surface);
-        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "hello" };
+        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "hello", UseNativeEditor = true };
         var root = new VC.Canvas { Width = 320, Height = 200 };
         VC.Canvas.SetLeft(text, 40);
         VC.Canvas.SetTop(text, 40);
@@ -364,6 +364,57 @@ public sealed class VisualTextEditingTests
         Assert.IsTrue(text.IsUsingNativeEditor, "the click opens the native editor");
         Assert.IsTrue(text.NativeEditor.Focused, "the first click leaves the caret in the native editor");
         form.Close();
+    }
+
+    [TestMethod]
+    public void TextBox_UsesTheVisualPathByDefault()
+    {
+        using var surface = CreateSurface(320, 160);
+        _ = surface.Handle;
+        Application.DoEvents();
+
+        var text = new VC.TextBox { Width = 260, Height = 34 };
+        surface.Root = text;
+        Layout(surface, 320, 160);
+        surface.FocusElement(text);
+        Application.DoEvents();
+
+        Assert.IsFalse(text.UseNativeEditor, "the native island is an opt-in fallback");
+        Assert.IsFalse(text.IsUsingNativeEditor, "the visual path is the default");
+        Assert.IsFalse(surface.Controls.Contains(text.NativeEditor), "no child HWND is parented by default");
+
+        surface.ProcessTextInput("abc");
+        Assert.AreEqual("abc", text.Text, "typing stays on the visual path");
+    }
+
+    [TestMethod]
+    public void TextBox_HidesThePlaceholderWhileFocused()
+    {
+        using var surface = new VisualHost { Size = new Size(300, 70) };
+        var text = new VC.TextBox
+        {
+            Width = 260,
+            Height = 34,
+            Placeholder = "Filter demos...",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 16f, FontStyle.Bold),
+            CaretBlinkInterval = 0,
+        };
+        surface.Root = text;
+        Layout(surface, 300, 70);
+
+        using (var idle = Render(surface, 300, 70))
+        {
+            Assert.IsTrue(ContainsNearColor(idle, Theme.Current.MutedForeground, 4),
+                "an idle field shows its placeholder");
+        }
+
+        surface.FocusElement(text);
+
+        using var focused = Render(surface, 300, 70);
+        var near = FindNearColor(focused, Theme.Current.MutedForeground, 4);
+        Assert.IsNull(near,
+            $"a focused field hides the placeholder behind the caret (found {near} at {Theme.Current.MutedForeground})");
     }
 
     [TestMethod]
@@ -439,6 +490,44 @@ public sealed class VisualTextEditingTests
         using var graphics = Graphics.FromImage(bitmap);
         surface.RenderTo(graphics, new Size(width, height));
         return bitmap;
+    }
+
+    private static Point? FindNearColor(Bitmap bitmap, Color color, int tolerance)
+    {
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                if (Math.Abs(pixel.R - color.R) <= tolerance
+                    && Math.Abs(pixel.G - color.G) <= tolerance
+                    && Math.Abs(pixel.B - color.B) <= tolerance)
+                {
+                    return new Point(x, y);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool ContainsNearColor(Bitmap bitmap, Color color, int tolerance)
+    {
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                if (Math.Abs(pixel.R - color.R) <= tolerance
+                    && Math.Abs(pixel.G - color.G) <= tolerance
+                    && Math.Abs(pixel.B - color.B) <= tolerance)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool ContainsColor(Bitmap bitmap, Color color)

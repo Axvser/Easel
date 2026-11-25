@@ -294,12 +294,13 @@ public class Button : ButtonBase
 /// <see cref="OnKeyDown"/>; the edit history is the self-drawn path's own snapshot stack.
 /// </para>
 /// <para>
-/// While the field has focus it also hosts a private <see cref="NativeControlHost"/> over its content rectangle. The
-/// hosted <see cref="System.Windows.Forms.TextBox"/> is the native island that supplies IME composition and an
-/// accessibility peer, and the self-drawn text and caret are hidden while it is active. The island is a real HWND, so
-/// it always paints above the visual tree and cannot be transformed, blended or clipped: multi-line overflow is
-/// clipped by the visual path, and only the content rectangle is covered — the border and padding stay visual. Set
-/// <see cref="UseNativeEditor"/> to <see langword="false"/> to keep the whole field on the visual path instead.
+/// When <see cref="UseNativeEditor"/> is <see langword="true"/> the focused field also hosts a private
+/// <see cref="NativeControlHost"/> over its content rectangle. The hosted
+/// <see cref="System.Windows.Forms.TextBox"/> is the native island that supplies IME composition and an accessibility
+/// peer, and the self-drawn text and caret are hidden while it is active. The island is a real HWND, so it always
+/// paints above the visual tree and cannot be transformed, blended or clipped: multi-line overflow is clipped by the
+/// visual path, and only the content rectangle is covered — the border and padding stay visual. The visual path is the
+/// default; turn the island on only as the fallback for IME composition or the native accessibility peer.
 /// </para>
 /// <para>
 /// A control template replaces the self-drawn border and background. The template must contain a
@@ -344,17 +345,23 @@ public class TextBox : TemplatedControl
             nameof(IsReadOnly), typeof(bool), typeof(TextBox),
             new PropertyMetadata(false) { AffectsRender = true });
 
-    /// <summary>Whether the focused field hosts the native editor island for IME and accessibility.</summary>
+    /// <summary>Whether the focused field falls back to the native editor island for IME and accessibility.</summary>
     /// <remarks>
-    /// The field is self-drawn either way; this only decides what happens while it has focus. Set it to
-    /// <see langword="false"/> for a fully visual text box — no child HWND, no airspace island — when IME composition
-    /// and the native accessibility peer are not needed. Typing, selection, clipboard, undo, templates and bindings stay
-    /// on the visual path.
+    /// <para>
+    /// The visual path is the default: no child HWND, no airspace island, and every appearance property — including
+    /// <see cref="SelectionBrush"/>, <see cref="SelectionForeground"/>, <see cref="CaretBrush"/>,
+    /// <see cref="CaretThickness"/> and <see cref="CaretBlinkInterval"/> — paints as authored.
+    /// </para>
+    /// <para>
+    /// Set this to <see langword="true"/> to use the native editor island as the fallback when IME composition or the
+    /// native accessibility peer is required. Typing, selection, clipboard, undo, templates and bindings stay on the
+    /// visual path either way.
+    /// </para>
     /// </remarks>
     public static readonly DependencyProperty UseNativeEditorProperty =
         DependencyProperty.Register(
             nameof(UseNativeEditor), typeof(bool), typeof(TextBox),
-            new PropertyMetadata(true));
+            new PropertyMetadata(false));
 
     /// <summary>Whether the field currently owns focus, including while its native editor island holds the keyboard focus.</summary>
     /// <remarks>A control template trigger reads this property; the CLR <see cref="VisualElement.IsFocused"/> stays the surface-level flag.</remarks>
@@ -779,7 +786,8 @@ public class TextBox : TemplatedControl
 
             if (string.IsNullOrEmpty(Text))
             {
-                if (!string.IsNullOrEmpty(Placeholder))
+                // 聚焦后插入符与占位文字会叠在同一行；占位只在未聚焦时显示。
+                if (!string.IsNullOrEmpty(Placeholder) && !IsFocused)
                 {
                     VisualText.Draw(this,
                         graphics,

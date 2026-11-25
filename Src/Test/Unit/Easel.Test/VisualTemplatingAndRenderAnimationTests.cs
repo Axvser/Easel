@@ -428,7 +428,7 @@ public sealed class VisualTemplatingAndRenderAnimationTests
         _ = surface.Handle;
         System.Windows.Forms.Application.DoEvents();
 
-        var box = new VC.TextBox { Width = 220, Height = 34 };
+        var box = new VC.TextBox { Width = 220, Height = 34, UseNativeEditor = true };
         box.Template = new VisualControlTemplate(scope =>
         {
             var chrome = new VC.Border { Padding = default };
