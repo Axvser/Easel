@@ -73,7 +73,10 @@ public class ItemsControl : TemplatedControl
     private INotifyCollectionChanged? _observed;
     private ItemsPanelTemplate? _appliedPanelTemplate;
     private Panel? _itemsHost;
+    private VisualElement? _hostTemplateRoot;
     private bool _rebuilding;
+    private bool _disposing;
+    private bool _realizesAllItems;
 
     /// <summary>Creates an empty items panel.</summary>
     public ItemsControl()
@@ -219,10 +222,18 @@ public class ItemsControl : TemplatedControl
     /// <summary>Realizes the current source items as children; the base implementation realizes every item.</summary>
     protected virtual void RealizeItems()
     {
+        // 宿主只解析一次：自绘控件没有模板宿主时，ResolveItemsHost 会扫描子项，逐行扫描会退化成 O(n²)。
+        var host = ResolveItemsHost();
         foreach (var item in _sourceItems)
         {
-            AddRealizedItem(CreateItemVisual(item));
+            var visual = CreateItemVisual(item);
+            _items.Add(visual);
+            AttachToHost(host, visual);
         }
+
+        // 只有走“全部实现”的这条路径，重挂模板时才能确定 _items 与源一一对应；虚拟化子类自行
+        // 覆盖本方法，保持原来的重建路径。
+        _realizesAllItems = true;
     }
 
     /// <summary>Removes every realized item visual from its host.</summary>
@@ -243,7 +254,18 @@ public class ItemsControl : TemplatedControl
     {
         if (visual is null) throw new ArgumentNullException(nameof(visual));
         _items.Add(visual);
+        AttachToItemsHost(visual);
+    }
+
+    // item 挂在模板里的宿主或控件自身；宿主解析只在模板根变化时重查，不为每行遍历模板树。
+    private void AttachToItemsHost(VisualElement visual)
+    {
         var host = ResolveItemsHost();
+        AttachToHost(host, visual);
+    }
+
+    private void AttachToHost(Panel? host, VisualElement visual)
+    {
         if (host is not null && !ReferenceEquals(host, visual))
         {
             host.Add(visual);
@@ -302,6 +324,7 @@ public class ItemsControl : TemplatedControl
             }
 
             _appliedPanelTemplate = template;
+            _hostTemplateRoot = null;
             _itemsHost = template.Create();
             Add(_itemsHost);
             return _itemsHost;
@@ -317,12 +340,21 @@ public class ItemsControl : TemplatedControl
         }
 
         // 控件模板的宿主在模板根内部；先按显式标记找，找不到时把模板根本身当宿主。
+        // 模板根在两次模板变更之间不变，找到一次就缓存，避免每实现一行都递归扫描模板树。
         if (TemplateRoot is { } templateRoot)
         {
+            if (ReferenceEquals(_hostTemplateRoot, templateRoot) && _itemsHost is not null)
+            {
+                return _itemsHost;
+            }
+
+            _hostTemplateRoot = templateRoot;
             _itemsHost = FindTemplateItemsHost(templateRoot)
                 ?? (templateRoot as Panel);
             return _itemsHost;
         }
+
+        _hostTemplateRoot = null;
 
         foreach (var child in Children)
         {
@@ -457,20 +489,56 @@ public class ItemsControl : TemplatedControl
     {
         base.OnTemplateChanging();
 
-        // 模板根销毁前把已实现的 item 摘出来并释放；重建会创建新的 item 视觉，不能留在旧宿主里。
-        foreach (var item in _items.ToArray())
+        // 模板根销毁前把已实现的 item 从旧宿主摘出来，但**不释放**：item 视觉只依赖 ItemTemplate/ItemFactory，
+        // 与列表自身的模板无关。保留同一批实例，OnTemplateChanged 直接挂到新宿主，避免“先建一遍、
+        // 施模板时再全毁重建一遍”的双份创建（200 行页面里这是最大的单项成本）。
+        // 控件本身在释放时已经逐行释放并摘掉，这里不再重复。
+        if (!_disposing)
         {
-            item.Dispose();
+            DetachRealizedItems();
         }
-
-        ClearRealizedItems();
     }
 
     /// <inheritdoc />
     protected override void OnTemplateChanged()
     {
         base.OnTemplateChanged();
-        RefreshItems();
+        ReattachRealizedItems();
+    }
+
+    // 摘下旧宿主但保留 _items，等下一次模板应用重新挂载。
+    private void DetachRealizedItems()
+    {
+        for (var index = _items.Count - 1; index >= 0; index--)
+        {
+            // 直接摘父级，不走 RemoveChild：那条路会为每行重解隐式样式并逐次 InvalidateMeasure，
+            // 而这里要么马上挂进新宿主（Add 会重挂表面通知），要么整行即将释放。
+            _items[index].Parent?.Children.Remove(_items[index]);
+        }
+    }
+
+    // 模板应用后把保留的 item 挂到新宿主；只有源或工厂已变化（数量对不上）时才真的重建。
+    private void ReattachRealizedItems()
+    {
+        if (_disposing)
+        {
+            return;
+        }
+
+        if (_items.Count != _sourceItems.Count || !_realizesAllItems)
+        {
+            RefreshItems();
+            return;
+        }
+
+        foreach (var item in _items)
+        {
+            AttachToItemsHost(item);
+        }
+
+        InvalidateMeasure();
+        OnItemsRebuilt();
+        ItemsRebuilt?.Invoke(this, EventArgs.Empty);
     }
 
     /// <inheritdoc />
@@ -497,7 +565,18 @@ public class ItemsControl : TemplatedControl
     {
         if (disposing)
         {
+            _disposing = true;
             Observe(_observed, null);
+            // 行先释放再摘父级：先摘会为每行触发一轮资源/父链重解析，而释放会摘掉这些订阅。
+            // 摘干净后 RemoveTemplate 的 RemoveChild 只需重扫外壳，不必再走一遍 200 行的样式树。
+            for (var index = _items.Count - 1; index >= 0; index--)
+            {
+                var item = _items[index];
+                item.Dispose();
+                item.Parent?.Children.Remove(item);
+            }
+
+            _items.Clear();
         }
 
         base.Dispose(disposing);
@@ -544,6 +623,7 @@ public class ItemsControl : TemplatedControl
 
             // 先确定宿主：空 ItemsSource 也要让 ItemsPanel 里的空面板参与布局。
             ResolveItemsHost();
+            _realizesAllItems = false;
             RealizeItems();
         }
         finally

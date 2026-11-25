@@ -7,7 +7,8 @@ namespace Easel.Visuals;
 /// </remarks>
 public sealed class VisualNameScope
 {
-    private readonly Dictionary<string, object> _names = new(StringComparer.Ordinal);
+    // 多数模板实例没有 x:Name；字典按需创建，省掉每个实例一次空字典分配。
+    private Dictionary<string, object>? _names;
 
     /// <summary>Registers <paramref name="value"/> under <paramref name="name"/>.</summary>
     /// <param name="name">The part name declared with <c>x:Name</c>.</param>
@@ -17,7 +18,7 @@ public sealed class VisualNameScope
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
         if (value is null) throw new ArgumentNullException(nameof(value));
-        _names[name] = value;
+        (_names ??= new Dictionary<string, object>(StringComparer.Ordinal))[name] = value;
     }
 
     /// <summary>Returns the object registered under <paramref name="name"/>, or <see langword="null"/>.</summary>
@@ -25,7 +26,7 @@ public sealed class VisualNameScope
     public object? Find(string name)
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
-        return _names.TryGetValue(name, out var value) ? value : null;
+        return _names is not null && _names.TryGetValue(name, out var value) ? value : null;
     }
 
     /// <summary>Returns the object registered under <paramref name="name"/> when it is a <typeparamref name="T"/>.</summary>
@@ -34,7 +35,7 @@ public sealed class VisualNameScope
     public T? Find<T>(string name) where T : class
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
-        return _names.TryGetValue(name, out var value) ? value as T : null;
+        return _names is not null && _names.TryGetValue(name, out var value) ? value as T : null;
     }
 }
 
@@ -198,6 +199,9 @@ internal sealed class ResourceBinding : IDisposable
     private readonly List<VisualElement> _chain = [];
     private readonly List<ResourceDictionary> _dictionaries = [];
     private VisualElement? _surfaceRoot;
+    private ResourceDictionary? _rootResources;
+    private ResourceDictionary? _surfaceResources;
+    private ResourceDictionary? _source;
     private bool _hadValue;
     private bool _disposed;
 
@@ -253,55 +257,126 @@ internal sealed class ResourceBinding : IDisposable
             return;
         }
 
-        RebuildChain();
-        if (!VisualResourceLookup.TryFindResource(_element, _key, out var value))
-        {
-            // 曾经解析过、现在被移除：动态引用回到默认值；从未解析过则保持等待，稍后再声明的资源仍会生效。
-            if (_dynamic && _hadValue)
-            {
-                _hadValue = false;
-                _onMissing?.Invoke();
-            }
+        UpdateChain();
+        AttachRootEvents();
+        RefreshValue();
+    }
 
+    private void RefreshValue()
+    {
+        var surface = _element.Surface;
+        var found = Resolve(surface, out var value, out var source);
+        SyncDictionarySubscriptions(surface, source);
+        if (found)
+        {
+            ApplyValue(value);
             return;
         }
 
-        _hadValue = true;
-        _apply(value);
-        if (!_dynamic)
+        // 曾经解析过、现在被移除：动态引用回到默认值；从未解析过则保持等待，稍后再声明的资源仍会生效。
+        if (_dynamic && _hadValue)
         {
-            // 静态资源一次性生效；之后字典再变化也不再改写属性。
-            Dispose();
+            _hadValue = false;
+            _onMissing?.Invoke();
         }
     }
 
-    // 父链可能还没接上（生成代码先赋属性后挂父级）；每变一次就重挂订阅并重试。
-    private void RebuildChain()
+    // 父链通常只在根上追加祖先（模板部件挂到列表/弹层）。按公共前缀增量地退订/订阅，
+    // 避免每次父级变化都把整条链退订再重挂；链被截断时也只摘掉消失的尾段。
+    private void UpdateChain()
     {
-        Unsubscribe();
-        VisualElement? root = null;
-        ResourceDictionary? source = null;
-        foreach (var current in EnumerateChain())
+        var index = 0;
+        var current = _element;
+        while (current is not null && index < _chain.Count && ReferenceEquals(_chain[index], current))
+        {
+            index++;
+            current = current.ParentElement;
+        }
+
+        if (current is null && index == _chain.Count)
+        {
+            return;
+        }
+
+        for (var tail = _chain.Count - 1; tail >= index; tail--)
+        {
+            _chain[tail].ParentChanged -= OnChainChanged;
+        }
+
+        if (index < _chain.Count)
+        {
+            _chain.RemoveRange(index, _chain.Count - index);
+        }
+
+        while (current is not null)
         {
             _chain.Add(current);
-            root = current;
-            // 父级变化仍要逐个监听：模板部件先在工厂里创建，链在挂到 ListBox/弹层时才变长；
-            // 只监听元素本身和当时的链根会漏掉随后挂上的中间父级。
             current.ParentChanged += OnChainChanged;
-            if (current.Resources.TryFindSource(_key, out _, out var found))
+            current = current.ParentElement;
+        }
+    }
+
+    private void AttachRootEvents()
+    {
+        var root = _chain.Count > 0 ? _chain[_chain.Count - 1] : null;
+        if (ReferenceEquals(root, _surfaceRoot))
+        {
+            return;
+        }
+
+        if (_surfaceRoot is not null)
+        {
+            _surfaceRoot.SurfaceChanged -= OnChainChanged;
+        }
+
+        _surfaceRoot = root;
+        if (root is not null)
+        {
+            root.SurfaceChanged += OnChainChanged;
+        }
+    }
+
+    // 一次向上遍历同时取值和来源字典；表面资源是链之后的最后一站。
+    private bool Resolve(VisualHost? surface, out object? value, out ResourceDictionary? source)
+    {
+        for (var current = _element; current is not null; current = current.ParentElement)
+        {
+            if (current.Resources.TryFindSource(_key, out value, out source))
             {
-                source = found;
+                return true;
             }
         }
 
-        // 只为可能提供这个 key 的字典挂订阅：元素自己的、链根的、表面的，以及当前命中的来源字典。
-        // 给每个祖先的 Resources 都挂订阅会让模板部件创建时产生成倍的订阅开销。
-        AddDictionary(_element.Resources);
-        if (root is not null)
+        if (surface is not null && surface.Resources.TryGetValue(_key, out value))
         {
-            _surfaceRoot = root;
-            root.SurfaceChanged += OnChainChanged;
-            AddDictionary(root.Resources);
+            source = surface.Resources;
+            return true;
+        }
+
+        value = null;
+        source = null;
+        return false;
+    }
+
+    // 只为可能提供/影响这个 key 的字典挂订阅，并摘掉链变化后已不可达的旧订阅。
+    // 订阅集合只在链根、表面或来源换人时才变；同一次构造里的重复父级事件直接跳过。
+    private void SyncDictionarySubscriptions(VisualHost? surface, ResourceDictionary? source)
+    {
+        var root = _chain.Count > 0 ? _chain[_chain.Count - 1] : null;
+        var rootResources = root?.Resources;
+        var surfaceResources = surface?.Resources;
+        if (ReferenceEquals(rootResources, _rootResources)
+            && ReferenceEquals(surfaceResources, _surfaceResources)
+            && ReferenceEquals(source, _source))
+        {
+            return;
+        }
+
+        var elementResources = _element.Resources;
+        AddDictionary(elementResources);
+        if (rootResources is not null)
+        {
+            AddDictionary(rootResources);
         }
 
         if (source is not null)
@@ -309,17 +384,36 @@ internal sealed class ResourceBinding : IDisposable
             AddDictionary(source);
         }
 
-        if (_element.Surface is { } surface)
+        if (surfaceResources is not null)
         {
-            AddDictionary(surface.Resources);
+            AddDictionary(surfaceResources);
         }
+
+        for (var index = _dictionaries.Count - 1; index >= 0; index--)
+        {
+            var dictionary = _dictionaries[index];
+            if (!ReferenceEquals(dictionary, elementResources)
+                && !ReferenceEquals(dictionary, rootResources)
+                && !ReferenceEquals(dictionary, source)
+                && !ReferenceEquals(dictionary, surfaceResources))
+            {
+                RemoveDictionary(dictionary);
+            }
+        }
+
+        _rootResources = rootResources;
+        _surfaceResources = surfaceResources;
+        _source = source;
     }
 
-    private IEnumerable<VisualElement> EnumerateChain()
+    private void ApplyValue(object? value)
     {
-        for (var current = _element; current is not null; current = current.ParentElement)
+        _hadValue = true;
+        _apply(value);
+        if (!_dynamic)
         {
-            yield return current;
+            // 静态资源一次性生效；之后字典再变化也不再改写属性。
+            Dispose();
         }
     }
 
@@ -332,6 +426,14 @@ internal sealed class ResourceBinding : IDisposable
 
         _dictionaries.Add(dictionary);
         dictionary.Changed += OnDictionaryChanged;
+    }
+
+    private void RemoveDictionary(ResourceDictionary dictionary)
+    {
+        if (_dictionaries.Remove(dictionary))
+        {
+            dictionary.Changed -= OnDictionaryChanged;
+        }
     }
 
     private void Unsubscribe()
@@ -355,15 +457,31 @@ internal sealed class ResourceBinding : IDisposable
         }
 
         _dictionaries.Clear();
+        _rootResources = null;
+        _surfaceResources = null;
+        _source = null;
     }
 
     private void OnChainChanged(object? sender, EventArgs e) => Refresh();
 
     private void OnDictionaryChanged(object? changedKey)
     {
-        if (changedKey is null || Equals(changedKey, _key))
+        if (_disposed)
         {
+            return;
+        }
+
+        if (changedKey is null)
+        {
+            // 合并字典列表或整个字典变了：命中的来源可能换人，重扫整条链。
             Refresh();
+            return;
+        }
+
+        if (Equals(changedKey, _key))
+        {
+            // 已知字典里的具体键变化不会改变父链，只重算值（来源可能因此换到别的字典）。
+            RefreshValue();
         }
     }
 }
