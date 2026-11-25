@@ -25,6 +25,28 @@ an island by cutting their rectangle out of its window region; `CornerRadius` ro
 equivalent. The focused visual `TextBox` uses a private host for IME/accessibility; set `UseNativeEditor="False"`
 to keep the field entirely visual.
 
+## Custom window chrome
+
+`VisualTitleBar` (a `TemplatedControl`) draws a caption bar: icon slot, title, minimize / maximize-restore / close,
+theme-aware hover (the close button turns red). Add it at the top of the shell view; `WindowChrome` resolves the
+hosting `Form` and:
+
+- sets `FormBorderStyle.None` (opt out with `AutoAttachChrome = false`, or call `WindowChrome.Attach`/`Detach`);
+- returns `HTCAPTION` over the empty drag area, so Windows keeps drag, Aero Snap (drag to the top/side) and
+  drag-back restore;
+- returns `HTCLIENT` over caption buttons and any focusable or cursor-bearing element in the bar;
+- returns the `HTLEFT/...` resize edges within 8 DIPs when the window is not maximized;
+- clips maximize to the monitor work area and asks DWM for rounded corners (best effort, guarded).
+
+```csharp
+var bar = new VisualTitleBar { Title = "My app" };
+shell.Add(bar);   // the bar finds the host's Form and attaches the chrome
+```
+
+Template it with `PART_Icon`, `PART_Title`, `PART_Minimize`, `PART_Maximize`, `PART_Close` (buttons) and an optional
+`PART_DragArea`; a template may put menus between the title and the buttons. Not covered: system menu/Alt+Space,
+UIA peers on the self-drawn buttons, per-monitor chrome details.
+
 ## Surface API
 
 | Member | Use |
