@@ -3,7 +3,143 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="Easel.Themes.Defaults.ContainersDefaults">
 
-  <!-- Built-in fallback appearance for Expander, GroupBox and TabControl; added to the implicit style table by Theme.DefaultStyles. -->
-  
+  <!-- Built-in fallback appearance for Expander, GroupBox, TabControl and TabItem; added to the implicit style table by Theme.DefaultStyles. -->
+
+  <Style TargetType="Expander">
+    <Style.Template>
+      <ControlTemplate TargetType="Expander">
+        <StackPanel IsHitTestVisible="False">
+          <Border x:Name="PART_Header"
+                  IsHitTestVisible="False"
+                  Height="32"
+                  Padding="0"
+                  Background="{DynamicResource Raised}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <StackPanel Orientation="Horizontal"
+                        Spacing="6"
+                        Padding="12,0"
+                        IsHitTestVisible="False">
+              <TextBlock x:Name="PART_Toggle"
+                         Text="▸"
+                         Opacity="0.65"
+                         VerticalAlignment="Center"
+                         IsHitTestVisible="False" />
+              <TextBlock Text="{TemplateBinding Header}"
+                         VerticalAlignment="Center"
+                         IsHitTestVisible="False" />
+            </StackPanel>
+          </Border>
+          <Grid x:Name="PART_ContentHost"
+                Padding="{TemplateBinding Padding}"
+                IsHitTestVisible="False" />
+        </StackPanel>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="GroupBox">
+    <Style.Template>
+      <ControlTemplate TargetType="GroupBox">
+        <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Border IsHitTestVisible="False"
+                  Padding="0"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="PART_Header"
+                  IsHitTestVisible="False"
+                  Margin="8,0,0,0"
+                  Padding="4,0"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Top"
+                  Background="{DynamicResource Surface}">
+            <TextBlock Text="{TemplateBinding Header}"
+                       IsHitTestVisible="False" />
+          </Border>
+          <StackPanel x:Name="PART_ContentHost"
+                      Margin="0,14,0,0"
+                      Padding="{TemplateBinding Padding}"
+                      IsHitTestVisible="False" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="TabItem">
+    <Style.Template>
+      <ControlTemplate TargetType="TabItem">
+        <Grid Height="32" IsHitTestVisible="False">
+          <Border x:Name="SelectionFill"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Raised}" />
+          <Border x:Name="SelectionLine"
+                  IsHitTestVisible="False"
+                  Height="2"
+                  VerticalAlignment="Bottom"
+                  Background="{DynamicResource Accent}" />
+          <TextBlock x:Name="MutedLabel"
+                     Text="{TemplateBinding Header}"
+                     Padding="14,0"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     IsHitTestVisible="False" />
+          <TextBlock x:Name="SelectedLabel"
+                     Text="{TemplateBinding Header}"
+                     Padding="14,0"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     IsHitTestVisible="False" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsSelected" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionFill" Property="Opacity" Value="1" />
+              <Setter TargetName="SelectionLine" Property="Opacity" Value="1" />
+              <Setter TargetName="MutedLabel" Property="Opacity" Value="0" />
+              <Setter TargetName="SelectedLabel" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSelected" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionFill" Property="Opacity" Value="0" />
+              <Setter TargetName="SelectionLine" Property="Opacity" Value="0" />
+              <Setter TargetName="MutedLabel" Property="Opacity" Value="0.65" />
+              <Setter TargetName="SelectedLabel" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="TabControl">
+    <Style.Template>
+      <ControlTemplate TargetType="TabControl">
+        <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid Grid.Row="0" IsHitTestVisible="False">
+            <StackPanel x:Name="PART_HeaderHost"
+                        Orientation="Horizontal"
+                        IsHitTestVisible="False" />
+            <Border Height="1"
+                    VerticalAlignment="Bottom"
+                    Background="{DynamicResource Border}"
+                    IsHitTestVisible="False" />
+          </Grid>
+          <Grid x:Name="PART_ContentHost"
+                Grid.Row="1"
+                IsHitTestVisible="False" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>

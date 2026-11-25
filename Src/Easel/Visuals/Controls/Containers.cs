@@ -1,13 +1,18 @@
 using System.Drawing;
 using System.Windows.Forms;
 using Easel;
-using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlThickness = Easel.Controls.Thickness;
+using XamlVisibility = Easel.Controls.Visibility;
 
 namespace Easel.Visuals.Controls;
 
 /// <summary>A header row that shows or hides one content element.</summary>
-public class Expander : VisualElement
+/// <remarks>
+/// The default template parts are <c>PART_Header</c> (the area a click toggles), <c>PART_Toggle</c> (the glyph the
+/// control points up or right) and <c>PART_ContentHost</c> (where <see cref="Content"/> is parented while a template
+/// is applied).
+/// </remarks>
+public class Expander : TemplatedControl
 {
     /// <summary>The text shown in the header.</summary>
     public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
@@ -26,10 +31,15 @@ public class Expander : VisualElement
 
     private const float HeaderHeight = 32f;
 
+    private VisualElement? _headerPart;
+    private VisualElement? _contentHost;
+    private VisualElement? _hostedContent;
+    private TextBlock? _togglePart;
+    private bool _disposing;
+
     /// <summary>Creates an expanded expander with the current theme metrics.</summary>
     public Expander()
     {
-        IsHitTestVisible = true;
         Focusable = true;
         Padding = new XamlThickness(0f);
         CornerRadius = Theme.Current.CornerRadius;
@@ -57,8 +67,21 @@ public class Expander : VisualElement
     }
 
     /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        // 释放时让模板根一并释放 Content；只有换模板才把 Content 摘出来留给新模板。
+        _disposing = disposing;
+        base.Dispose(disposing);
+    }
+
+    /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
+        if (IsTemplated)
+        {
+            return base.MeasureOverride(availableSize);
+        }
+
         var width = 0;
         var height = (int)Math.Ceiling(HeaderHeight + Padding.Vertical);
         if (IsExpanded && Content is { } content)
@@ -76,6 +99,12 @@ public class Expander : VisualElement
     /// <inheritdoc />
     protected override void ArrangeOverride(Size finalSize)
     {
+        if (IsTemplated)
+        {
+            base.ArrangeOverride(finalSize);
+            return;
+        }
+
         if (!IsExpanded || Content is not { } content)
         {
             return;
@@ -89,90 +118,49 @@ public class Expander : VisualElement
     }
 
     /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
-    {
-        var theme = Theme.Current;
-        var header = new RectangleF(0f, 0f, Bounds.Width, HeaderHeight);
-        using (var background = new SolidBrush(theme.SurfaceAlt))
-        using (var path = XamlDrawing.RoundedRectangle(header, CornerRadius > 0 ? CornerRadius : theme.CornerRadius))
-        {
-            graphics.FillPath(background, path);
-        }
-
-        using (var border = new Pen(theme.ControlBorder, 1f))
-        using (var path = XamlDrawing.RoundedRectangle(
-                   new RectangleF(0.5f, 0.5f, Math.Max(0f, Bounds.Width - 1f), Math.Max(0f, HeaderHeight - 1f)),
-                   CornerRadius > 0 ? CornerRadius : theme.CornerRadius))
-        {
-            graphics.DrawPath(border, path);
-        }
-
-        using (var chevron = new SolidBrush(theme.MutedForeground))
-        {
-            var x = 12f;
-            var y = HeaderHeight / 2f;
-            graphics.FillPolygon(chevron, IsExpanded
-                ? new[]
-                {
-                    new PointF(x - 1f, y - 2f),
-                    new PointF(x + 5f, y - 2f),
-                    new PointF(x + 2f, y + 2f),
-                }
-                : new[]
-                {
-                    new PointF(x, y - 4f),
-                    new PointF(x + 4f, y),
-                    new PointF(x, y + 4f),
-                });
-        }
-
-        VisualText.Draw(this,
-            graphics,
-            Header,
-            ResolveFont(DefaultFont),
-            theme.Foreground,
-            new Rectangle(24, 0, Math.Max(0, (int)Bounds.Width - 32), (int)HeaderHeight),
-            wrap: false,
-            StringAlignment.Near,
-            StringAlignment.Center);
-    }
-
-    /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
         if (ReferenceEquals(e.Property, ContentProperty))
         {
-            if (e.OldValue is VisualElement old && Children.Contains(old))
-            {
-                RemoveChild(old);
-            }
-
-            if (e.NewValue is VisualElement next)
-            {
-                if (next.Parent is ContainerVisual parent)
-                {
-                    parent.Remove(next);
-                }
-
-                Add(next);
-                next.IsVisible = IsExpanded;
-            }
-
-            InvalidateMeasure();
+            SyncContent();
         }
-        else if (ReferenceEquals(e.Property, IsExpandedProperty) && Content is { } content)
+        else if (ReferenceEquals(e.Property, IsExpandedProperty))
         {
-            content.IsVisible = IsExpanded;
+            SyncToggle();
+            ApplyContentVisibility();
             InvalidateMeasure();
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        if (!_disposing)
+        {
+            DetachHostedContent();
+        }
+
+        _headerPart = null;
+        _contentHost = null;
+        _togglePart = null;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanged()
+    {
+        _headerPart = GetTemplateChild<VisualElement>("PART_Header");
+        _contentHost = GetTemplateChild<VisualElement>("PART_ContentHost");
+        _togglePart = GetTemplateChild<TextBlock>("PART_Toggle");
+        SyncToggle();
+        SyncContent();
     }
 
     /// <inheritdoc />
     protected override void OnPointerPressed(VisualPointerEventArgs args)
     {
         base.OnPointerPressed(args);
-        if (args.Button != MouseButtons.Left || args.GetPosition(this).Y > HeaderHeight)
+        if (args.Button != MouseButtons.Left || !IsPointerInHeader(args))
         {
             return;
         }
@@ -192,10 +180,121 @@ public class Expander : VisualElement
             args.Handled = true;
         }
     }
+
+    // 有模板时以 PART_Header 的实际矩形为准；没有模板时沿用旧的 32 像素阈值。
+    private bool IsPointerInHeader(VisualPointerEventArgs args)
+    {
+        if (_headerPart is { } header)
+        {
+            var point = args.GetPosition(header);
+            return point.X >= 0f && point.Y >= 0f
+                && point.X <= header.Bounds.Width && point.Y <= header.Bounds.Height;
+        }
+
+        return args.GetPosition(this).Y <= HeaderHeight;
+    }
+
+    private void SyncContent()
+    {
+        var content = Content;
+        if (!ReferenceEquals(_hostedContent, content))
+        {
+            DetachHostedContent();
+            _hostedContent = content;
+        }
+
+        if (content is not null)
+        {
+            if (_contentHost is { } host)
+            {
+                if (!ReferenceEquals(content.ParentElement, host))
+                {
+                    content.ParentElement?.RemoveChild(content);
+                    AddToHost(host, content);
+                }
+            }
+            else if (!ReferenceEquals(content.ParentElement, this))
+            {
+                content.ParentElement?.RemoveChild(content);
+                Add(content);
+            }
+        }
+
+        ApplyContentVisibility();
+        InvalidateMeasure();
+    }
+
+    private void DetachHostedContent()
+    {
+        if (_hostedContent is not { } content)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(content.ParentElement, this))
+        {
+            RemoveChild(content);
+        }
+        else if (_contentHost is { } host && ReferenceEquals(content.ParentElement, host))
+        {
+            RemoveFromHost(host, content);
+        }
+
+        _hostedContent = null;
+    }
+
+    private void ApplyContentVisibility()
+    {
+        if (_hostedContent is { } content)
+        {
+            content.Visibility = IsExpanded ? XamlVisibility.Visible : XamlVisibility.Collapsed;
+        }
+    }
+
+    private void SyncToggle()
+    {
+        if (_togglePart is { } toggle)
+        {
+            toggle.Text = IsExpanded ? "▾" : "▸";
+        }
+    }
+
+    private static void AddToHost(VisualElement host, VisualElement child)
+    {
+        if (host is Border border)
+        {
+            border.Child = child;
+            return;
+        }
+
+        host.Add(child);
+    }
+
+    private static void RemoveFromHost(VisualElement host, VisualElement child)
+    {
+        if (host is Border border)
+        {
+            if (ReferenceEquals(border.Child, child))
+            {
+                border.Child = null;
+            }
+
+            return;
+        }
+
+        if (ReferenceEquals(child.ParentElement, host))
+        {
+            host.RemoveChild(child);
+        }
+    }
 }
 
 /// <summary>A titled frame with one child and a gap in its top border for the header.</summary>
-public class GroupBox : VisualElement
+/// <remarks>
+/// The default template parts are <c>PART_Header</c> (the title badge that breaks the frame) and
+/// <c>PART_ContentHost</c> (where <see cref="Child"/> is parented while a template is applied).
+/// </remarks>
+public class GroupBox : TemplatedControl
 {
     /// <summary>The text drawn in the top border gap.</summary>
     public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
@@ -206,6 +305,10 @@ public class GroupBox : VisualElement
     public static readonly DependencyProperty ChildProperty = DependencyProperty.Register(
         nameof(Child), typeof(VisualElement), typeof(GroupBox),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
+
+    private VisualElement? _contentHost;
+    private VisualElement? _hostedChild;
+    private bool _disposing;
 
     /// <summary>Creates an empty group box.</summary>
     public GroupBox()
@@ -240,8 +343,20 @@ public class GroupBox : VisualElement
     }
 
     /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        _disposing = disposing;
+        base.Dispose(disposing);
+    }
+
+    /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
+        if (IsTemplated)
+        {
+            return base.MeasureOverride(availableSize);
+        }
+
         var padding = Padding;
         var inner = new Size(
             Math.Max(0, availableSize.Width - (int)Math.Ceiling(padding.Horizontal)),
@@ -255,6 +370,12 @@ public class GroupBox : VisualElement
     /// <inheritdoc />
     protected override void ArrangeOverride(Size finalSize)
     {
+        if (IsTemplated)
+        {
+            base.ArrangeOverride(finalSize);
+            return;
+        }
+
         if (Child is not { } child)
         {
             return;
@@ -272,63 +393,116 @@ public class GroupBox : VisualElement
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (!ReferenceEquals(e.Property, ChildProperty))
+        if (ReferenceEquals(e.Property, ChildProperty))
         {
-            return;
+            SyncChild();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        if (!_disposing)
+        {
+            DetachHostedChild();
         }
 
-        if (e.OldValue is VisualElement old && Children.Contains(old))
+        _contentHost = null;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanged()
+    {
+        _contentHost = GetTemplateChild<VisualElement>("PART_ContentHost");
+        SyncChild();
+    }
+
+    private void SyncChild()
+    {
+        var child = Child;
+        if (!ReferenceEquals(_hostedChild, child))
         {
-            RemoveChild(old);
+            DetachHostedChild();
+            _hostedChild = child;
         }
 
-        if (e.NewValue is VisualElement next)
+        if (child is not null)
         {
-            if (next.Parent is ContainerVisual parent)
+            if (_contentHost is { } host)
             {
-                parent.Remove(next);
+                if (!ReferenceEquals(child.ParentElement, host))
+                {
+                    child.ParentElement?.RemoveChild(child);
+                    AddToHost(host, child);
+                }
             }
+            else if (!ReferenceEquals(child.ParentElement, this))
+            {
+                child.ParentElement?.RemoveChild(child);
 
-            // 本类隐藏了 Add<T> 去写 Child；这里必须走基类，否则不会挂进 Children 参与绘制。
-            base.Add(next);
+                // 本类隐藏了 Add<T> 去写 Child；这里必须走基类，否则不会挂进 Children 参与绘制。
+                base.Add(child);
+            }
         }
 
         InvalidateMeasure();
     }
 
-    /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
+    private void DetachHostedChild()
     {
-        var theme = Theme.Current;
-        var headerWidth = string.IsNullOrEmpty(Header)
-            ? 0f
-            : VisualText.Measure(Header, ResolveFont(DefaultFont), 0f, wrap: false, RenderDpi).Width + 12f;
-        var border = BorderBrush?.ApproximateColor ?? theme.ControlBorder;
-        using var pen = new Pen(border, 1f);
-        using var path = XamlDrawing.RoundedRectangle(
-            new RectangleF(0.5f, 0.5f, Math.Max(0f, Bounds.Width - 1f), Math.Max(0f, Bounds.Height - 1f)),
-            CornerRadius);
-        graphics.DrawPath(pen, path);
-
-        if (headerWidth > 0f)
+        if (_hostedChild is not { } child)
         {
-            using var background = new SolidBrush(Background?.ApproximateColor ?? theme.Surface);
-            graphics.FillRectangle(background, 10f, 0f, headerWidth, 14f);
-            VisualText.Draw(this,
-                graphics,
-                Header,
-                ResolveFont(DefaultFont),
-                theme.Foreground,
-                new Rectangle(14, 0, (int)headerWidth, 14),
-                wrap: false,
-                StringAlignment.Near,
-                StringAlignment.Center);
+            return;
+        }
+
+        if (ReferenceEquals(child.ParentElement, this))
+        {
+            RemoveChild(child);
+        }
+        else if (_contentHost is { } host && ReferenceEquals(child.ParentElement, host))
+        {
+            RemoveFromHost(host, child);
+        }
+
+        _hostedChild = null;
+    }
+
+    private static void AddToHost(VisualElement host, VisualElement child)
+    {
+        if (host is Border border)
+        {
+            border.Child = child;
+            return;
+        }
+
+        host.Add(child);
+    }
+
+    private static void RemoveFromHost(VisualElement host, VisualElement child)
+    {
+        if (host is Border border)
+        {
+            if (ReferenceEquals(border.Child, child))
+            {
+                border.Child = null;
+            }
+
+            return;
+        }
+
+        if (ReferenceEquals(child.ParentElement, host))
+        {
+            host.RemoveChild(child);
         }
     }
 }
 
-/// <summary>One page of a <see cref="TabControl"/>.</summary>
-public class TabItem : VisualElement
+/// <summary>One page of a <see cref="TabControl"/>; its template draws the tab header.</summary>
+/// <remarks>
+/// The tab control parents the page content, not this item. <see cref="IsSelected"/> drives the default template's
+/// selected fill, accent line and foreground so a tab can show its state without self-drawing.
+/// </remarks>
+public class TabItem : TemplatedControl
 {
     /// <summary>The text shown on the tab.</summary>
     public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
@@ -339,6 +513,11 @@ public class TabItem : VisualElement
     public static readonly DependencyProperty ContentProperty = DependencyProperty.Register(
         nameof(Content), typeof(VisualElement), typeof(TabItem),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
+
+    /// <summary>Whether this tab is the selected page.</summary>
+    public static readonly DependencyProperty IsSelectedProperty = DependencyProperty.Register(
+        nameof(IsSelected), typeof(bool), typeof(TabItem),
+        new PropertyMetadata(false) { AffectsRender = true });
 
     /// <summary>Creates an empty tab.</summary>
     public TabItem()
@@ -359,10 +538,22 @@ public class TabItem : VisualElement
         get => (VisualElement?)GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
     }
+
+    /// <summary>Whether this tab is the selected page.</summary>
+    public bool IsSelected
+    {
+        get => (bool)GetValue(IsSelectedProperty)!;
+        set => SetValue(IsSelectedProperty, value);
+    }
 }
 
 /// <summary>A tab strip with one visible page.</summary>
-public class TabControl : VisualElement
+/// <remarks>
+/// The default template parts are <c>PART_HeaderHost</c> (the panel that receives the <see cref="TabItem"/> headers)
+/// and <c>PART_ContentHost</c> (the area the selected page is arranged over). The selected page stays a direct child
+/// of this control so existing tree walks keep finding it under the tab control.
+/// </remarks>
+public class TabControl : TemplatedControl
 {
     /// <summary>The zero-based index of the selected page, or -1.</summary>
     public static readonly DependencyProperty SelectedIndexProperty = DependencyProperty.Register(
@@ -370,12 +561,13 @@ public class TabControl : VisualElement
         new PropertyMetadata(-1) { AffectsMeasure = true, AffectsRender = true });
 
     private const float TabHeight = 32f;
-    private readonly List<RectangleF> _tabs = [];
+
+    private Panel? _headerHost;
+    private VisualElement? _contentHostPart;
 
     /// <summary>Creates an empty tab control.</summary>
     public TabControl()
     {
-        IsHitTestVisible = true;
         Focusable = true;
         Padding = new XamlThickness(0f);
     }
@@ -396,34 +588,43 @@ public class TabControl : VisualElement
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
-        var width = 0f;
-        var pageWidth = 0;
-        var pageHeight = 0;
-        foreach (var item in Items)
+        if (IsTemplated)
         {
-            width += VisualText.Measure(item.Header, ResolveFont(DefaultFont), 0f, wrap: false, RenderDpi).Width + 28f;
+            var template = MeasureTemplate(availableSize);
+            var page = MeasureSelectedContent(availableSize);
+            return new Size(
+                Math.Max(template.Width, page.Width + (int)Math.Ceiling(Padding.Horizontal)),
+                template.Height + page.Height + (int)Math.Ceiling(Padding.Vertical));
         }
 
-        if (SelectedIndex >= 0 && SelectedIndex < Items.Count && Items[SelectedIndex].Content is { } content)
-        {
-            var measured = content.Measure(new Size(
-                Math.Max(0, availableSize.Width - (int)Math.Ceiling(Padding.Horizontal)),
-                0));
-            pageWidth = measured.Width;
-            pageHeight = measured.Height;
-        }
-
+        var fallback = MeasureSelectedContent(availableSize);
         return new Size(
-            Math.Max((int)Math.Ceiling(width), pageWidth) + (int)Math.Ceiling(Padding.Horizontal),
-            (int)Math.Ceiling(TabHeight + pageHeight + Padding.Vertical));
+            fallback.Width + (int)Math.Ceiling(Padding.Horizontal),
+            (int)Math.Ceiling(TabHeight + fallback.Height + Padding.Vertical));
     }
 
     /// <inheritdoc />
     protected override void ArrangeOverride(Size finalSize)
     {
-        if (SelectedIndex >= 0 && SelectedIndex < Items.Count && Items[SelectedIndex].Content is { } content)
+        if (IsTemplated)
         {
-            content.Arrange(new RectangleF(
+            ArrangeTemplate(finalSize);
+            if (SelectedContent is { } content)
+            {
+                var origin = ContentOrigin();
+                content.Arrange(new RectangleF(
+                    origin.X,
+                    origin.Y,
+                    Math.Max(0f, finalSize.Width - origin.X - Padding.Right),
+                    Math.Max(0f, finalSize.Height - origin.Y - Padding.Bottom)));
+            }
+
+            return;
+        }
+
+        if (SelectedContent is { } fallback)
+        {
+            fallback.Arrange(new RectangleF(
                 (int)Math.Ceiling(Padding.Left),
                 TabHeight,
                 Math.Max(0f, finalSize.Width - Padding.Horizontal),
@@ -432,39 +633,44 @@ public class TabControl : VisualElement
     }
 
     /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
-        var theme = Theme.Current;
-        _tabs.Clear();
-        var x = (float)Math.Ceiling(Padding.Left);
-        for (var index = 0; index < Items.Count; index++)
+        base.OnPropertyChanged(e);
+        if (ReferenceEquals(e.Property, SelectedIndexProperty))
         {
-            var width = (float)Math.Ceiling(
-                VisualText.Measure(Items[index].Header, ResolveFont(DefaultFont), 0f, wrap: false, RenderDpi).Width + 28f);
-            var tab = new RectangleF(x, 0f, width, TabHeight);
-            _tabs.Add(tab);
-            if (index == SelectedIndex)
-            {
-                using var background = new SolidBrush(theme.SurfaceAlt);
-                graphics.FillRectangle(background, tab);
-                using var accent = new Pen(theme.Accent, 2f);
-                graphics.DrawLine(accent, tab.Left + 6f, tab.Bottom - 1f, tab.Right - 6f, tab.Bottom - 1f);
-            }
+            SyncSelection();
+            SyncContent();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
-            VisualText.Draw(this,
-                graphics,
-                Items[index].Header,
-                ResolveFont(DefaultFont),
-                index == SelectedIndex ? theme.Foreground : theme.MutedForeground,
-                new Rectangle((int)tab.X, (int)tab.Y, (int)tab.Width, (int)tab.Height),
-                wrap: false,
-                StringAlignment.Center,
-                StringAlignment.Center);
-            x += width;
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        // 页签写在模板根里，换模板前先摘出来，否则模板根释放时会把它们一起释放。
+        if (_headerHost is { } host)
+        {
+            foreach (var item in Items.ToArray())
+            {
+                if (ReferenceEquals(item.ParentElement, host))
+                {
+                    host.RemoveChild(item);
+                }
+            }
         }
 
-        using var line = new Pen(theme.ControlBorder, 1f);
-        graphics.DrawLine(line, 0f, TabHeight - 0.5f, Bounds.Width, TabHeight - 0.5f);
+        _headerHost = null;
+        _contentHostPart = null;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanged()
+    {
+        _headerHost = GetTemplateChild<Panel>("PART_HeaderHost");
+        _contentHostPart = GetTemplateChild<VisualElement>("PART_ContentHost");
+        SyncHeaders();
+        SyncSelection();
+        SyncContent();
     }
 
     /// <inheritdoc />
@@ -476,19 +682,15 @@ public class TabControl : VisualElement
             return;
         }
 
-        var point = args.GetPosition(this);
-        for (var index = 0; index < _tabs.Count; index++)
+        var index = HitTestHeader(args);
+        if (index < 0)
         {
-            if (!_tabs[index].Contains(point))
-            {
-                continue;
-            }
-
-            Focus();
-            SelectedIndex = index;
-            args.Handled = true;
             return;
         }
+
+        Focus();
+        SelectedIndex = index;
+        args.Handled = true;
     }
 
     /// <inheritdoc />
@@ -505,21 +707,50 @@ public class TabControl : VisualElement
         args.Handled = true;
     }
 
-    /// <summary>Re-syncs the visible page after <see cref="Items"/> changed.</summary>
+    /// <summary>Re-syncs the headers and the visible page after <see cref="Items"/> changed.</summary>
     public void Refresh()
     {
+        SyncHeaders();
+        SyncSelection();
         SyncContent();
         InvalidateMeasure();
     }
 
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    private VisualElement? SelectedContent
+        => SelectedIndex >= 0 && SelectedIndex < Items.Count ? Items[SelectedIndex].Content : null;
+
+    private void SyncHeaders()
     {
-        base.OnPropertyChanged(e);
-        if (ReferenceEquals(e.Property, SelectedIndexProperty))
+        if (_headerHost is not { } host)
         {
-            SyncContent();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        foreach (var child in host.Children.ToArray())
+        {
+            if (child is TabItem item && !Items.Contains(item))
+            {
+                host.RemoveChild(item);
+            }
+        }
+
+        foreach (var item in Items)
+        {
+            if (ReferenceEquals(item.ParentElement, host))
+            {
+                continue;
+            }
+
+            item.ParentElement?.RemoveChild(item);
+            host.Add(item);
+        }
+    }
+
+    private void SyncSelection()
+    {
+        for (var index = 0; index < Items.Count; index++)
+        {
+            Items[index].IsSelected = index == SelectedIndex;
         }
     }
 
@@ -549,5 +780,63 @@ public class TabControl : VisualElement
                 RemoveChild(content);
             }
         }
+    }
+
+    private Size MeasureSelectedContent(Size availableSize)
+    {
+        if (SelectedContent is not { } content)
+        {
+            return Size.Empty;
+        }
+
+        return content.Measure(new Size(
+            Math.Max(0, availableSize.Width - (int)Math.Ceiling(Padding.Horizontal)),
+            0));
+    }
+
+    // 内容区由模板里的 PART_ContentHost 定位；模板没给部件时退回页签条底部。
+    private PointF ContentOrigin()
+    {
+        var self = AbsoluteBounds;
+        if (_contentHostPart is { } contentHost)
+        {
+            var bounds = contentHost.AbsoluteBounds;
+            return new PointF(
+                Padding.Left + bounds.X - self.X,
+                bounds.Y - self.Y);
+        }
+
+        if (_headerHost is { } headerHost)
+        {
+            return new PointF(Padding.Left, headerHost.AbsoluteBounds.Bottom - self.Y);
+        }
+
+        return new PointF(Padding.Left, TabHeight);
+    }
+
+    private int HitTestHeader(VisualPointerEventArgs args)
+    {
+        if (_headerHost is null)
+        {
+            return -1;
+        }
+
+        for (var index = 0; index < Items.Count; index++)
+        {
+            var item = Items[index];
+            if (!ReferenceEquals(item.ParentElement, _headerHost))
+            {
+                continue;
+            }
+
+            var point = args.GetPosition(item);
+            if (point.X >= 0f && point.Y >= 0f
+                && point.X <= item.Bounds.Width && point.Y <= item.Bounds.Height)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }
