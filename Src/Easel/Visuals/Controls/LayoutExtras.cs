@@ -487,13 +487,20 @@ public class GridSplitter : VisualElement
             delta = -delta;
         }
 
+        var next = Math.Max(Orientation == Orientation.Vertical ? 80d : 40d, _startSize + delta);
+        var current = Orientation == Orientation.Vertical ? Target.Bounds.Width : Target.Bounds.Height;
+        if (Math.Abs(next - current) < 0.5d)
+        {
+            return;
+        }
+
         if (Orientation == Orientation.Vertical)
         {
-            Target.Width = Math.Max(80d, _startSize + delta);
+            Target.Width = next;
         }
         else
         {
-            Target.Height = Math.Max(40d, _startSize + delta);
+            Target.Height = next;
         }
 
         InvalidateMeasure();

@@ -256,6 +256,18 @@ public class ComboBox : TemplatedControl
     }
 
     /// <inheritdoc />
+    protected override void ArrangeOverride(Size finalSize)
+    {
+        base.ArrangeOverride(finalSize);
+        // 弹层的宽度按目标控件收口：ListBox/ItemsControl 的默认外壳会想要整块可用宽度，
+        // 不约束的话下拉会被 desired.Width 撑到整个画面。
+        if (_templatePopup?.Child is { } child && finalSize.Width > 0f)
+        {
+            child.MaxWidth = finalSize.Width;
+        }
+    }
+
+    /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
         if (IsTemplated)

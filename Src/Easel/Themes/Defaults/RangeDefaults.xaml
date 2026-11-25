@@ -67,13 +67,13 @@
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch"
                   Background="{DynamicResource SurfaceAlt}"
-                  CornerRadius="999" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="PART_Fill"
                   IsHitTestVisible="False"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch"
                   Background="{DynamicResource Accent}"
-                  CornerRadius="999" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
         </Grid>
       </ControlTemplate>
     </Style.Template>

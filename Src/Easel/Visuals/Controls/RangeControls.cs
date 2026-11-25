@@ -78,6 +78,11 @@ public class ProgressBar : TemplatedControl
     protected override void ArrangeOverride(Size finalSize)
     {
         base.ArrangeOverride(finalSize);
+        ArrangeTemplateParts(finalSize);
+    }
+
+    private void ArrangeTemplateParts(SizeF finalSize)
+    {
         if (!IsTemplated)
         {
             return;
@@ -154,7 +159,16 @@ public class ProgressBar : TemplatedControl
                 || ReferenceEquals(e.Property, MinimumProperty)
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
-            InvalidateArrange();
+            // 值变化只移动模板部件，不让整棵模板重排；拖动时每帧一次 Arrange 会放大到整页布局。
+            if (Bounds.Width > 0f && Bounds.Height > 0f)
+            {
+                ArrangeTemplateParts(Bounds.Size);
+                InvalidateVisual();
+            }
+            else
+            {
+                InvalidateArrange();
+            }
         }
     }
 }
@@ -252,6 +266,11 @@ public class Slider : TemplatedControl
     protected override void ArrangeOverride(Size finalSize)
     {
         base.ArrangeOverride(finalSize);
+        ArrangeTemplateParts(finalSize);
+    }
+
+    private void ArrangeTemplateParts(SizeF finalSize)
+    {
         if (!IsTemplated)
         {
             return;
@@ -405,7 +424,15 @@ public class Slider : TemplatedControl
                 || ReferenceEquals(e.Property, MinimumProperty)
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
-            InvalidateArrange();
+            if (Bounds.Width > 0f && Bounds.Height > 0f)
+            {
+                ArrangeTemplateParts(Bounds.Size);
+                InvalidateVisual();
+            }
+            else
+            {
+                InvalidateArrange();
+            }
         }
     }
 
