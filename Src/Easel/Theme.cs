@@ -294,6 +294,7 @@ public static class Theme
     // The built-in palettes are XAML resources in Themes/; the static sources are created once and shared.
     private static readonly Themes.DarkTheme DarkSource = new();
     private static readonly Themes.LightTheme LightSource = new();
+    private static readonly ResourceDictionary HighContrastSource = CreatePaletteResourceDictionary(CreateHighContrast());
 
     private static ThemeMode _mode = ThemeMode.Dark;
     private static ThemeMode _systemMode = ThemeMode.Dark;
@@ -541,6 +542,95 @@ public static class Theme
     }
 
     internal static ResourceDictionary DefaultStyles { get; } = new Themes.DefaultStyles();
+
+    // 把当前模式的资源原地同步进宿主的字典：画笔只改颜色，非画笔值不变就不写。
+    internal static void SyncResourceDictionary(ResourceDictionary target)
+    {
+        if (target is null) throw new ArgumentNullException(nameof(target));
+
+        var mode = EffectiveMode;
+        var source = mode == ThemeMode.HighContrast ? HighContrastSource : SourceFor(mode);
+        foreach (var pair in source)
+        {
+            if (pair.Value is SolidColorBrush sourceBrush)
+            {
+                if (target.TryGetValue(pair.Key, out var existingBrush) && existingBrush is SolidColorBrush targetBrush)
+                {
+                    // 原地改色让模板持有的同一支画笔跟着变；只赋值会让每个 DynamicResource 收到一次 Changed。
+                    if (targetBrush.Color != sourceBrush.Color)
+                    {
+                        targetBrush.Color = sourceBrush.Color;
+                    }
+                }
+                else
+                {
+                    target[pair.Key] = new SolidColorBrush(sourceBrush.Color);
+                }
+
+                continue;
+            }
+
+            if (target.TryGetValue(pair.Key, out var existing) && SameResourceValue(existing, pair.Value))
+            {
+                continue;
+            }
+
+            target[pair.Key] = pair.Value;
+        }
+    }
+
+    // 主题里排版样式是两份独立实例但取值相同；按内容比较才能避免每次切换都重写并触发 Changed。
+    private static bool SameResourceValue(object? left, object? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left is SolidColorBrush leftBrush && right is SolidColorBrush rightBrush)
+        {
+            return leftBrush.Color == rightBrush.Color;
+        }
+
+        if (left is VisualStyle leftStyle && right is VisualStyle rightStyle)
+        {
+            return SameStyle(leftStyle, rightStyle);
+        }
+
+        return Equals(left, right);
+    }
+
+    private static bool SameStyle(VisualStyle left, VisualStyle right)
+    {
+        // 只对无 BasedOn/Template、无触发器、无绑定 setter 的样式做逐项比较；其余情况保守地视为不同。
+        if (left.TargetType != right.TargetType
+            || left.BasedOn is not null
+            || right.BasedOn is not null
+            || left.Template is not null
+            || right.Template is not null
+            || left.Triggers.Count != 0
+            || right.Triggers.Count != 0
+            || left.Setters.Count != right.Setters.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < left.Setters.Count; index++)
+        {
+            var leftSetter = left.Setters[index];
+            var rightSetter = right.Setters[index];
+            if (!ReferenceEquals(leftSetter.Property, rightSetter.Property)
+                || leftSetter.TargetName != rightSetter.TargetName
+                || leftSetter.Binding is not null
+                || rightSetter.Binding is not null
+                || !SameResourceValue(leftSetter.Value, rightSetter.Value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     internal static VisualStyle? FindDefaultStyle(VisualElement element)
     {

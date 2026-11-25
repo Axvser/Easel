@@ -75,6 +75,7 @@ public class VisualHost : System.Windows.Forms.Control
     private Bitmap? _frameScratch;
     private Graphics? _frameScratchGraphics;
     private bool _frameCacheValid;
+    private bool _frameCacheStale;
     private RectangleF _frameDamage;
     private bool _frameDamageFull = true;
     private bool _framePanPending;
@@ -532,6 +533,7 @@ public class VisualHost : System.Windows.Forms.Control
     private void InvalidateFrameCache()
     {
         _frameCacheValid = false;
+        _frameCacheStale = false;
         _frameMovedVisuals.Clear();
         MarkFrameFull();
     }
@@ -558,13 +560,30 @@ public class VisualHost : System.Windows.Forms.Control
             && _frameCache.Width == size.Width
             && _frameCache.Height == size.Height;
 
-        if (!sizeMatches || !_frameCacheValid || _frameDamageFull)
+        // 过期缓存上没有局部脏区时重画整帧比补建缓存再贴图更便宜，输出也与上一次直画一致。
+        var hasDamage = _frameDamage.Width > 0f
+                        || _frameDamage.Height > 0f
+                        || _framePanPending;
+
+        if (_frameDamageFull || (_frameCacheStale && !hasDamage))
+        {
+            // 整帧重画直接落到目标，不再经缓存再整幅贴回：本帧无论如何都要重画整棵树，
+            // 而 PArgb 缓存到调用方位图的全尺寸贴图常常和整棵树一样贵。缓存内容与
+            // 目标不再一致，标为过期；后续局部脏区帧会先补建一次缓存，动画增量贴图不受影响。
+            RenderCore(target, size, new Rectangle(0, 0, size.Width, size.Height));
+            _frameCacheStale = sizeMatches;
+            ResetFrameDamage();
+            return true;
+        }
+
+        if (!sizeMatches || !_frameCacheValid || _frameCacheStale)
         {
             var full = new RectangleF(0f, 0f, size.Width, size.Height);
             var graphics = EnsureFrameCache(size);
             ClearFrameRegion(graphics, full, wholeSurface: true);
             RenderRootInto(graphics, size, full, cull: false);
             _frameCacheValid = true;
+            _frameCacheStale = false;
             ResetFrameDamage();
         }
         else if (!TryShiftFrame(size))
@@ -2092,7 +2111,7 @@ public class VisualHost : System.Windows.Forms.Control
         _overlay.RefreshImplicitStyles();
     }
 
-    // 主题色由控件在绘制时读取，切换 Theme.Mode 只失效表面即可重绘。
+    // 主题色由控件在绘制时读取，切换 Theme.Mode 失效表面即可；资源同步会原地改色。
     private void OnThemeChanged(object? sender, EventArgs e)
     {
         if (IsDisposed)
@@ -2107,21 +2126,9 @@ public class VisualHost : System.Windows.Forms.Control
     // 宿主自带当前主题字典，默认模板里的 DynamicResource 才能找到主题键；应用自己的字典后合并、优先级更高。
     private void RefreshThemeResources()
     {
-        // 主题切换时共享画笔原地改色，模板部件持有的同一个 brush 会一起变色；
-        // 清空/重建字典会让每个 DynamicResource 绑定收到每个 key 的 Changed，切主题变成事件风暴。
-        var fresh = Theme.CreateResourceDictionary(Theme.EffectiveMode);
-        foreach (var pair in fresh)
-        {
-            if (_themeResources.TryGetValue(pair.Key, out var existing)
-                && existing is SolidColorBrush oldBrush
-                && pair.Value is SolidColorBrush newBrush)
-            {
-                oldBrush.Color = newBrush.Color;
-                continue;
-            }
-
-            _themeResources[pair.Key] = pair.Value;
-        }
+        // 画笔原地改色，模板部件持有的同一个 brush 会一起变色；非画笔键值相同则不写，
+        // 避免每个 DynamicResource 收到一次 Changed 的事件风暴。
+        Theme.SyncResourceDictionary(_themeResources);
     }
 
     internal VisualElement OverlayHost => _overlay;
