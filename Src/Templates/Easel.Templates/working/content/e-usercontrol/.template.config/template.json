@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "View"
+  ],
+  "identity": "Easel.UserControl",
+  "name": "Easel UserControl",
+  "description": "A XAML-first visual view hosted by an Easel VisualHost.",
+  "shortName": "e-usercontrol",
+  "sourceName": "TemplateClass",
+  "defaultName": "MyView",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated view.",
+      "defaultValue": "MyApp.Views",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

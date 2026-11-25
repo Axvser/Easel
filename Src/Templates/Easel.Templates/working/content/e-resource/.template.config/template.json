@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Resources"
+  ],
+  "identity": "Easel.ResourceDictionary",
+  "name": "Easel ResourceDictionary",
+  "description": "A XAML resource dictionary for brushes, thicknesses, styles and templates.",
+  "shortName": "e-resource",
+  "sourceName": "TemplateClass",
+  "defaultName": "AppResources",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated resource dictionary.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

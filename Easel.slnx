@@ -10,6 +10,9 @@
   <Folder Name="/Generators/">
     <Project Path="Src/Generators/Easel.Generator/Easel.Generator.csproj" />
   </Folder>
+  <Folder Name="/Templates/">
+    <Project Path="Src/Templates/Easel.Templates/working/Easel.Templates.csproj" />
+  </Folder>
   <Folder Name="/Test/Unit/">
     <Project Path="Src/Test/Unit/Easel.Test/Easel.Test.csproj" />
   </Folder>

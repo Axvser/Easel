@@ -18,12 +18,19 @@ model and point here for the WinForms XAML surface. Easel itself does not refere
 ```powershell
 dotnet add package WinForms.Easel
 dotnet add package WinForms.Easel.Generator
+dotnet new install WinForms.Easel.Templates
 ```
 
 | Package | Contains |
 | --- | --- |
 | `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation engine |
 | `WinForms.Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
+| `WinForms.Easel.Templates` | `dotnet new` items: `e-usercontrol` (XAML view + code-behind) and `e-resource` (resource dictionary) |
+
+```powershell
+dotnet new e-usercontrol -n SettingsView --namespace MyApp.Views
+dotnet new e-resource -n AppResources --namespace MyApp
+```
 
 `WinForms.Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
 `WinForms.Easel.Generator` targets `netstandard2.0` (Roslyn 4.8). A host uses `net8.0-windows` or later for

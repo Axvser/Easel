@@ -1,0 +1,10 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="TemplateNamespace.TemplateClass">
+
+  <!-- Easel customization: declare brushes, thicknesses, styles and templates under the keys your views request. -->
+  <SolidColorBrush x:Key="AccentSurface" Color="#FF0078D4" />
+  <x:Thickness x:Key="CardPadding">12</x:Thickness>
+
+</ResourceDictionary>

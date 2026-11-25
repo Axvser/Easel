@@ -1,0 +1,14 @@
+﻿<local:TemplateClass
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:TemplateNamespace"
+    x:Class="TemplateNamespace.TemplateClass">
+
+  <!-- Easel customization: replace this content. Visual children join the same measure/arrange pass as the host. -->
+  <StackPanel Margin="12" Spacing="8">
+    <TextBlock Text="TemplateClass" FontSize="16" FontWeight="SemiBold" />
+    <TextBlock Text="Compose the view in XAML. The code-behind only assigns a DataContext."
+               Wrap="True" />
+  </StackPanel>
+
+</local:TemplateClass>
