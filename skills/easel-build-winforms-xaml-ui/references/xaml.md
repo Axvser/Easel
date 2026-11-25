@@ -338,4 +338,4 @@ practice.
 - Anti-aliased arbitrary-shape clipping of a live HWND (`IsSnapshot` + a visual `Clip`, or `CornerRadius` which is aliased).
 - `DateTime` literals, arbitrary object constructors without a public parameterless constructor.
 - Implicit styles from a standalone dictionary applied automatically (declare them on a visual element instead).
-- Animation without an injected `IVisualAnimator`.
+- Animation of a property type the engine cannot interpolate (see [animation.md](animation.md)).

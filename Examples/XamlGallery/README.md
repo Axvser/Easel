@@ -137,8 +137,7 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 - **Animation** — a new Group runs four scenes and prints the markup next to each: `TransitionAction` on
   `Opacity`/`CornerRadius`, a `KeyFrameAnimation` chain, brush interpolation (`{StaticResource}` endpoints,
   structural gradient→gradient and the cross-fade fallback), and a `Transform3D` endpoint. The cards run on
-  VeloxDev.WinForms' transition engine, resolved from NuGet at the latest version (`Program` calls
-  `EaselAnimationBootstrap.EnsureRegistered`); Easel itself ships no engine.
+  Easel's own animation engine; nothing has to be registered or injected.
 - **MVVM + XAML** — the shell is XAML bound to `GalleryShellViewModel`; scenario pages are XAML bound to
   `DashboardViewModel`, `SettingsViewModel`, `PlayerViewModel` and `ChatViewModel`. Card roots derive from
   `ThemedStackPanel`/`ThemedGrid`/`ThemedDockPanel`/`ThemedBorder`, which seed the palette and gradient
@@ -190,10 +189,9 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 - Theme selection is Dark+ / Light+ / High contrast / Follow system; a switch rebuilds the visual root so
   every view reads the new theme resources and `Theme.Current` values.
 
-## Animation injection
+## Animation
 
-Easel does not ship an animation engine. `Easel.Animation.AnimationRuntime.Animator` accepts an
-`IVisualAnimator` implementation from the host package; trigger actions, keyframe animations and
-`VisualTransition` delegate interpolation, frame pacing and hold-end semantics to it. Without an injected
-backend, requesting an animation throws a clear `InvalidOperationException`; the gallery cards themselves
-do not animate.
+Easel ships its own animation engine. Trigger actions, keyframe animations and `VisualTransition`
+interpolate values, pace frames and hold the end value themselves; the gallery registers nothing at startup.
+Animatable types are numbers, geometry, 2D/3D transforms, `Color` and `Brush`; an unsupported property is
+rejected with a clear `NotSupportedException`.

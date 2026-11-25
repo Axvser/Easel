@@ -1,6 +1,6 @@
 ﻿---
 name: easel-build-winforms-xaml-ui
-description: Build WinForms UI entirely with Easel's XAML runtime — bootstrap one VisualHost, author XAML views and controls, use layouts, resources/styles/templates, bindings/MVVM, themes (built-in Dark+/Light+, system follow, custom dictionaries), visual composition (gradients, opacity masks, effects, 3D transforms) and the injectable animation contract. Use when writing or reviewing Easel XAML, customizing Easel controls or types, theming an Easel app, or replacing hand-built WinForms UI with the visual runtime.
+description: Build WinForms UI entirely with Easel's XAML runtime — bootstrap one VisualHost, author XAML views and controls, use layouts, resources/styles/templates, bindings/MVVM, themes (built-in Dark+/Light+, system follow, custom dictionaries), visual composition (gradients, opacity masks, effects, 3D transforms) and the built-in animation engine. Use when writing or reviewing Easel XAML, customizing Easel controls or types, theming an Easel app, or replacing hand-built WinForms UI with the visual runtime.
 ---
 
 # Easel — build WinForms UI with XAML
@@ -22,7 +22,7 @@ dotnet add package WinForms.Easel.Generator
 
 | Package | Contains |
 | --- | --- |
-| `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation contract |
+| `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation engine |
 | `WinForms.Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
 
 `WinForms.Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
@@ -171,12 +171,9 @@ accounting for the per-frame warp cost.
 ⚙ **Gradient text uses the native GDI+ brush path.** A `Brush` on `TextBlock.Foreground` is real; a gradient
 on a multiline `TextBox` restarts per line.
 
-⚙ **Easel does not ship an animation engine.** Trigger actions and `VisualTransition` call
-`AnimationRuntime.Animator`; without an injected `IVisualAnimator` they throw a clear
-`InvalidOperationException`. If the app accepts VeloxDev, install **`VeloxDev.WinForms`** — its module
-initializer wires its animator, but only once code in that assembly runs; an app that uses the package *only*
-for animation calls `VeloxDev.WinForms.XamlAnimation.EaselAnimationBootstrap.EnsureRegistered()` once at
-startup.
+⚙ **Easel ships its own animation engine.** Trigger actions and `VisualTransition` interpolate values,
+pace frames and hold the end value with no backend to register. An unsupported property type is rejected
+with a clear `NotSupportedException` at the call site.
 
 ## Reference index
 
@@ -189,7 +186,7 @@ startup.
 | Use brushes, gradients, Visual trees, masks, effects, 3D, shapes | [references/visuals.md](references/visuals.md) |
 | Theme an app, author a custom ResourceDictionary, follow Windows | [references/themes.md](references/themes.md) |
 | Bind a view model, use `[VeloxProperty]`/`[VeloxCommand]`, validate | [references/mvvm.md](references/mvvm.md) |
-| Animate a property, trigger actions, keyframes, inject an engine | [references/animation.md](references/animation.md) |
+| Animate a property, trigger actions, keyframes | [references/animation.md](references/animation.md) |
 | Copy a complete form/list/settings/menu/popup/custom-theme recipe | [references/recipes.md](references/recipes.md) |
 | Diagnose a blank view, wrong bounds, focus/airspace, resource or 3D issue | [references/pitfalls.md](references/pitfalls.md) |
 
@@ -208,13 +205,13 @@ switches. Use it as the reference composition for a new app.
 - [ ] The app starts with `Theme.Mode` set before the first view is built (or uses `Theme.Current` defaults).
 - [ ] The primary path works at 150% DPI and after a theme switch.
 - [ ] Native islands stay rectangular; no popup is expected to cover one.
-- [ ] Any animation call has `AnimationRuntime.Animator` injected, or is guarded by `CanAnimate`.
+- [ ] Any animated property has a CLR type the engine can interpolate (see `references/animation.md`).
 - [ ] The gallery's `--smoke`/`--capture` pattern is used for visual verification when changing the runtime.
 
 ## What this skill does not cover
 
 - The VeloxDev workflow model, node/slot/link behaviour, compiling and executing graphs: use the VeloxDev
   workflow skill and its WinForms page.
-- VeloxDev's transition engine and its `Transition<T>` API: use VeloxDev's animation skill; Easel only defines
-  the injection contract.
+- VeloxDev's standalone transition engine and its `Transition<T>` API for non-Easel targets: use VeloxDev's
+  animation skill. Easel animations use Easel's own engine and never require VeloxDev.
 - WinForms designer, `Control` layout, native painting: Easel replaces those; `NativeControlHost` is the seam.

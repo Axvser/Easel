@@ -35,10 +35,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The gallery is a demo: it tracks the latest published VeloxDev packages instead of a local checkout. -->
+    <!-- The gallery is a demo: the MVVM helpers track the latest published VeloxDev packages. Animation is
+         Easel's own engine, so no VeloxDev adapter package is referenced. -->
     <PackageReference Include="VeloxDev.Core" Version="*" />
     <PackageReference Include="VeloxDev.Core.Generator" Version="*" />
-    <PackageReference Include="VeloxDev.WinForms" Version="*" />
   </ItemGroup>
 
   <ItemGroup>

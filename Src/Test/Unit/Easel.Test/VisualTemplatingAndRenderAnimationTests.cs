@@ -196,6 +196,103 @@ public sealed class VisualTemplatingAndRenderAnimationTests
     }
 
     [TestMethod]
+    public void Animate_WithZeroDuration_HoldsTheEndValueAtLocalPriority()
+    {
+        var border = new VC.Border { Opacity = 1d };
+
+        VisualTransition.Animate(
+            border,
+            VisualElement.OpacityProperty,
+            0.25d,
+            new AnimationSpec { Duration = TimeSpan.Zero });
+
+        Assert.AreEqual(0.25d, border.Opacity, 0.001d, "the completed animation shows its end value");
+
+        border.Opacity = 0.9d;
+        Assert.AreEqual(0.9d, border.Opacity, 0.001d,
+            "the held end value sits at local precedence, so a later local write overrides it");
+    }
+
+    [TestMethod]
+    public void AnimateKeyFrames_WithZeroDuration_EndsAtTheLastFrame()
+    {
+        var border = new VC.Border { Width = 100d };
+        KeyFrame[] frames =
+        [
+            new KeyFrame { Offset = 0d, Value = 100d },
+            new KeyFrame { Offset = 0.5d, Value = 120d },
+            new KeyFrame { Offset = 1d, Value = 80d },
+        ];
+
+        VisualTransition.AnimateKeyFrames(border, VisualElement.WidthProperty, frames, TimeSpan.Zero);
+
+        Assert.AreEqual(80d, border.Width, 0.001d, "the chain ends at the last frame value");
+
+        border.Width = 60d;
+        Assert.AreEqual(60d, border.Width, 0.001d, "the held chain end yields to a later local write");
+    }
+
+    [TestMethod]
+    public void Animate_WithADuration_CompletesAndHoldsTheEndValue()
+    {
+        var border = new VC.Border { Opacity = 1d };
+        VisualTransition.Animate(
+            border,
+            VisualElement.OpacityProperty,
+            0.35d,
+            new AnimationSpec { Duration = TimeSpan.FromMilliseconds(30), FPS = 120 });
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (VisualTransition.HasActive(border) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(10);
+        }
+
+        Assert.IsFalse(VisualTransition.HasActive(border), "the animation reaches its end");
+        Assert.AreEqual(0.35d, border.Opacity, 0.001d, "the end frame is exact");
+
+        border.Opacity = 0.8d;
+        Assert.AreEqual(0.8d, border.Opacity, 0.001d,
+            "the animation layer is cleared so a later local write wins");
+    }
+
+    [TestMethod]
+    public void Animate_OnTheSameProperty_SupersedesTheEarlierRun()
+    {
+        var border = new VC.Border { Opacity = 1d };
+
+        VisualTransition.Animate(
+            border,
+            VisualElement.OpacityProperty,
+            0d,
+            new AnimationSpec { Duration = TimeSpan.FromHours(1) });
+        VisualTransition.Animate(
+            border,
+            VisualElement.OpacityProperty,
+            0.4d,
+            new AnimationSpec { Duration = TimeSpan.Zero });
+
+        Assert.AreEqual(0.4d, border.Opacity, 0.001d, "the newer animation wins on the same property");
+    }
+
+    [TestMethod]
+    public void Stop_HoldsTheReachedValueForALaterLocalWriteToOverride()
+    {
+        var border = new VC.Border { Opacity = 1d };
+        VisualTransition.Animate(
+            border,
+            VisualElement.OpacityProperty,
+            0d,
+            new AnimationSpec { Duration = TimeSpan.FromHours(1) });
+
+        VisualTransition.Stop(border);
+
+        border.Opacity = 0.7d;
+        Assert.AreEqual(0.7d, border.Opacity, 0.001d,
+            "a stopped animation leaves no animation layer that would outrank the later local write");
+    }
+
+    [TestMethod]
     public void TextBoxTemplate_HostsAContentPartAndReplacesTheSelfDrawnChrome()
     {
         using var surface = new VisualHost { Size = new Size(240, 120), DpiScaleOverride = 1f };

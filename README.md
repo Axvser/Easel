@@ -238,9 +238,9 @@ dotnet add package WinForms.Easel
 | `WinForms.Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
 
 The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
-`[VeloxProperty]` / `[VeloxCommand]` view models and `VeloxDev.WinForms` for the animation backend,
-both taken from NuGet at their latest published versions; it also opts into WPF for the real
-`MediaPlayer` / `MediaElement` audio and video pages. The Easel runtime still has no WPF dependency.
+`[VeloxProperty]` / `[VeloxCommand]` view models, taken from NuGet at the latest published version; it
+also opts into WPF for the real `MediaPlayer` / `MediaElement` audio and video pages. Animation is Easel's
+own engine, so no VeloxDev adapter package is referenced. The Easel runtime still has no WPF dependency.
 
 ## Build and test
 
@@ -252,18 +252,21 @@ dotnet run --project Examples/XamlGallery/Demo/Demo.csproj
 
 ### Gallery references
 
-The gallery always builds against the Easel source projects in this repository. Its VeloxDev
-dependencies use floating `*` versions, so a demo build tracks the latest published packages
-instead of pinning a revision.
+The gallery always builds against the Easel source projects in this repository. Its MVVM helpers use
+VeloxDev.Core with floating `*` versions, so a demo build tracks the latest published packages; animation
+is Easel's own engine and needs no VeloxDev package.
 
-## Animation is a contract
+## Animation engine
 
-Easel owns the animation contract but not an engine. `Easel.Animation.AnimationRuntime.Animator`
-accepts an `IVisualAnimator`; trigger actions, keyframe animations and `VisualTransition` delegate
-interpolation, frame pacing and hold-end semantics to it. Without an injected backend, an animation
-request throws a clear `InvalidOperationException`. **Install the latest `VeloxDev.WinForms`** if
-the app accepts the VeloxDev dependency: its module initializer wires `EaselVisualAnimator` automatically,
-so Easel animations work immediately with no extra package or manual registration.
+Easel carries its own animation engine. Trigger actions, keyframe animations and `VisualTransition`
+interpolate values, pace frames and hold the end value themselves; there is no backend to register and no
+injection seam. Animations write at `BindingPriority.Animation` and, when they complete or are stopped, hold
+the reached value at local precedence so a later local or style write can take over.
+
+The engine interpolates numbers, geometry (`Point`, `Size`, `Rectangle`, `Padding`, `Thickness`), 2D/3D
+transforms, `Color` and `Brush`. Brush and `Transform3D` interpolation is structural: gradient shapes and 3D
+transform parameters are lerped rather than flattened. A property whose CLR type has no interpolation is
+rejected with a clear `NotSupportedException` at the call site.
 
 ## Repository map
 

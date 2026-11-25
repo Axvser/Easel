@@ -1,4 +1,6 @@
 using Easel.Animation;
+using Easel.Animation.Runtime;
+using Easel.Animation.Sampling;
 
 namespace Easel.Visuals;
 
@@ -37,11 +39,11 @@ public sealed class KeyFrame
 }
 
 /// <summary>
-/// A trigger action that animates one dependency property to <see cref="To"/> through the injected animation backend.
+/// A trigger action that animates one dependency property to <see cref="To"/> with Easel's animation engine.
 /// </summary>
 /// <remarks>
 /// The animation writes at <see cref="BindingPriority.Animation"/>, so it outranks a local value, style setter or
-/// trigger setter while it runs. A new animation started on the same element supersedes the running one.
+/// trigger setter while it runs. A new animation started on the same property supersedes the running one.
 /// <para>
 /// When it completes or is stopped, the value it reached is written at <see cref="BindingPriority.LocalValue"/> and
 /// the animation layer is cleared. The end value therefore holds at local precedence (HoldEnd) instead of shadowing
@@ -78,7 +80,7 @@ public sealed class TransitionAction : VisualTriggerAction
 /// </summary>
 /// <remarks>
 /// Each adjacent pair of keyframes becomes one segment whose duration is proportional to its slice of
-/// <see cref="Duration"/>. The chain is one mutual animation: a later animation on the same element supersedes all
+/// <see cref="Duration"/>. The chain is one animation: a later animation on the same property supersedes all
 /// of it, and <see cref="VisualTransition.Stop"/> ends it where it stands. As with
 /// <see cref="TransitionAction"/>, the value reached when the chain ends is held at
 /// <see cref="BindingPriority.LocalValue"/> after the animation layer is cleared.
@@ -127,12 +129,11 @@ public sealed class KeyFrameAnimation : VisualTriggerAction
 }
 
 /// <summary>
-/// Runs a dependency-property animation on a <see cref="VisualElement"/> through the injected animation backend.
+/// Runs a dependency-property animation on a <see cref="VisualElement"/> with Easel's built-in animation engine.
 /// </summary>
 /// <remarks>
-/// Easel owns the animation contract and value normalization; the backend supplied through
-/// <see cref="AnimationRuntime.Animator"/> owns interpolation, frame pacing and the hold-end bookkeeping. A host that
-/// does not inject a backend gets a clear <see cref="InvalidOperationException"/> when it asks for an animation.
+/// Easel normalizes the end value and provides interpolation, frame pacing and the hold-end bookkeeping itself, so a
+/// host never registers a backend.
 /// <para>
 /// A completed or stopped animation holds its last value by writing it at <see cref="BindingPriority.LocalValue"/>
 /// and clearing the animation layer, so the value never keeps outranking later writes at animation precedence.
@@ -145,10 +146,10 @@ public static class VisualTransition
     /// <param name="property">The dependency property to animate.</param>
     /// <param name="to">The value the animation ends at.</param>
     /// <param name="effect">The effect to run; omitted means a 240 ms ease-out.</param>
-    /// <remarks>A new animation supersedes whatever is already running on <paramref name="target"/>.</remarks>
+    /// <remarks>A new animation supersedes whatever is already running on the same property.</remarks>
     /// <exception cref="ArgumentNullException"><paramref name="target"/> or <paramref name="property"/> is <see langword="null"/>.</exception>
     /// <exception cref="NotSupportedException">
-    /// <paramref name="property"/> has no registered sampler in the active backend (for example a
+    /// <paramref name="property"/> has no interpolation in the engine (for example a
     /// <see cref="VisualEffect"/> or a string property). The animation is rejected instead of being accepted and
     /// holding the current value for its duration.
     /// </exception>
@@ -161,15 +162,15 @@ public static class VisualTransition
         if (target is null) throw new ArgumentNullException(nameof(target));
         if (property is null) throw new ArgumentNullException(nameof(property));
 
-        EnsureAnimatable(target, property);
+        EnsureAnimatable(property);
 
-        // 调用方常把 1 / 1f 交给一个 Thickness 属性；在这一处统一成属性类型，sampler 就不必猜。
+        // 调用方常把 1 / 1f 交给一个 Thickness 属性；在这一处统一成属性类型，插值器就不必猜。
         if (to is not null && !property.PropertyType.IsInstanceOfType(to))
         {
             to = XamlRuntime.ConvertValue(to, property.PropertyType);
         }
 
-        AnimationRuntime.Animator.Animate(target, property, to, effect ?? new AnimationSpec());
+        AnimationScheduler.Animate(target, property, to, effect ?? new AnimationSpec());
     }
 
     /// <summary>Animates <paramref name="property"/> through <paramref name="frames"/>, one segment per adjacent pair.</summary>
@@ -181,7 +182,7 @@ public static class VisualTransition
     /// <param name="loopTime">Additional full passes; zero runs once and <see cref="int.MaxValue"/> repeats forever.</param>
     /// <param name="isAutoReverse">Whether each pass also runs backwards.</param>
     /// <exception cref="ArgumentNullException"><paramref name="target"/>, <paramref name="property"/> or <paramref name="frames"/> is <see langword="null"/>.</exception>
-    /// <exception cref="NotSupportedException"><paramref name="property"/> has no registered sampler.</exception>
+    /// <exception cref="NotSupportedException"><paramref name="property"/> has no interpolation in the engine.</exception>
     public static void AnimateKeyFrames(
         VisualElement target,
         DependencyProperty property,
@@ -225,7 +226,7 @@ public static class VisualTransition
             return;
         }
 
-        EnsureAnimatable(target, property);
+        EnsureAnimatable(property);
 
         ordered.Sort(static (left, right) => left.Offset.CompareTo(right.Offset));
         var spec = new AnimationSpec
@@ -235,7 +236,7 @@ public static class VisualTransition
             LoopTime = loopTime,
             IsAutoReverse = isAutoReverse,
         };
-        AnimationRuntime.Animator.AnimateKeyFrames(target, property, ordered, spec);
+        AnimationScheduler.AnimateKeyFrames(target, property, ordered, spec);
     }
 
     /// <summary>Stops every animation currently running on <paramref name="target"/>.</summary>
@@ -249,22 +250,22 @@ public static class VisualTransition
     public static void Stop(VisualElement target)
     {
         if (target is null) throw new ArgumentNullException(nameof(target));
-        AnimationRuntime.Animator.Stop(target);
+        AnimationScheduler.Stop(target);
     }
 
-    internal static bool HasActive(VisualElement target) => AnimationRuntime.Animator.HasActive(target);
+    internal static bool HasActive(VisualElement target) => AnimationScheduler.HasActive(target);
 
-    // 后端没有该类型的采样器时整段停住当前值；在启动前直接拒绝，而不是开一趟什么也不写的动画。
-    private static void EnsureAnimatable(VisualElement target, DependencyProperty property)
+    // 没有该类型的插值器时整段停住当前值；在启动前直接拒绝，而不是开一趟什么也不写的动画。
+    private static void EnsureAnimatable(DependencyProperty property)
     {
-        if (AnimationRuntime.Animator.CanAnimate(target, property))
+        if (ValueInterpolator.CanInterpolate(property.PropertyType))
         {
             return;
         }
 
         throw new NotSupportedException(
-            $"'{property.Name}' of type '{property.PropertyType.Name}' has no interpolator in the active visual "
-            + "animator, so it cannot be animated. Register a sampler for the type or animate a supported property; "
-            + "a VisualEffect cannot be interpolated at all.");
+            $"'{property.Name}' of type '{property.PropertyType.Name}' has no interpolator in Easel's animation "
+            + "engine, so it cannot be animated. Animate a supported property; a VisualEffect cannot be interpolated "
+            + "at all.");
     }
 }
