@@ -272,6 +272,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private Size _measureAvailable;
     private Size _desiredSize;
 
+    /// <summary>When true, layout changes inside this element stop here; its parent slot is assumed fixed.</summary>
+    public bool IsLayoutBoundary { get; set; }
+
+    internal Size MeasureAvailable => _measureAvailable;
+
     // 布局缓存的复用前提：Measure 之后没有被 InvalidateMeasure 推翻。Grid 用它判断能否跳过重测。
     internal bool IsMeasureValid => _measureValid;
     private VisualHost? _surface;
@@ -1020,12 +1025,32 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         }
     }
 
+    /// <summary>Whether a property change must invalidate the measure chain (fixed-size text can skip it).</summary>
+    protected virtual bool ShouldInvalidateMeasure(DependencyPropertyChangedEventArgs e) => true;
+
     /// <summary>Marks this element and its ancestors as needing a new measure pass.</summary>
     public void InvalidateMeasure()
     {
         _measureValid = false;
         _arrangeValid = false;
-        ParentElement?.InvalidateMeasure();
+
+        if (IsLayoutBoundary)
+        {
+            Surface?.NotifyBoundaryLayoutInvalidated(this, frameFull: true);
+            return;
+        }
+
+        for (var parent = ParentElement; parent is not null; parent = parent.ParentElement)
+        {
+            parent._measureValid = false;
+            parent._arrangeValid = false;
+            if (parent.IsLayoutBoundary)
+            {
+                Surface?.NotifyBoundaryLayoutInvalidated(parent, frameFull: true);
+                return;
+            }
+        }
+
         Surface?.InvalidateSurface();
     }
 
@@ -1043,14 +1068,24 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private void InvalidateArrangeCore(bool frameFull)
     {
         _arrangeValid = false;
-        if (ParentElement is { } parent)
+
+        if (IsLayoutBoundary)
         {
-            parent.InvalidateArrangeCore(frameFull);
+            Surface?.NotifyBoundaryLayoutInvalidated(this, frameFull);
+            return;
         }
-        else
+
+        for (var parent = ParentElement; parent is not null; parent = parent.ParentElement)
         {
-            Surface?.NotifyArrangeInvalidated(frameFull);
+            parent._arrangeValid = false;
+            if (parent.IsLayoutBoundary)
+            {
+                Surface?.NotifyBoundaryLayoutInvalidated(parent, frameFull);
+                return;
+            }
         }
+
+        Surface?.NotifyArrangeInvalidated(frameFull);
     }
 
     /// <summary>Requests a repaint of the hosting surface without a new layout pass.</summary>
@@ -1494,7 +1529,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             }
         }
 
-        if (e.Property.Metadata.AffectsMeasure)
+        if (e.Property.Metadata.AffectsMeasure && ShouldInvalidateMeasure(e))
         {
             InvalidateMeasure();
         }

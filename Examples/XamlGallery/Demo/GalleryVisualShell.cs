@@ -36,6 +36,8 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         InitializeComponent();
 
         _inspector = new GalleryVisualInspector(Resources);
+        // 预览卡片内部的尺寸变化（Slider/GridSplitter）只重排预览视口，不牵动左目录与右属性面板。
+        PreviewScroll.IsLayoutBoundary = true;
         InspectorHost.Content = _inspector.Root;
         LeftSplitter.Target = CatalogPane;
         RightSplitter.Target = InspectorPane;
@@ -84,7 +86,17 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
 
         if (item is not null)
         {
-            CatalogTree.Reveal(item);
+            // Reveal 会把 SelectedItem 设成同一项；抑制回传，避免再走一次 ShowCard（页面构建两次）。
+            var previous = _syncingSelection;
+            _syncingSelection = true;
+            try
+            {
+                CatalogTree.Reveal(item);
+            }
+            finally
+            {
+                _syncingSelection = previous;
+            }
         }
 
         return true;

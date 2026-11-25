@@ -455,6 +455,25 @@ public class VisualHost : System.Windows.Forms.Control
     // 根节点自身的属性变化会整块失效；记录一笔，后续的整块脏区不能再当成平移的附带失效。
     internal void NotifyRootContentChanged() => _frameContentStamp++;
 
+    private readonly List<VisualElement> _dirtyLayoutBoundaries = [];
+
+    // 布局边界内部的失效只重排边界子树；父级槽位不变，整窗仍重画。
+    internal void NotifyBoundaryLayoutInvalidated(VisualElement boundary, bool frameFull)
+    {
+        if (boundary.Surface == this && !_dirtyLayoutBoundaries.Contains(boundary))
+        {
+            _dirtyLayoutBoundaries.Add(boundary);
+        }
+
+        _damageFull = true;
+        if (frameFull)
+        {
+            MarkFrameFull();
+        }
+
+        Invalidate();
+    }
+
     // 布局失效：窗口路径整面重画；frameFull 决定帧缓存是否也必须整帧重来。
     internal void NotifyArrangeInvalidated(bool frameFull)
     {
@@ -2339,10 +2358,36 @@ public class VisualHost : System.Windows.Forms.Control
 
     private void EnsureLayout(Size size)
     {
-        if (_root is null || (_layoutValid && _layoutSize == size))
+        if (_root is null)
         {
             return;
         }
+
+        if (_layoutValid && _layoutSize == size)
+        {
+            if (_dirtyLayoutBoundaries.Count == 0)
+            {
+                return;
+            }
+
+            var boundaries = _dirtyLayoutBoundaries.ToArray();
+            _dirtyLayoutBoundaries.Clear();
+            foreach (var boundary in boundaries)
+            {
+                if (boundary.Surface != this || !boundary.IsVisible)
+                {
+                    continue;
+                }
+
+                var available = boundary.MeasureAvailable;
+                boundary.Measure(available);
+                boundary.Arrange(boundary.Bounds);
+            }
+
+            return;
+        }
+
+        _dirtyLayoutBoundaries.Clear();
 
         // 先认领这一趟：measure/arrange 里再有 InvalidateMeasure（滚动条折叠/展开就是这种）
         // 会把 _layoutValid 打回 false，下一帧继续排版，而不是被本次结尾的 true 吞掉。

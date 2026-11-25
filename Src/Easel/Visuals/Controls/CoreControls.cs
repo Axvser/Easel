@@ -344,6 +344,26 @@ public class TextBlock : VisualElement
     }
 
     /// <inheritdoc />
+    protected override bool ShouldInvalidateMeasure(DependencyPropertyChangedEventArgs e)
+    {
+        // 固定宽度且不换行时，文本变化只改字形，不改一行的高度或显式宽度；只需重画这条文字。
+        if (ReferenceEquals(e.Property, TextProperty)
+            && !Wrap
+            && !double.IsNaN(Width)
+            && Width >= 0d
+            && !ContainsNewLine(e.OldValue as string)
+            && !ContainsNewLine(e.NewValue as string))
+        {
+            return false;
+        }
+
+        return base.ShouldInvalidateMeasure(e);
+    }
+
+    private static bool ContainsNewLine(string? text)
+        => text is not null && (text.Contains((char)10) || text.Contains((char)13));
+
+    /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
         var width = availableSize.Width > 0

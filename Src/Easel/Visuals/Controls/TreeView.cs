@@ -540,6 +540,7 @@ public class TreeView : TemplatedControl
     private TreeViewItem? _pressedRow;
     private Panel? _itemsHost;
     private bool _rebuilding;
+    private bool _suspendRebuild;
     private bool _disposing;
 
     /// <summary>Creates a focusable tree with the current theme font.</summary>
@@ -595,12 +596,31 @@ public class TreeView : TemplatedControl
     {
         if (item is null) throw new ArgumentNullException(nameof(item));
 
-        for (var parent = item.ParentItem; parent is not null; parent = parent.ParentItem)
+        // 展开祖先会经 Observe 触发 Rebuild；批量展开期间先挂起，最后只重建一次。
+        var changed = false;
+        _suspendRebuild = true;
+        try
         {
-            parent.IsExpanded = true;
+            for (var parent = item.ParentItem; parent is not null; parent = parent.ParentItem)
+            {
+                if (!parent.IsExpanded)
+                {
+                    parent.IsExpanded = true;
+                    changed = true;
+                }
+            }
+        }
+        finally
+        {
+            _suspendRebuild = false;
         }
 
-        Rebuild();
+        // 已展开且在可视行里时不必拆挂整棵树；Reveal 不应让一次选中重建所有行。
+        if (changed || !_rows.Contains(item))
+        {
+            Rebuild();
+        }
+
         SelectedItem = item;
     }
 
@@ -953,7 +973,7 @@ public class TreeView : TemplatedControl
 
     private void Rebuild()
     {
-        if (_rebuilding)
+        if (_rebuilding || _suspendRebuild)
         {
             return;
         }
