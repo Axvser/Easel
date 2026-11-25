@@ -70,10 +70,16 @@
     </Style.Template>
   </Style>
 
-  <Style TargetType="TabItem">
+  <!-- The header container seam: the keyed style carries the whole tab-header template, and the exact-type
+       implicit style below applies it. A host replaces the header look by supplying its own TabItem style; the
+       tab control only pushes IsSelected / IsPointerOver / IsFocusVisible onto these containers. -->
+  <Style x:Key="TabItemContainerStyle" TargetType="TabItem">
     <Style.Template>
       <ControlTemplate TargetType="TabItem">
         <Grid Height="32" IsHitTestVisible="False">
+          <Border x:Name="HoverBand"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Hover}" />
           <Border x:Name="SelectionFill"
                   IsHitTestVisible="False"
                   Background="{DynamicResource Raised}" />
@@ -82,6 +88,12 @@
                   Height="2"
                   VerticalAlignment="Bottom"
                   Background="{DynamicResource Accent}" />
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  Margin="1"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <TextBlock x:Name="MutedLabel"
                      Text="{TemplateBinding Header}"
                      Padding="14,0"
@@ -96,14 +108,6 @@
                      IsHitTestVisible="False" />
         </Grid>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsSelected" Value="True">
-            <Trigger.Setters>
-              <Setter TargetName="SelectionFill" Property="Opacity" Value="1" />
-              <Setter TargetName="SelectionLine" Property="Opacity" Value="1" />
-              <Setter TargetName="MutedLabel" Property="Opacity" Value="0" />
-              <Setter TargetName="SelectedLabel" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
           <Trigger Property="IsSelected" Value="False">
             <Trigger.Setters>
               <Setter TargetName="SelectionFill" Property="Opacity" Value="0" />
@@ -112,10 +116,50 @@
               <Setter TargetName="SelectedLabel" Property="Opacity" Value="0" />
             </Trigger.Setters>
           </Trigger>
+          <Trigger Property="IsSelected" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionFill" Property="Opacity" Value="1" />
+              <Setter TargetName="SelectionLine" Property="Opacity" Value="1" />
+              <Setter TargetName="MutedLabel" Property="Opacity" Value="0" />
+              <Setter TargetName="SelectedLabel" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="True">
+            <Trigger.Setters>
+              <Setter Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate>
     </Style.Template>
   </Style>
+
+  <Style TargetType="TabItem" BasedOn="{StaticResource TabItemContainerStyle}" />
 
   <Style TargetType="TabControl">
     <Style.Template>

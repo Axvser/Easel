@@ -499,8 +499,15 @@ public class GroupBox : TemplatedControl
 
 /// <summary>One page of a <see cref="TabControl"/>; its template draws the tab header.</summary>
 /// <remarks>
-/// The tab control parents the page content, not this item. <see cref="IsSelected"/> drives the default template's
-/// selected fill, accent line and foreground so a tab can show its state without self-drawing.
+/// <para>
+/// The tab control parents the page content, not this item, and hosts this item itself as the header container.
+/// <see cref="IsSelected"/>, <see cref="IsPointerOver"/> and <see cref="TemplatedControl.IsFocusVisible"/> drive the
+/// default template's bands and ring, so a host can replace the whole header look through the implicit
+/// <c>TabItem</c> style without retemplating the tab control.
+/// </para>
+/// <para>
+/// The state properties are visual only: the tab control still owns selection and content placement.
+/// </para>
 /// </remarks>
 public class TabItem : TemplatedControl
 {
@@ -517,6 +524,11 @@ public class TabItem : TemplatedControl
     /// <summary>Whether this tab is the selected page.</summary>
     public static readonly DependencyProperty IsSelectedProperty = DependencyProperty.Register(
         nameof(IsSelected), typeof(bool), typeof(TabItem),
+        new PropertyMetadata(false) { AffectsRender = true });
+
+    /// <summary>Whether the pointer is over this tab header.</summary>
+    public static readonly DependencyProperty IsPointerOverProperty = DependencyProperty.Register(
+        nameof(IsPointerOver), typeof(bool), typeof(TabItem),
         new PropertyMetadata(false) { AffectsRender = true });
 
     /// <summary>Creates an empty tab.</summary>
@@ -545,13 +557,33 @@ public class TabItem : TemplatedControl
         get => (bool)GetValue(IsSelectedProperty)!;
         set => SetValue(IsSelectedProperty, value);
     }
+
+    /// <summary>Whether the pointer is over this tab header.</summary>
+    /// <remarks>This dependency property shadows <see cref="VisualElement.IsPointerOver"/> so a style or template
+    /// trigger can observe the tab's hover state.</remarks>
+    public new bool IsPointerOver => (bool)GetValue(IsPointerOverProperty)!;
+
+    /// <inheritdoc />
+    protected override void OnPointerEntered(VisualPointerEventArgs args)
+    {
+        base.OnPointerEntered(args);
+        SetValue(IsPointerOverProperty, true);
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(VisualPointerEventArgs args)
+    {
+        base.OnPointerExited(args);
+        SetValue(IsPointerOverProperty, false);
+    }
 }
 
 /// <summary>A tab strip with one visible page.</summary>
 /// <remarks>
 /// The default template parts are <c>PART_HeaderHost</c> (the panel that receives the <see cref="TabItem"/> headers)
 /// and <c>PART_ContentHost</c> (the area the selected page is arranged over). The selected page stays a direct child
-/// of this control so existing tree walks keep finding it under the tab control.
+/// of this control so existing tree walks keep finding it under the tab control. Header appearance belongs to the
+/// <see cref="TabItem"/> container style; this control only pushes selection and focus state onto those containers.
 /// </remarks>
 public class TabControl : TemplatedControl
 {
@@ -641,6 +673,11 @@ public class TabControl : TemplatedControl
             SyncSelection();
             SyncContent();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
+        }
+        else if (ReferenceEquals(e.Property, IsFocusVisibleProperty))
+        {
+            // 焦点环属于选中的页签；容器只接收状态，不自己拿焦点。
+            SyncFocusRing();
         }
     }
 
@@ -751,6 +788,18 @@ public class TabControl : TemplatedControl
         for (var index = 0; index < Items.Count; index++)
         {
             Items[index].IsSelected = index == SelectedIndex;
+        }
+
+        SyncFocusRing();
+    }
+
+    // 页签本身不拿焦点：把本控件的键盘焦点可见态推给选中的容器，模板触发器就能画出焦点环。
+    private void SyncFocusRing()
+    {
+        var visible = IsFocusVisible;
+        for (var index = 0; index < Items.Count; index++)
+        {
+            Items[index].SetValue(IsFocusVisibleProperty, visible && index == SelectedIndex);
         }
     }
 
