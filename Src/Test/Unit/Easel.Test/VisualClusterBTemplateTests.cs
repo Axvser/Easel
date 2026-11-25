@@ -344,7 +344,13 @@ public sealed class VisualClusterBTemplateTests
     public void CalendarTemplate_HostsCalendarItemAndDrivesSelection()
     {
         using var surface = new VisualHost { Size = new Size(320, 300), DpiScaleOverride = 1f };
-        using var calendar = new VC.Calendar { Width = 250f, Height = 226f };
+        using var calendar = new VC.Calendar
+        {
+            Width = 250f,
+            Height = 226f,
+            // 显式空样式退出默认模板，后面清掉 Template 才能回到自绘路径。
+            Style = new VisualStyle { TargetType = typeof(VC.Calendar) },
+        };
 
         VC.CalendarItem? item = null;
         VC.Border? indicator = null;
@@ -416,7 +422,12 @@ public sealed class VisualClusterBTemplateTests
     public void DatePickerTemplate_WiresTextBoxButtonAndPopup()
     {
         using var surface = new VisualHost { Size = new Size(320, 300), DpiScaleOverride = 1f };
-        using var picker = new VC.DatePicker { Width = 180f };
+        using var picker = new VC.DatePicker
+        {
+            Width = 180f,
+            // 显式空样式退出默认模板，后面清掉 Template 才能回到自绘路径。
+            Style = new VisualStyle { TargetType = typeof(VC.DatePicker) },
+        };
 
         VC.TextBox? editor = null;
         VC.Button? button = null;
@@ -499,7 +510,11 @@ public sealed class VisualClusterBTemplateTests
     {
         using var surface = new VisualHost { Size = new Size(320, 280) };
         using var root = new VC.StackPanel();
-        using var picker = new VC.DatePicker { Width = 180f };
+        using var picker = new VC.DatePicker
+        {
+            Width = 180f,
+            Style = new VisualStyle { TargetType = typeof(VC.DatePicker) },
+        };
         root.Add(picker);
         surface.Root = root;
         Layout(surface, 320, 280);

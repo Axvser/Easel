@@ -3,6 +3,140 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="Easel.Themes.Defaults.CalendarDefaults">
 
-  <!-- Built-in fallback appearance for Calendar and DatePicker; added to the implicit style table by Theme.DefaultStyles. -->
+  <!-- Built-in fallback appearance for Calendar, CalendarItem and DatePicker; added to the implicit style table by
+       Theme.DefaultStyles. The month grid lives in CalendarItem's template: PART_Header, PART_Previous, PART_Next,
+       PART_WeekDays and PART_Days are populated by the item, which keeps selection and navigation in code. -->
+
+  <Style TargetType="Calendar">
+    <Style.Template>
+      <ControlTemplate TargetType="Calendar">
+        <Grid ClipToBounds="True">
+          <Border IsHitTestVisible="False"
+                  Background="{DynamicResource Surface}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <CalendarItem x:Name="PART_CalendarItem" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="CalendarItem">
+    <Style.Template>
+      <ControlTemplate TargetType="CalendarItem">
+        <!-- The fixed 238px column and 34/22/168 rows keep the original 250x226 month geometry; the padding comes
+             from the item so CalendarItem can fill the calendar without a second inset. -->
+        <Grid x:Name="Root"
+              ClipToBounds="True"
+              Padding="{TemplateBinding Padding}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="238" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="34" />
+            <RowDefinition Height="22" />
+            <RowDefinition Height="168" />
+          </Grid.RowDefinitions>
+
+          <Border x:Name="PART_Previous"
+                  Grid.Row="0"
+                  Width="24"
+                  Height="24"
+                  Padding="0"
+                  Margin="4,0,0,0"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False">
+            <Polygon Points="16,6 6,12 16,18"
+                     Fill="{DynamicResource Muted}"
+                     IsHitTestVisible="False" />
+          </Border>
+
+          <TextBlock x:Name="PART_Header"
+                     Grid.Row="0"
+                     TextAlignment="Center"
+                     Foreground="{TemplateBinding Foreground}"
+                     IsHitTestVisible="False" />
+
+          <Border x:Name="PART_Next"
+                  Grid.Row="0"
+                  Width="24"
+                  Height="24"
+                  Padding="0"
+                  Margin="0,0,4,0"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False">
+            <Polygon Points="8,6 18,12 8,18"
+                     Fill="{DynamicResource Muted}"
+                     IsHitTestVisible="False" />
+          </Border>
+
+          <UniformGrid x:Name="PART_WeekDays"
+                       Grid.Row="1"
+                       Rows="1"
+                       Columns="7"
+                       IsHitTestVisible="False" />
+
+          <UniformGrid x:Name="PART_Days"
+                       Grid.Row="2"
+                       Rows="6"
+                       Columns="7" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="DatePicker">
+    <Style.Setters>
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="DatePicker">
+        <Grid x:Name="Root">
+          <Border IsHitTestVisible="False"
+                  Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <TextBox x:Name="PART_TextBox"
+                   Padding="{TemplateBinding Padding}" />
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Button x:Name="PART_Button"
+                  Width="24"
+                  Height="22"
+                  Padding="0"
+                  Margin="0,0,4,0"
+                  FontSize="10"
+                  Text="▾"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Center" />
+          <VisualPopup x:Name="PART_Popup" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>

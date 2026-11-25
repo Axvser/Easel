@@ -4,6 +4,7 @@ using System.Windows.Forms;
 using Easel;
 using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlBrush = Easel.Brush;
+using XamlTextAlignment = Easel.Controls.TextAlignment;
 using XamlThickness = Easel.Controls.Thickness;
 using VisualButton = Easel.Visuals.Controls.Button;
 using VisualTextBox = Easel.Visuals.Controls.TextBox;
@@ -12,21 +13,45 @@ namespace Easel.Visuals.Controls;
 
 /// <summary>The month grid hosted by a templated <see cref="Calendar"/>.</summary>
 /// <remarks>
-/// The item reads and writes the owning calendar's state: it draws the month header, the weekday row and up to six
-/// week rows, and pointer presses navigate the month or select a day. Without an owner it paints nothing, so a template
-/// that declares the part is required to attach it.
+/// <para>
+/// The item reads and writes the owning calendar's state. With a template it presents the month through named parts:
+/// <c>PART_Header</c> (a <see cref="TextBlock"/> for the month title), <c>PART_Previous</c> and <c>PART_Next</c>
+/// (decorative navigation hit regions), <c>PART_WeekDays</c> (a one-row <see cref="UniformGrid"/> for the weekday
+/// labels) and <c>PART_Days</c> (a six-row <see cref="UniformGrid"/> whose cells are created by this item).
+/// </para>
+/// <para>
+/// Without a template it falls back to the original self-drawn month grid, so an explicit empty style still shows a
+/// calendar. A template that omits the header or the two grids throws <see cref="InvalidOperationException"/>.
+/// </para>
 /// </remarks>
-public class CalendarItem : VisualElement
+public class CalendarItem : TemplatedControl
 {
     internal const float HeaderHeight = 34f;
     internal const float WeekHeaderHeight = 22f;
     internal const float CellHeight = 28f;
     internal const float CellWidth = 34f;
+    internal const float GridWidth = CellWidth * 7f;
+    internal const float GridHeight = CellHeight * 6f;
+    internal const int DayCount = 42;
+
+    /// <summary>The month-title and day-number colour as a brush value; an empty colour uses the active theme.</summary>
+    public static readonly DependencyProperty ForegroundProperty = DependencyProperty.Register(
+        nameof(Foreground), typeof(XamlBrush), typeof(CalendarItem),
+        new PropertyMetadata(null) { AffectsRender = true });
 
     private readonly List<(RectangleF Bounds, DateTime Date)> _cells = [];
+    private readonly CalendarDayCell[] _dayCells = new CalendarDayCell[DayCount];
+    private readonly TextBlock[] _weekDayLabels = new TextBlock[7];
     private RectangleF _previous;
     private RectangleF _next;
     private DateTime? _hoverDate;
+    private Calendar? _owner;
+    private TextBlock? _headerPart;
+    private VisualElement? _previousPart;
+    private VisualElement? _nextPart;
+    private UniformGrid? _weekPart;
+    private UniformGrid? _daysPart;
+    private bool _themeSubscribed;
 
     /// <summary>Creates a hit-testable month grid with theme padding.</summary>
     public CalendarItem()
@@ -36,18 +61,48 @@ public class CalendarItem : VisualElement
         CornerRadius = Theme.Current.CornerRadius;
     }
 
+    /// <summary>The month-title and day-number colour as a brush value; an empty colour uses the active theme.</summary>
+    public Brush? Foreground
+    {
+        get => (XamlBrush?)GetValue(ForegroundProperty);
+        set => SetValue(ForegroundProperty, value);
+    }
+
     /// <summary>The calendar whose month, selection and colours this item presents, or <see langword="null"/>.</summary>
-    public Calendar? Owner { get; internal set; }
+    public Calendar? Owner
+    {
+        get => _owner;
+        internal set
+        {
+            if (ReferenceEquals(_owner, value))
+            {
+                return;
+            }
+
+            _owner = value;
+            RefreshFromOwner();
+        }
+    }
+
+    // 指针下的日期；月格绘制与日格样式读取它。
+    internal DateTime? HoverDate => _hoverDate;
 
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
-        => new(
-            (int)Math.Ceiling((CellWidth * 7f) + Padding.Horizontal),
-            (int)Math.Ceiling(HeaderHeight + WeekHeaderHeight + (CellHeight * 6f) + Padding.Vertical));
+        => IsTemplated
+            ? MeasureTemplate(availableSize)
+            : new Size(
+                (int)Math.Ceiling(GridWidth + Padding.Horizontal),
+                (int)Math.Ceiling(HeaderHeight + WeekHeaderHeight + GridHeight + Padding.Vertical));
 
     /// <inheritdoc />
     protected override void OnRender(Graphics graphics)
     {
+        if (IsTemplated)
+        {
+            return;
+        }
+
         if (Owner is not { } owner)
         {
             return;
@@ -158,7 +213,7 @@ public class CalendarItem : VisualElement
     protected override void OnPointerMoved(VisualPointerEventArgs args)
     {
         base.OnPointerMoved(args);
-        SetHover(IsEnabled ? DateAt(args.GetPosition(this)) : null);
+        SetHover(IsEnabled ? DateAt(args) : null);
     }
 
     /// <inheritdoc />
@@ -168,36 +223,38 @@ public class CalendarItem : VisualElement
         SetHover(null);
     }
 
-    private DateTime? DateAt(PointF point)
-    {
-        foreach (var (bounds, date) in _cells)
-        {
-            if (bounds.Contains(point))
-            {
-                return date;
-            }
-        }
-
-        return null;
-    }
-
-    private void SetHover(DateTime? date)
-    {
-        if (_hoverDate == date)
-        {
-            return;
-        }
-
-        _hoverDate = date;
-        InvalidateVisual();
-    }
-
     /// <inheritdoc />
     protected override void OnPointerPressed(VisualPointerEventArgs args)
     {
         base.OnPointerPressed(args);
         if (!IsEnabled || args.Button != MouseButtons.Left || Owner is not { } owner)
         {
+            return;
+        }
+
+        if (IsTemplated)
+        {
+            if (Hits(_previousPart, args))
+            {
+                owner.DisplayMonth = owner.DisplayMonth.AddMonths(-1);
+                args.Handled = true;
+                return;
+            }
+
+            if (Hits(_nextPart, args))
+            {
+                owner.DisplayMonth = owner.DisplayMonth.AddMonths(1);
+                args.Handled = true;
+                return;
+            }
+
+            if (DateAt(args) is { } date)
+            {
+                owner.Focus();
+                owner.SelectedDate = date;
+                args.Handled = true;
+            }
+
             return;
         }
 
@@ -226,6 +283,311 @@ public class CalendarItem : VisualElement
                 return;
             }
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        DetachTemplateParts();
+        base.OnTemplateChanging();
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanged()
+    {
+        base.OnTemplateChanged();
+        if (!IsTemplated)
+        {
+            RefreshFromOwner();
+            return;
+        }
+
+        ResolveTemplateParts();
+        SubscribeTheme();
+        RefreshFromOwner();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            UnsubscribeTheme();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    // 月、选中、周起始日或前景变化时由所属 Calendar 调用，模板部件随之对齐。
+    internal void RefreshFromOwner()
+    {
+        if (_owner is { } owner)
+        {
+            if (_headerPart is { } header)
+            {
+                header.Text = owner.DisplayMonth.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
+            }
+
+            if (IsTemplated && _weekPart is not null)
+            {
+                ApplyWeekDayLabels(owner);
+            }
+
+            if (IsTemplated && _daysPart is not null)
+            {
+                ApplyDayCells(owner);
+            }
+
+            SetValue(
+                ForegroundProperty,
+                owner.Foreground.IsEmpty ? null : new SolidColorBrush(owner.Foreground));
+        }
+
+        InvalidateVisual();
+    }
+
+    private void ResolveTemplateParts()
+    {
+        _headerPart = GetTemplateChild<TextBlock>("PART_Header");
+        _previousPart = GetTemplateChild<VisualElement>("PART_Previous");
+        _nextPart = GetTemplateChild<VisualElement>("PART_Next");
+        _weekPart = GetTemplateChild<UniformGrid>("PART_WeekDays");
+        _daysPart = GetTemplateChild<UniformGrid>("PART_Days");
+        if (_headerPart is null || _weekPart is null || _daysPart is null)
+        {
+            throw new InvalidOperationException(
+                "The CalendarItem ControlTemplate must declare 'PART_Header' (a TextBlock), 'PART_WeekDays' and "
+                + "'PART_Days' (UniformGrid parts).");
+        }
+
+        PopulateWeekDays();
+        PopulateDays();
+    }
+
+    private void PopulateWeekDays()
+    {
+        var part = _weekPart!;
+        while (part.Children.Count > 0)
+        {
+            part.RemoveChild((VisualElement)part.Children[0]);
+        }
+
+        for (var column = 0; column < _weekDayLabels.Length; column++)
+        {
+            var label = new TextBlock { TextAlignment = XamlTextAlignment.Center };
+            _weekDayLabels[column] = part.Add(label);
+        }
+
+        ApplyWeekDayColor();
+    }
+
+    private void PopulateDays()
+    {
+        var part = _daysPart!;
+        while (part.Children.Count > 0)
+        {
+            part.RemoveChild((VisualElement)part.Children[0]);
+        }
+
+        for (var index = 0; index < _dayCells.Length; index++)
+        {
+            _dayCells[index] = part.Add(new CalendarDayCell { Item = this });
+        }
+    }
+
+    private void ApplyWeekDayLabels(Calendar owner)
+    {
+        var firstWeekDay = (int)owner.FirstDayOfWeek;
+        for (var column = 0; column < _weekDayLabels.Length; column++)
+        {
+            var day = (DayOfWeek)((firstWeekDay + column) % 7);
+            var label = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);
+            if (label.Length > 2)
+            {
+                label = label.Substring(0, 2);
+            }
+
+            _weekDayLabels[column].Text = label;
+        }
+    }
+
+    private void ApplyDayCells(Calendar owner)
+    {
+        var firstOfMonth = owner.DisplayMonth;
+        var offset = ((int)firstOfMonth.DayOfWeek - (int)owner.FirstDayOfWeek + 7) % 7;
+        var days = DateTime.DaysInMonth(firstOfMonth.Year, firstOfMonth.Month);
+        for (var index = 0; index < _dayCells.Length; index++)
+        {
+            var dayNumber = index - offset + 1;
+            var cell = _dayCells[index];
+            cell.Date = dayNumber >= 1 && dayNumber <= days
+                ? new DateTime(firstOfMonth.Year, firstOfMonth.Month, dayNumber)
+                : null;
+            cell.IsHitTestVisible = cell.Date.HasValue;
+        }
+
+        _daysPart?.InvalidateVisual();
+    }
+
+    private void ApplyWeekDayColor()
+    {
+        foreach (var label in _weekDayLabels)
+        {
+            if (label is not null)
+            {
+                label.Foreground = Theme.Current.MutedForeground;
+            }
+        }
+    }
+
+    private void SubscribeTheme()
+    {
+        if (_themeSubscribed)
+        {
+            return;
+        }
+
+        Theme.Changed += OnThemeChanged;
+        _themeSubscribed = true;
+        ApplyWeekDayColor();
+    }
+
+    private void UnsubscribeTheme()
+    {
+        if (!_themeSubscribed)
+        {
+            return;
+        }
+
+        Theme.Changed -= OnThemeChanged;
+        _themeSubscribed = false;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        ApplyWeekDayColor();
+        InvalidateVisual();
+    }
+
+    private void DetachTemplateParts()
+    {
+        _headerPart = null;
+        _previousPart = null;
+        _nextPart = null;
+        _weekPart = null;
+        _daysPart = null;
+        Array.Clear(_dayCells, 0, _dayCells.Length);
+        Array.Clear(_weekDayLabels, 0, _weekDayLabels.Length);
+        UnsubscribeTheme();
+    }
+
+    private DateTime? DateAt(VisualPointerEventArgs args)
+    {
+        if (!IsTemplated)
+        {
+            return DateAt(args.GetPosition(this));
+        }
+
+        if (_daysPart is not { } days || Owner is null)
+        {
+            return null;
+        }
+
+        var point = args.GetPosition(days);
+        var width = days.Bounds.Width;
+        var height = days.Bounds.Height;
+        if (width <= 0f || height <= 0f)
+        {
+            return null;
+        }
+
+        var column = (int)Math.Floor(point.X / (width / 7f));
+        var row = (int)Math.Floor(point.Y / (height / 6f));
+        if (column < 0 || column >= 7 || row < 0 || row >= 6)
+        {
+            return null;
+        }
+
+        var index = (row * 7) + column;
+        return index < _dayCells.Length ? _dayCells[index]?.Date : null;
+    }
+
+    private DateTime? DateAt(PointF point)
+    {
+        foreach (var (bounds, date) in _cells)
+        {
+            if (bounds.Contains(point))
+            {
+                return date;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool Hits(VisualElement? part, VisualPointerEventArgs args)
+        => part is not null && part.AbsoluteBounds.Contains(args.Position);
+
+    private void SetHover(DateTime? date)
+    {
+        if (_hoverDate == date)
+        {
+            return;
+        }
+
+        _hoverDate = date;
+        InvalidateVisual();
+    }
+}
+
+/// <summary>One day slot in a templated <see cref="CalendarItem"/> month grid.</summary>
+/// <remarks>The cell paints the hover wash, the selected accent and the day number; an empty slot has no date and
+/// passes pointer hits through to the grid.</remarks>
+public sealed class CalendarDayCell : VisualElement
+{
+    /// <summary>Creates a hit-testable day cell.</summary>
+    public CalendarDayCell()
+    {
+        IsHitTestVisible = true;
+    }
+
+    // 所属月格；日格从它读取日历状态。
+    internal CalendarItem? Item { get; set; }
+
+    // 该槽位显示的日期；开头/结尾的空槽为 null。
+    internal DateTime? Date { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
+        if (Item?.Owner is not { } owner || Date is not { } date)
+        {
+            return;
+        }
+
+        var theme = Theme.Current;
+        var selected = owner.SelectedDate is { } selectedDate && selectedDate.Date == date;
+        var hovered = !selected && Item.HoverDate is { } hover && hover.Date == date;
+        var foreground = owner.Foreground.IsEmpty ? theme.Foreground : owner.Foreground;
+        if (hovered || selected)
+        {
+            using var fill = new SolidBrush(selected ? theme.Accent : Color.FromArgb(36, theme.Accent));
+            using var path = XamlDrawing.RoundedRectangle(
+                new RectangleF(3f, 2f, Math.Max(0f, Bounds.Width - 6f), Math.Max(0f, Bounds.Height - 4f)),
+                4f);
+            graphics.FillPath(fill, path);
+        }
+
+        VisualText.Draw(
+            this,
+            graphics,
+            date.Day.ToString(CultureInfo.CurrentCulture),
+            ResolveFont(DefaultFont),
+            selected ? theme.AccentForeground : foreground,
+            new Rectangle(0, 0, Math.Max(0, (int)Bounds.Width), Math.Max(0, (int)Bounds.Height)),
+            wrap: false,
+            StringAlignment.Center,
+            StringAlignment.Center);
     }
 }
 
@@ -614,7 +976,7 @@ public class Calendar : TemplatedControl
             || ReferenceEquals(e.Property, FirstDayOfWeekProperty)
             || ReferenceEquals(e.Property, ForegroundProperty))
         {
-            _calendarItem?.InvalidateVisual();
+            _calendarItem?.RefreshFromOwner();
         }
     }
 
@@ -651,8 +1013,19 @@ public class Calendar : TemplatedControl
         };
 
         item.Owner = this;
+        RestoreNestedTemplate(item);
         _calendarItem = item;
         item.InvalidateVisual();
+    }
+
+    // 外层模板的 SetTemplatedParentRecursive 会一路盖到内嵌模板的后代，让内层部件的 TemplateBinding 源错位；
+    // 内层模板根要重新认回自己的控件。
+    private static void RestoreNestedTemplate(VisualElement nested)
+    {
+        if (nested is TemplatedControl { TemplateRoot: { } root } templated)
+        {
+            root.SetTemplatedParentRecursive(templated);
+        }
     }
 }
 
@@ -701,6 +1074,7 @@ public class DatePicker : TemplatedControl
     private bool _opening;
     private bool _syncingText;
     private bool _syncingToggle;
+    private bool _themeSubscribed;
 
     /// <summary>Creates a focusable date field with theme metrics.</summary>
     public DatePicker()
@@ -952,7 +1326,9 @@ public class DatePicker : TemplatedControl
             SyncPartText();
             SelectedDateChanged?.Invoke(this, EventArgs.Empty);
         }
-        else if (ReferenceEquals(e.Property, FormatProperty) || ReferenceEquals(e.Property, PlaceholderProperty))
+        else if (ReferenceEquals(e.Property, FormatProperty)
+                 || ReferenceEquals(e.Property, PlaceholderProperty)
+                 || ReferenceEquals(e.Property, ForegroundProperty))
         {
             SyncPartText();
         }
@@ -1016,6 +1392,9 @@ public class DatePicker : TemplatedControl
         _partTextBox = textBox;
         _partTextBox.PropertyChanged -= OnPartTextChanged;
         _partTextBox.PropertyChanged += OnPartTextChanged;
+        _partTextBox.PointerPressed -= OnPartTextPointerPressed;
+        _partTextBox.PointerPressed += OnPartTextPointerPressed;
+        RestoreNestedTemplate(textBox);
         SyncPartText();
 
         var buttonPart = GetTemplateChild<VisualElement>("PART_Button");
@@ -1040,6 +1419,8 @@ public class DatePicker : TemplatedControl
             default:
                 throw WrongPart("PART_Button", buttonPart, "Button or ToggleButton");
         }
+
+        RestoreNestedTemplate(buttonPart);
 
         var popupPart = GetTemplateChild<VisualElement>("PART_Popup");
         if (popupPart is null)
@@ -1078,6 +1459,7 @@ public class DatePicker : TemplatedControl
         }
 
         SyncPartToggle();
+        SubscribeTheme();
     }
 
     private void DetachTemplateParts()
@@ -1085,8 +1467,11 @@ public class DatePicker : TemplatedControl
         if (_partTextBox is { } textBox)
         {
             textBox.PropertyChanged -= OnPartTextChanged;
+            textBox.PointerPressed -= OnPartTextPointerPressed;
             _partTextBox = null;
         }
+
+        UnsubscribeTheme();
 
         if (_partButton is { } button)
         {
@@ -1146,12 +1531,40 @@ public class DatePicker : TemplatedControl
         try
         {
             _partTextBox.Text = DisplayText;
+            // 未选日期时用弱化色；模板里的 TextBox 只认自己的 Foreground 本地值。
+            _partTextBox.Foreground = SelectedDate is null
+                ? Theme.Current.MutedForeground
+                : Foreground.IsEmpty ? Theme.Current.Foreground : Foreground;
         }
         finally
         {
             _syncingText = false;
         }
     }
+
+    private void SubscribeTheme()
+    {
+        if (_themeSubscribed)
+        {
+            return;
+        }
+
+        Theme.Changed += OnThemeChanged;
+        _themeSubscribed = true;
+    }
+
+    private void UnsubscribeTheme()
+    {
+        if (!_themeSubscribed)
+        {
+            return;
+        }
+
+        Theme.Changed -= OnThemeChanged;
+        _themeSubscribed = false;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e) => SyncPartText();
 
     private void SyncPartToggle()
     {
@@ -1189,6 +1602,19 @@ public class DatePicker : TemplatedControl
 
     private void OnPartButtonClick(object? sender, EventArgs e)
     {
+        Focus();
+        IsDropDownOpen = !IsDropDownOpen;
+        SyncPartToggle();
+    }
+
+    private void OnPartTextPointerPressed(object? sender, VisualPointerEventArgs e)
+    {
+        if (!IsEnabled || e.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        // TextBox 把按下标记为已处理，冒泡到不了 DatePicker；模板里的输入框也要能开合日历。
         Focus();
         IsDropDownOpen = !IsDropDownOpen;
         SyncPartToggle();
@@ -1272,6 +1698,16 @@ public class DatePicker : TemplatedControl
 
     private static InvalidOperationException MissingPart(string name, string expected)
         => new($"The DatePicker ControlTemplate must declare a part named '{name}' ({expected}).");
+
+    // 外层模板的 SetTemplatedParentRecursive 会一路盖到内嵌模板的后代，让内层部件的 TemplateBinding 源错位；
+    // 内层模板根要重新认回自己的控件。
+    private static void RestoreNestedTemplate(VisualElement nested)
+    {
+        if (nested is TemplatedControl { TemplateRoot: { } root } templated)
+        {
+            root.SetTemplatedParentRecursive(templated);
+        }
+    }
 
     private static InvalidOperationException WrongPart(string name, object part, string expected)
         => new(
