@@ -295,6 +295,28 @@ public sealed class VisualTextEditingTests
         Assert.AreEqual("xabcy", box.Text, "a selection past the end is clamped to the text length");
     }
 
+    [TestMethod]
+    public void FirstClickPositionsTheNativeEditorCaret()
+    {
+        using var surface = new VisualHost { Size = new Size(240, 80) };
+        _ = surface.Handle;
+        Application.DoEvents();
+
+        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "abcdefghij" };
+        surface.Root = text;
+        Layout(surface, 240, 80);
+        Application.DoEvents();
+
+        var point = new PointF(text.AbsoluteBounds.X + 150f, text.AbsoluteBounds.Y + 16f);
+        surface.ProcessPointerDown(point, MouseButtons.Left);
+        surface.ProcessPointerUp(point, MouseButtons.Left);
+        Application.DoEvents();
+
+        Assert.IsTrue(text.IsUsingNativeEditor, "the click opens the native editor");
+        Assert.IsGreaterThan(0, text.CaretIndex, "the click sets the visual caret");
+        Assert.IsGreaterThan(0, text.NativeEditor.SelectionStart, "the first click positions the native caret");
+    }
+
     private static VisualHost CreateSurface(int width, int height)
         => new() { Size = new Size(width, height) };
 

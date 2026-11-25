@@ -839,6 +839,12 @@ public class TextBox : TemplatedControl
         ResetCaretBlink();
         EnsureCaretVisible();
         InvalidateVisual();
+        if (_nativeActive)
+        {
+            // 第一次点击通常同时打开原生编辑器：把刚算出的光标同步过去，否则编辑器从旧位置开始。
+            SyncEditorFromVisual();
+        }
+
         args.Handled = true;
     }
 
@@ -854,6 +860,11 @@ public class TextBox : TemplatedControl
         ResetCaretBlink();
         EnsureCaretVisible();
         InvalidateVisual();
+        if (_nativeActive)
+        {
+            SyncEditorFromVisual();
+        }
+
         args.Handled = true;
     }
 
