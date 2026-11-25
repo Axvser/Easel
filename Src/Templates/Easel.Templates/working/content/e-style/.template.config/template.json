@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Styles"
+  ],
+  "identity": "Easel.Style",
+  "name": "Easel Style",
+  "description": "A keyed visual style with setters and a trigger.",
+  "shortName": "e-style",
+  "sourceName": "TemplateClass",
+  "defaultName": "AppStyles",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated resource dictionary.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

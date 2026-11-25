@@ -25,11 +25,15 @@ dotnet new install WinForms.Easel.Templates
 | --- | --- |
 | `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation engine |
 | `WinForms.Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
-| `WinForms.Easel.Templates` | `dotnet new` items: `e-usercontrol` (XAML view + code-behind) and `e-resource` (resource dictionary) |
+| `WinForms.Easel.Templates` | `dotnet new` items: `e-usercontrol`, `e-resource`, `e-theme`, `e-style`, `e-controltemplate`, `e-datatemplate` |
 
 ```powershell
 dotnet new e-usercontrol -n SettingsView --namespace MyApp.Views
 dotnet new e-resource -n AppResources --namespace MyApp
+dotnet new e-theme -n AppTheme --namespace MyApp
+dotnet new e-style -n AppStyles --namespace MyApp
+dotnet new e-controltemplate -n ControlTemplates --namespace MyApp
+dotnet new e-datatemplate -n ItemTemplates --namespace MyApp
 ```
 
 `WinForms.Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;

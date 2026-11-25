@@ -1,0 +1,21 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    x:Class="TemplateNamespace.TemplateClass">
+
+  <!-- Easel customization: the template root is the chrome; PART_Frame is read with GetTemplateChild("PART_Frame").
+       Apply it with Template="{StaticResource CardChrome}". -->
+  <ControlTemplate x:Key="CardChrome" TargetType="ContentControl">
+    <Border x:Name="PART_Frame"
+            Background="#FF15151B"
+            BorderBrush="#FF34343F"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="14">
+      <StackPanel Spacing="6">
+        <ContentPresenter />
+      </StackPanel>
+    </Border>
+  </ControlTemplate>
+
+</ResourceDictionary>

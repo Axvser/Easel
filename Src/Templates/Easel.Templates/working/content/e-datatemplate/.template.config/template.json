@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Templates"
+  ],
+  "identity": "Easel.DataTemplate",
+  "name": "Easel DataTemplate",
+  "description": "A keyed DataTemplate for items, list rows and DataGrid cells.",
+  "shortName": "e-datatemplate",
+  "sourceName": "TemplateClass",
+  "defaultName": "ItemTemplates",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated resource dictionary.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

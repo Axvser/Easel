@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Theme"
+  ],
+  "identity": "Easel.Theme",
+  "name": "Easel Theme",
+  "description": "A global theme resource dictionary: palette, typography, metrics and keyed styles.",
+  "shortName": "e-theme",
+  "sourceName": "TemplateClass",
+  "defaultName": "AppTheme",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated resource dictionary.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

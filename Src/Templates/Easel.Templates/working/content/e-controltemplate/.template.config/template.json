@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Templates"
+  ],
+  "identity": "Easel.ControlTemplate",
+  "name": "Easel ControlTemplate",
+  "description": "A keyed ControlTemplate with a named part and a ContentPresenter.",
+  "shortName": "e-controltemplate",
+  "sourceName": "TemplateClass",
+  "defaultName": "ControlTemplates",
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated resource dictionary.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}
