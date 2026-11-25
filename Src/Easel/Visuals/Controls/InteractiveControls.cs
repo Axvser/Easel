@@ -440,6 +440,20 @@ public class TextBox : TemplatedControl
             nameof(IsOverwriteMode), typeof(bool), typeof(TextBox),
             new PropertyMetadata(false) { AffectsRender = true });
 
+    /// <summary>The opacity of the overwrite caret block in the range 0..1.</summary>
+    /// <remarks>The block stays translucent so the character under it remains readable.</remarks>
+    public static readonly DependencyProperty CaretBlockOpacityProperty =
+        DependencyProperty.Register(
+            nameof(CaretBlockOpacity), typeof(double), typeof(TextBox),
+            new PropertyMetadata(0.35d, null, static (_, value) =>
+            {
+                var opacity = (double)value;
+                return opacity < 0d ? 0d : opacity > 1d ? 1d : opacity;
+            })
+            {
+                AffectsRender = true,
+            });
+
     private readonly System.Windows.Forms.Timer _caretTimer;
     private readonly System.Windows.Forms.TextBox _editor;
     private readonly NativeControlHost _nativeHost;
@@ -654,6 +668,13 @@ public class TextBox : TemplatedControl
         set => SetValue(IsOverwriteModeProperty, value);
     }
 
+    /// <summary>The opacity of the overwrite caret block in the range 0..1.</summary>
+    public double CaretBlockOpacity
+    {
+        get => (double)GetValue(CaretBlockOpacityProperty)!;
+        set => SetValue(CaretBlockOpacityProperty, value);
+    }
+
     /// <summary>The first selected character.</summary>
     public int SelectionStart => XamlMath.Clamp(Math.Min(_selectionAnchor, _caretIndex), 0, Text.Length);
 
@@ -786,6 +807,8 @@ public class TextBox : TemplatedControl
             : Foreground;
         var textBrush = GetValue(ForegroundProperty) as XamlBrush ?? new SolidColorBrush(foreground);
         var offset = AcceptsReturn ? 0f : _horizontalOffset;
+        // 单行字段在内容矩形里垂直居中；多行按顶部对齐，和文本编辑器一致。
+        var textTop = content.Top + (MultiLine ? 0f : Math.Max(0f, (content.Height - _lineHeight) / 2f));
 
         var state = graphics.Save();
         try
@@ -796,7 +819,7 @@ public class TextBox : TemplatedControl
             var selectionLength = IsFocused ? SelectionLength : 0;
             if (selectionLength > 0)
             {
-                DrawSelection(graphics, content, offset, SelectionBrush ?? new SolidColorBrush(theme.Selection));
+                DrawSelection(graphics, content, offset, textTop, SelectionBrush ?? new SolidColorBrush(theme.Selection));
             }
 
             if (string.IsNullOrEmpty(Text))
@@ -809,7 +832,7 @@ public class TextBox : TemplatedControl
                         Placeholder,
                         Font,
                         theme.MutedForeground,
-                        new RectangleF(content.Left, content.Top, content.Width, _lineHeight),
+                        new RectangleF(content.Left, textTop, content.Width, _lineHeight),
                         wrap: false,
                         StringAlignment.Near,
                         StringAlignment.Near);
@@ -817,12 +840,12 @@ public class TextBox : TemplatedControl
             }
             else
             {
-                DrawLines(graphics, content, offset, textBrush, selectionStart, selectionLength, SelectionForeground);
+                DrawLines(graphics, content, offset, textTop, textBrush, selectionStart, selectionLength, SelectionForeground);
             }
 
             if (IsFocused && _caretVisible && !IsReadOnly)
             {
-                DrawCaret(graphics, content, offset, textBrush);
+                DrawCaret(graphics, content, offset, textTop, textBrush);
             }
         }
         finally
@@ -1371,6 +1394,7 @@ public class TextBox : TemplatedControl
         Graphics graphics,
         Rectangle content,
         float offset,
+        float textTop,
         XamlBrush foreground,
         int selectionStart,
         int selectionLength,
@@ -1389,15 +1413,15 @@ public class TextBox : TemplatedControl
             var lineEnd = line.Start + line.Length;
             if (selectionForeground is null || selectionLength <= 0 || selectionEnd <= line.Start || selectionStart >= lineEnd)
             {
-                DrawLineSegment(graphics, content, offset, index, line, display, foreground, 0, line.Length);
+                DrawLineSegment(graphics, content, offset, textTop, index, line, display, foreground, 0, line.Length);
                 continue;
             }
 
             var from = XamlMath.Clamp(selectionStart - line.Start, 0, line.Length);
             var to = XamlMath.Clamp(selectionEnd - line.Start, 0, line.Length);
-            DrawLineSegment(graphics, content, offset, index, line, display, foreground, 0, from);
-            DrawLineSegment(graphics, content, offset, index, line, display, selectionForeground, from, to - from);
-            DrawLineSegment(graphics, content, offset, index, line, display, foreground, to, line.Length - to);
+            DrawLineSegment(graphics, content, offset, textTop, index, line, display, foreground, 0, from);
+            DrawLineSegment(graphics, content, offset, textTop, index, line, display, selectionForeground, from, to - from);
+            DrawLineSegment(graphics, content, offset, textTop, index, line, display, foreground, to, line.Length - to);
         }
     }
 
@@ -1405,6 +1429,7 @@ public class TextBox : TemplatedControl
         Graphics graphics,
         Rectangle content,
         float offset,
+        float textTop,
         int lineIndex,
         TextLine line,
         string display,
@@ -1421,13 +1446,13 @@ public class TextBox : TemplatedControl
         var width = (float)Math.Ceiling(VisualText.MeasureWidthTight(text, Font, RenderDpi));
         var destination = new RectangleF(
             content.Left - offset + MeasurePrefix(line, start),
-            content.Top + (lineIndex * _lineHeight),
+            textTop + (lineIndex * _lineHeight),
             Math.Max(1f, width + 2f),
             _lineHeight);
         VisualText.DrawTight(this, graphics, text, Font, brush, destination);
     }
 
-    private void DrawSelection(Graphics graphics, Rectangle content, float offset, XamlBrush selection)
+    private void DrawSelection(Graphics graphics, Rectangle content, float offset, float textTop, XamlBrush selection)
     {
         var selectionStart = SelectionStart;
         var selectionEnd = selectionStart + SelectionLength;
@@ -1447,13 +1472,13 @@ public class TextBox : TemplatedControl
                 graphics,
                 new RectangleF(
                     left,
-                    content.Top + (index * _lineHeight),
+                    textTop + (index * _lineHeight),
                     Math.Max(1f, right - left),
                     _lineHeight));
         }
     }
 
-    private void DrawCaret(Graphics graphics, Rectangle content, float offset, XamlBrush foreground)
+    private void DrawCaret(Graphics graphics, Rectangle content, float offset, float textTop, XamlBrush foreground)
     {
         var brush = CaretBrush ?? foreground;
         var color = brush.ApproximateColor;
@@ -1466,7 +1491,7 @@ public class TextBox : TemplatedControl
         var lineIndex = FindLineIndex(CaretIndex);
         var line = _lines[lineIndex];
         var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start);
-        var top = content.Top + (lineIndex * _lineHeight) + 2f;
+        var top = textTop + (lineIndex * _lineHeight) + 2f;
         var height = Math.Max(1f, _lineHeight - 4f);
         if (IsOverwriteMode)
         {
@@ -1474,7 +1499,13 @@ public class TextBox : TemplatedControl
             var width = CaretIndex < line.Start + line.Length
                 ? MeasurePrefix(line, CaretIndex - line.Start + 1) - MeasurePrefix(line, CaretIndex - line.Start)
                 : Math.Max(6f, thickness * 4f);
-            brush.Paint(graphics, new RectangleF(caretX, top, Math.Max(1f, width), height));
+            var alpha = (int)Math.Round(color.A * CaretBlockOpacity);
+            if (alpha > 0)
+            {
+                using var block = new SolidBrush(Color.FromArgb(alpha, color));
+                graphics.FillRectangle(block, caretX, top, Math.Max(1f, width), height);
+            }
+
             return;
         }
 

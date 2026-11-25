@@ -601,6 +601,7 @@ public sealed class VisualTextEditingTests
             CaretBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
             CaretThickness = 1d,
             CaretBlinkInterval = 0,
+            CaretBlockOpacity = 1d,
         };
         surface.Root = text;
         Layout(surface, 260, 80);
@@ -682,6 +683,47 @@ public sealed class VisualTextEditingTests
     }
 
     private static bool IsRedish(Color pixel) => pixel.R > 120 && pixel.G < 80 && pixel.B < 80;
+
+    [TestMethod]
+    public void TextBox_CentersSingleLineTextVertically()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 100) };
+        var text = new VC.TextBox
+        {
+            Width = 220,
+            Height = 64,
+            Text = "WW",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 16f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            CaretBlinkInterval = 0,
+        };
+        surface.Root = text;
+        Layout(surface, 260, 100);
+        surface.FocusElement(text);
+
+        using var bitmap = Render(surface, 260, 100);
+        var top = int.MaxValue;
+        var bottom = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                if (pixel.R > 160 && pixel.G > 160 && pixel.B > 160)
+                {
+                    top = Math.Min(top, y);
+                    bottom = Math.Max(bottom, y);
+                }
+            }
+        }
+
+        Assert.IsTrue(bottom > top, "the text is painted");
+        var textCenter = (top + bottom) / 2f;
+        var fieldCenter = text.AbsoluteBounds.Top + (text.AbsoluteBounds.Height / 2f);
+        Assert.IsTrue(Math.Abs(textCenter - fieldCenter) <= 4f,
+            $"the single line sits in the middle (text={textCenter}, field={fieldCenter})");
+    }
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
