@@ -275,8 +275,8 @@ public sealed class VisualClusterBTemplateTests
         Assert.AreEqual(1, menu.Submenu!.Containers.Count, "the submenu realized its child row");
 
         menu.Template = null;
-        Assert.IsNull(menu.TemplateRoot, "clearing the template removes the row containers");
-        Assert.AreEqual(0, menu.Containers.Count);
+        Assert.IsNotNull(menu.TemplateRoot, "clearing the direct template reveals the built-in default shell");
+        Assert.AreEqual(2, menu.Containers.Count, "the default shell realizes the menu rows again");
     }
 
     [TestMethod]
@@ -320,8 +320,8 @@ public sealed class VisualClusterBTemplateTests
         Assert.IsTrue(bar.Containers[0].IsHighlighted, "the open header exposes its state");
 
         bar.Template = null;
-        Assert.IsNull(bar.TemplateRoot);
-        Assert.AreEqual(0, bar.Containers.Count);
+        Assert.IsNotNull(bar.TemplateRoot, "clearing the direct template reveals the built-in default shell");
+        Assert.AreEqual(2, bar.Containers.Count, "the default shell realizes the top-level headers again");
     }
 
     [TestMethod]

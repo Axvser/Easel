@@ -3,6 +3,261 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="Easel.Themes.Defaults.MenuDefaults">
 
-  <!-- Built-in fallback appearance for the menu family; added to the implicit style table by Theme.DefaultStyles. -->
+  <!-- Built-in fallback appearance for the menu family; added to the implicit style table by Theme.DefaultStyles.
+       The shells host one items presenter and keep every part out of hit testing, so pointer input still reaches the
+       menu itself. Row appearance lives in the container style; the self-drawn path stays as the no-template fallback. -->
+
+  <Style TargetType="VisualContextMenu">
+    <Style.Setters>
+      <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="VisualContextMenu">
+        <Grid x:Name="Root" IsHitTestVisible="False">
+          <!-- Auto tracks keep the shell at its content size; a star track would take the popup's whole placement room. -->
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <Border x:Name="Chrome"
+                  Background="{DynamicResource SurfaceAlt}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="0"
+                  IsHitTestVisible="False" />
+          <Border x:Name="HoverRing"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="0"
+                  IsHitTestVisible="False" />
+          <ItemsPresenter x:Name="PART_ItemsPresenter"
+                          Margin="{TemplateBinding Padding}"
+                          MinWidth="180"
+                          IsHitTestVisible="False" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="VisualMenu">
+    <Style.Template>
+      <ControlTemplate TargetType="VisualMenu">
+        <Border x:Name="Chrome"
+                Background="{DynamicResource Raised}"
+                BorderBrush="{DynamicResource Border}"
+                BorderThickness="0,0,0,1"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}"
+                IsHitTestVisible="False">
+          <StackPanel x:Name="PART_ItemsPresenter"
+                      Orientation="Horizontal"
+                      IsHitTestVisible="False" />
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="PART_ItemsPresenter" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="PART_ItemsPresenter" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="VisualMenuItemContainer">
+    <!-- Baselines for the trigger-driven parts: template triggers rank above style setters, a local value would not. -->
+    <Style.Setters>
+      <Setter TargetName="Root" Property="Opacity" Value="1" />
+      <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+      <Setter TargetName="PressedBand" Property="Opacity" Value="0" />
+      <Setter TargetName="CheckMark" Property="Opacity" Value="0" />
+      <Setter TargetName="SubmenuArrow" Property="Opacity" Value="0" />
+      <Setter TargetName="SeparatorLine" Property="Visibility" Value="Collapsed" />
+      <Setter TargetName="TopLevelHeader" Property="Visibility" Value="Collapsed" />
+      <Setter TargetName="RowContent" Property="Visibility" Value="Visible" />
+      <Setter TargetName="RowContent" Property="Height" Value="28" />
+      <Setter TargetName="RowContent" Property="Opacity" Value="1" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="VisualMenuItemContainer">
+        <Grid x:Name="Root" IsHitTestVisible="False">
+          <Border x:Name="SelectionBand"
+                  Background="{DynamicResource Selection}"
+                  CornerRadius="3"
+                  Margin="0,1"
+                  IsHitTestVisible="False" />
+          <Border x:Name="PressedBand"
+                  Background="{DynamicResource Pressed}"
+                  CornerRadius="3"
+                  Margin="0,1"
+                  IsHitTestVisible="False" />
+          <Rectangle x:Name="SeparatorLine"
+                     Height="1"
+                     VerticalAlignment="Center"
+                     Margin="6,0"
+                     Fill="{DynamicResource Border}"
+                     IsHitTestVisible="False" />
+          <Grid x:Name="RowContent" MinWidth="180" IsHitTestVisible="False">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="20" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="18" />
+            </Grid.ColumnDefinitions>
+            <Path x:Name="CheckMark"
+                  Data="M 0 5 L 4 9 L 11 0"
+                  Stroke="{DynamicResource Accent}"
+                  StrokeThickness="1.6"
+                  Margin="5,0,0,0"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False" />
+            <TextBlock x:Name="RowHeader"
+                       Grid.Column="1"
+                       Text="{TemplateBinding Header}"
+                       Foreground="{TemplateBinding Foreground}"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False" />
+            <TextBlock x:Name="GestureText"
+                       Grid.Column="2"
+                       Text="{TemplateBinding InputGestureText}"
+                       Opacity="0.65"
+                       Margin="0,0,8,0"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False" />
+            <Path x:Name="SubmenuArrow"
+                  Grid.Column="3"
+                  Data="M 0 0 L 5 4 L 0 8 Z"
+                  Fill="{DynamicResource Muted}"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False" />
+          </Grid>
+          <TextBlock x:Name="TopLevelHeader"
+                     Text="{TemplateBinding Header}"
+                     Foreground="{TemplateBinding Foreground}"
+                     Height="{DynamicResource ControlHeight}"
+                     Padding="12,0"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     IsHitTestVisible="False" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsHighlighted" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsHighlighted" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="PressedBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="PressedBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="HasSubmenu" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SubmenuArrow" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="HasSubmenu" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="SubmenuArrow" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="CheckMark" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="CheckMark" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsTopLevel" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="RowContent" Property="Visibility" Value="Collapsed" />
+              <Setter TargetName="TopLevelHeader" Property="Visibility" Value="Visible" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsTopLevel" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="RowContent" Property="Visibility" Value="Visible" />
+              <Setter TargetName="TopLevelHeader" Property="Visibility" Value="Collapsed" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSeparator" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="RowContent" Property="Height" Value="9" />
+              <Setter TargetName="RowContent" Property="Opacity" Value="0" />
+              <Setter TargetName="SeparatorLine" Property="Visibility" Value="Visible" />
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+              <Setter TargetName="PressedBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSeparator" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="RowContent" Property="Height" Value="28" />
+              <Setter TargetName="RowContent" Property="Opacity" Value="1" />
+              <Setter TargetName="SeparatorLine" Property="Visibility" Value="Collapsed" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+              <Setter TargetName="PressedBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>

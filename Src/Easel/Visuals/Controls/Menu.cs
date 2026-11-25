@@ -77,6 +77,9 @@ public sealed class VisualMenuItem
 /// The container draws the row itself while it has no template of its own. A menu template can still style a
 /// container through an implicit style; <see cref="IsHighlighted"/>, <see cref="IsPressed"/> and
 /// <see cref="IsEnabled"/> are dependency properties so triggers can observe the interactive state.
+/// <see cref="Header"/>, <see cref="InputGestureText"/>, <see cref="IsSeparator"/>, <see cref="HasSubmenu"/> and
+/// <see cref="IsChecked"/> mirror the item's plain properties as dependency properties, so a row template can bind
+/// and trigger on them; they refresh when <see cref="Item"/> changes.
 /// </remarks>
 public class VisualMenuItemContainer : TemplatedControl
 {
@@ -105,6 +108,39 @@ public class VisualMenuItemContainer : TemplatedControl
     public static readonly DependencyProperty IsTopLevelProperty = DependencyProperty.Register(
         nameof(IsTopLevel), typeof(bool), typeof(VisualMenuItemContainer),
         new PropertyMetadata(false) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>The row text copied from <see cref="VisualMenuItem.Header"/>.</summary>
+    public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
+        nameof(Header), typeof(string), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(string.Empty) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>The shortcut text copied from <see cref="VisualMenuItem.InputGestureText"/>.</summary>
+    public static readonly DependencyProperty InputGestureTextProperty = DependencyProperty.Register(
+        nameof(InputGestureText), typeof(string), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>Whether this row is a separator copied from <see cref="VisualMenuItem.IsSeparator"/>.</summary>
+    public static readonly DependencyProperty IsSeparatorProperty = DependencyProperty.Register(
+        nameof(IsSeparator), typeof(bool), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(false) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>Whether this row has child items and therefore opens a submenu.</summary>
+    public static readonly DependencyProperty HasSubmenuProperty = DependencyProperty.Register(
+        nameof(HasSubmenu), typeof(bool), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(false) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>Whether this row carries a check mark copied from <see cref="VisualMenuItem.IsChecked"/>.</summary>
+    public static readonly DependencyProperty IsCheckedProperty = DependencyProperty.Register(
+        nameof(IsChecked), typeof(bool), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(false) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>The row-text colour as a brush value; an empty colour uses the active theme.</summary>
+    public static readonly DependencyProperty ForegroundProperty = DependencyProperty.Register(
+        nameof(Foreground), typeof(XamlBrush), typeof(VisualMenuItemContainer),
+        new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+        {
+            AffectsRender = true,
+        });
 
     /// <summary>Creates an unhighlighted container that passes uncovered pointer hits to its menu.</summary>
     public VisualMenuItemContainer()
@@ -141,8 +177,88 @@ public class VisualMenuItemContainer : TemplatedControl
         set => SetValue(IsTopLevelProperty, value);
     }
 
+    /// <summary>The row text copied from <see cref="VisualMenuItem.Header"/>.</summary>
+    public string Header
+    {
+        get => (string)GetValue(HeaderProperty)!;
+        set => SetValue(HeaderProperty, value ?? string.Empty);
+    }
+
+    /// <summary>The shortcut text copied from <see cref="VisualMenuItem.InputGestureText"/>.</summary>
+    public string? InputGestureText
+    {
+        get => (string?)GetValue(InputGestureTextProperty);
+        set => SetValue(InputGestureTextProperty, value);
+    }
+
+    /// <summary>Whether this row is a separator copied from <see cref="VisualMenuItem.IsSeparator"/>.</summary>
+    public bool IsSeparator
+    {
+        get => (bool)GetValue(IsSeparatorProperty)!;
+        set => SetValue(IsSeparatorProperty, value);
+    }
+
+    /// <summary>Whether this row has child items and therefore opens a submenu.</summary>
+    public bool HasSubmenu
+    {
+        get => (bool)GetValue(HasSubmenuProperty)!;
+        set => SetValue(HasSubmenuProperty, value);
+    }
+
+    /// <summary>Whether this row carries a check mark copied from <see cref="VisualMenuItem.IsChecked"/>.</summary>
+    public bool IsChecked
+    {
+        get => (bool)GetValue(IsCheckedProperty)!;
+        set => SetValue(IsCheckedProperty, value);
+    }
+
     /// <summary>The row-text colour; an empty colour uses the active theme.</summary>
-    public Color Foreground { get; set; } = Color.Empty;
+    public Color Foreground
+    {
+        get => GetValue(ForegroundProperty) is XamlBrush brush ? brush.ApproximateColor : Color.Empty;
+        set
+        {
+            if (value.IsEmpty)
+            {
+                ClearValue(ForegroundProperty);
+            }
+            else
+            {
+                SetValue(ForegroundProperty, new SolidColorBrush(value));
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (ReferenceEquals(e.Property, ItemProperty))
+        {
+            SyncFromItem();
+        }
+    }
+
+    // 行模板只认 DP：把 item 的纯 CLR 状态镜像成可绑定/可触发的 DP；Item 换人或菜单 Refresh 重建时刷新。
+    private void SyncFromItem()
+    {
+        var item = Item;
+        SetValue(HeaderProperty, item?.Header ?? string.Empty);
+        SetValue(InputGestureTextProperty, item?.InputGestureText);
+        SetValue(IsSeparatorProperty, item?.IsSeparator ?? false);
+        SetValue(HasSubmenuProperty, item is { Items.Count: > 0 });
+        SetValue(IsCheckedProperty, item?.IsChecked ?? false);
+
+        // 禁用项要把容器本身也标成禁用；恢复时清掉本地值，交回祖先的继承状态。
+        if (item is { IsEnabled: false })
+        {
+            SetValue(IsEnabledProperty, false);
+        }
+        else
+        {
+            ClearValue(IsEnabledProperty);
+        }
+    }
 
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
@@ -462,6 +578,12 @@ public class VisualContextMenu : VisualPopup
     {
         if (_templateRoot is not null)
         {
+            // Items 是普通列表，加项不会通知；模板先于 Items 填充时在这里补建，避免菜单条一直空着。
+            if (!ContainersMatchItems())
+            {
+                RebuildContainers();
+            }
+
             return _templateRoot.Measure(availableSize);
         }
 
@@ -998,6 +1120,24 @@ public class VisualContextMenu : VisualPopup
         }
     }
 
+    private bool ContainersMatchItems()
+    {
+        if (_containers.Count != Items.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < Items.Count; index++)
+        {
+            if (!ReferenceEquals(_containers[index].Item, Items[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private void DetachContainers()
     {
         foreach (var container in _containers)
@@ -1122,11 +1262,31 @@ public class VisualMenu : TemplatedControl
     /// <summary>The drop-down menu opened from the bar, or <see langword="null"/>.</summary>
     public VisualContextMenu? OpenedMenu => _open;
 
+    /// <summary>Rebuilds the header containers after <see cref="Items"/> changed.</summary>
+    /// <remarks>Adding to the list does not notify the bar; call this, or invalidate layout, to realize new headers
+    /// while a template is applied.</remarks>
+    public void Refresh()
+    {
+        _hover = -1;
+        if (IsTemplated)
+        {
+            RebuildContainers();
+        }
+
+        InvalidateMeasure();
+    }
+
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
         if (IsTemplated)
         {
+            // 模板可能在 Items 填好之前就由隐式样式应用；测量时发现数量对不上就补建一次。
+            if (!ContainersMatchItems())
+            {
+                RebuildContainers();
+            }
+
             return MeasureTemplate(availableSize);
         }
 
@@ -1397,6 +1557,24 @@ public class VisualMenu : TemplatedControl
         }
 
         UpdateContainerStates();
+    }
+
+    private bool ContainersMatchItems()
+    {
+        if (_containers.Count != Items.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < Items.Count; index++)
+        {
+            if (!ReferenceEquals(_containers[index].Item, Items[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void DetachContainers()
