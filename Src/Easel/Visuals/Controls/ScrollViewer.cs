@@ -769,71 +769,31 @@ public sealed class ScrollOffsetRequestedEventArgs(float horizontalOffset, float
 
 /// <summary>Hosts an ordinary WinForms control as a rectangular island above the visual surface.</summary>
 /// <remarks>
-/// The child is a real HWND and therefore always paints above the visual tree; it cannot be transformed, blended or
-/// clipped by an arbitrary visual. Use it only for controls that need native behavior (editing, third-party hosts).
+/// <para>
+/// This is the code-behind form of <see cref="NativeElement"/>: the caller assigns <see cref="Child"/> and the host
+/// owns it. The control is a real HWND and therefore always paints above the visual tree; it cannot be transformed,
+/// blended or clipped by an arbitrary visual.
+/// </para>
+/// <para>
+/// Prefer <see cref="NativeElement"/> when the native control is declared in XAML; this type stays for hand-written
+/// interop code, such as the native editor island inside <see cref="TextBox"/>.
+/// </para>
 /// </remarks>
-public class NativeControlHost : VisualElement
+public class NativeControlHost : NativeElement
 {
-    private System.Windows.Forms.Control? _child;
-
-    /// <summary>Creates a host that does not take pointer hits itself.</summary>
-    public NativeControlHost()
-    {
-        IsHitTestVisible = false;
-    }
-
     /// <summary>The native control placed over this element's rectangle.</summary>
     public System.Windows.Forms.Control? Child
     {
-        get => _child;
+        get => Native;
         set
         {
-            if (ReferenceEquals(_child, value))
+            if (ReferenceEquals(Native, value))
             {
                 return;
             }
 
-            Surface?.RemoveNative(this);
-            _child = value;
-            InvalidateMeasure();
+            OwnsNative = value is not null;
+            Native = value;
         }
-    }
-
-    /// <inheritdoc />
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        if (_child is null)
-        {
-            return Size.Empty;
-        }
-
-        var preferred = _child.GetPreferredSize(System.Drawing.Size.Empty);
-        return new Size(
-            _child.Width > 0 ? _child.Width : preferred.Width,
-            _child.Height > 0 ? _child.Height : preferred.Height);
-    }
-
-    /// <inheritdoc />
-    protected override void ArrangeOverride(Size finalSize)
-    {
-        if (_child is null)
-        {
-            return;
-        }
-
-        Surface?.PlaceNative(this, _child, Rectangle.Round(AbsoluteBounds));
-    }
-
-    /// <inheritdoc />
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            Surface?.RemoveNative(this);
-            _child?.Dispose();
-            _child = null;
-        }
-
-        base.Dispose(disposing);
     }
 }

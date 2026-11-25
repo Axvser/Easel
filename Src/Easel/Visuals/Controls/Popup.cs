@@ -194,6 +194,8 @@ public class VisualPopup : VisualElement
         y = XamlMath.Clamp(y, 0f, Math.Max(0f, client.Height - height));
         Arrange(new RectangleF(x, y, width, height));
         InvalidateVisual();
+        // 弹层位置变了，原生岛的窗口区域要重新挖洞。
+        _surface.RefreshNativeRegions();
     }
 
     // 目标或自身在祖先链上即视为点击来自弹层内部；ComboBox 点自己那一格时也走这条。

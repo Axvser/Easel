@@ -10,8 +10,9 @@
 		<LangVersion>latest</LangVersion>
 		<SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 		<!-- WFO1000: the runtime's public designer properties are not designer-serialized.
-		     IL2026/IL2075: the XAML layer intentionally uses TypeDescriptor/reflection for native properties. -->
-		<NoWarn>$(NoWarn);WFO1000;IL2026;IL2059;IL2067;IL2075</NoWarn>
+		     IL2026/IL2070/IL2072/IL2075: the XAML and native-binding layers intentionally use TypeDescriptor/reflection
+		     over WinForms properties. -->
+		<NoWarn>$(NoWarn);WFO1000;IL2026;IL2059;IL2067;IL2070;IL2072;IL2075</NoWarn>
 		<!-- The .NET Framework 4.6.1 and .NET Core 3.0 reference assemblies carry less nullable metadata;
 		     the same code is warning-free on net5/net8. -->
 		<NoWarn Condition="'$(TargetFramework)' == 'netframework4.6.1' Or '$(TargetFramework)' == 'netcoreapp3.0'">$(NoWarn);CS8600;CS8602;CS8603;CS8604</NoWarn>

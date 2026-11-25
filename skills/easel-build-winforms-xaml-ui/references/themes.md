@@ -1,4 +1,4 @@
-# Themes and resource dictionaries
+﻿# Themes and resource dictionaries
 
 Easel controls have a default palette; an application can switch it, follow Windows, or provide its own
 `ResourceDictionary`. The same values drive self-drawn chrome and XAML `{StaticResource}` lookups.
@@ -180,7 +180,7 @@ Theme.Changed += (_, _) =>
 ```
 
 - Apply the theme to the host and rebuild views so every control reads the new palette.
-- Native islands (focused `TextBox` editor, `NativeControlHost`) choose their native color mode when handles
+- Native islands (focused `TextBox` editor, `NativeElement`/`NativeControlHost`) choose their native color mode when handles
   are created. Call `Application.SetColorMode` for new handles; changing it late does not repaint existing
   islands.
 - `Theme.Changed` can arrive on the UI context for system-follow; still marshal if your host mutates controls

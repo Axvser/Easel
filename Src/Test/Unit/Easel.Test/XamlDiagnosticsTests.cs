@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Easel.Generator;
 using Easel.Test.Infrastructure;
 
@@ -161,22 +161,21 @@ public sealed class XamlDiagnosticsTests
     }
 
     [TestMethod]
-    public void ANativePrefixedType_IsRejectedAsXaml019()
+    public void ANativePrefixedType_GeneratesANativeElement()
     {
         const string xaml = """
             <local:ProbeView
                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:local="clr-namespace:Probe"
-                xmlns:native="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
                 x:Class="Probe.ProbeView">
               <native:Button Text="OK" />
             </local:ProbeView>
             """;
 
         var result = Run(xaml, Source);
-        var matches = result.Diagnostics.Where(diagnostic => diagnostic.Id is "EASEL_XAML001" or "EASEL_XAML019").ToArray();
-        Assert.IsNotEmpty(matches, GeneratorProbe.Describe(result.Diagnostics));
+        Assert.IsEmpty(result.Diagnostics, GeneratorProbe.Describe(result.Diagnostics));
+        StringAssert.Contains(result.GeneratedText(), "NativeElement<global::System.Windows.Forms.Button>");
     }
 
     private static string Wrap(string body) => OpenRoot + "\n" + body + "\n" + CloseRoot;

@@ -1,4 +1,4 @@
-# XAML language, resources, styles and bindings
+﻿# XAML language, resources, styles and bindings
 
 The XAML compiler is a Roslyn source generator over a deliberate **subset**, not a runtime XAML loader. It reads
 each `.xaml` `AdditionalFile`, resolves every element/property against the compilation, and writes ordinary C#
@@ -38,10 +38,34 @@ xmlns:local="clr-namespace:MyApp.Views"
 | `Foo` (no prefix) | `Easel.Visuals.Controls.Foo`, then `.Visuals.Controls.Shapes.Foo`, then `.Visuals.Foo`, then `Easel.Controls.Foo`, `Easel.Controls.Shapes.Foo`, `Easel.Foo` |
 | `local:Foo` | the `clr-namespace` type |
 | `v:Foo` | legacy alias for the Easel visual namespaces |
-| `native:Foo` / `System.Windows.Forms` | rejected; visual parents accept `VisualElement` only |
+| `native:Foo` (built-in prefix; no `xmlns:native` declaration) | a native control wrapped in `NativeElement<Foo>`; layout attributes target the wrapper, the rest target the control |
 
 An unprefixed name that is not an Easel type is `EASEL_XAML019`; write `local:`. An unprefixed local type is
 never silently accepted.
+
+## Native controls
+
+Write the built-in `native:` prefix; no `xmlns:native` declaration is needed. The author never writes a host:
+
+```xml
+<native:GroupBox Text="Native group" Margin="12" Width="240">
+  <StackPanel Spacing="6">
+    <TextBlock Text="Visual content inside a native container" />
+    <native:Button Text="Native button" Click="OnNativeClick" />
+  </StackPanel>
+</native:GroupBox>
+```
+
+- Layout attributes (`Margin`, `Width`/`Height`, `Min`/`Max`, `HorizontalAlignment`, `VerticalAlignment`,
+  `Visibility`, `IsEnabled`, `DataContext`, attached properties) write the wrapper `NativeElement`, so they use
+  the normal measure/arrange pass.
+- Every other attribute (`Text`, `BackColor`, `Padding`, `AutoSize`, `Tag`, …) and any event writes the native
+  control.
+- A native element hosts one visual root (`Content`). Several native children are allowed and are wrapped in an implicit vertical `StackPanel` in document order; nest an explicit panel when another layout is needed.
+- `x:Name` is the wrapper; `Name.Native` is the typed control.
+- A native CLR property binding goes through `NativePropertyBinding.For(type, property)`: the binding writes a proxy property on the wrapper and the control is updated. `Mode=TwoWay`/`OneWayToSource` reports back through `INotifyPropertyChanged`, the conventional `XxxChanged` event, or a fallback that runs at `Application.Idle` and a 200 ms timer. The native `Enter`/`Leave` raise the wrapper's logical `GotFocus`/`LostFocus`, so `UpdateSourceTrigger=LostFocus` behaves exactly like a visual target.
+- `Opacity`, `Transform` and arbitrary visual clip only apply in snapshot mode (`IsSnapshot="True"`): the control is painted as a bitmap in the visual pass and takes part in composition. A live HWND rejects `WS_EX_LAYERED` and affine transforms. In a Form, snapshot mode also creates an almost invisible input proxy (`Opacity = 1/255`, a fully transparent window is click-through) so real mouse/keyboard/IME reach the control: opacity/translation are exact, a scale re-lays the control out at the scaled size (hit areas match), and rotation keeps the transformed polygon interactive (whole-control hits exact, item positions approximate). Call `RefreshSnapshot()` after changing the control.
+- `CornerRadius` rounds the live window through its window region (aliased). An open popup cuts its rectangle out of the island's region, so it can cover the island.
 
 ## Elements, children and properties
 
@@ -310,8 +334,8 @@ practice.
 - `{DynamicResource}` in style/trigger setter values or trigger-action properties.
 - `DataTrigger`/`MultiTrigger` (use a `Trigger` on a DP, or convert in the view model).
 - Elements from non-Easel assemblies without a `clr-namespace` prefix; unprefixed local types.
-- WinForms controls as visual children (`NativeControlHost` only).
-- Native controls inside transformed/clipped/blended subtrees.
+- Live native controls inside transformed/blended subtrees (set `IsSnapshot="True"`).
+- Anti-aliased arbitrary-shape clipping of a live HWND (`IsSnapshot` + a visual `Clip`, or `CornerRadius` which is aliased).
 - `DateTime` literals, arbitrary object constructors without a public parameterless constructor.
 - Implicit styles from a standalone dictionary applied automatically (declare them on a visual element instead).
 - Animation without an injected `IVisualAnimator`.

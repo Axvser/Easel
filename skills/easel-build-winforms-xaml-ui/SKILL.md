@@ -1,4 +1,4 @@
----
+﻿---
 name: easel-build-winforms-xaml-ui
 description: Build WinForms UI entirely with Easel's XAML runtime — bootstrap one VisualHost, author XAML views and controls, use layouts, resources/styles/templates, bindings/MVVM, themes (built-in Dark+/Light+, system follow, custom dictionaries), visual composition (gradients, opacity masks, effects, 3D transforms) and the injectable animation contract. Use when writing or reviewing Easel XAML, customizing Easel controls or types, theming an Easel app, or replacing hand-built WinForms UI with the visual runtime.
 ---
@@ -112,11 +112,26 @@ or `Application.SetHighDpiMode` before the first window) **and** `AutoScaleMode 
 that hosts `VisualHost`. Miss the second and WinForms scales the form while the host scales the tree, so everything
 renders twice as large. Details in [references/runtime.md](references/runtime.md#dpi).
 
-⚙ **One HWND.** Never add a WinForms control to a visual tree. The only native paths are
-`NativeControlHost` (an explicit rectangular island) and the focused `TextBox`'s private native editor.
+⚙ **One HWND for the visual tree.** A WinForms control never joins the visual paint pass; it is always an HWND
+island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElement<Button>`), or assign
+`NativeControlHost.Child` in code-behind. The focused `TextBox` uses the same island for IME/accessibility.
 
-⚙ **A visual parent accepts `VisualElement` children only.** `native:` and `System.Windows.Forms` controls are
-rejected. Use `NativeControlHost` for a native widget.
+⚙ **Native layout is the same layout.** `Margin`, `Width`/`Height`, `Min`/`Max`, alignment, `Grid.Row`,
+`DockPanel.Dock`, `Canvas.Left`, `Panel.ZIndex` and `Visibility` on a `native:` element are routed to the
+wrapper and participate in the normal measure/arrange pass. Every other attribute goes to the native control
+(`Text`, `BackColor`, `Padding`, events). A native CLR property binds through a generated proxy property; `Mode=TwoWay` reports back through `INotifyPropertyChanged`, `XxxChanged`, or an idle/200 ms fallback; native `Enter`/`Leave` raise the wrapper's logical focus events, so `LostFocus` triggers behave like a visual target.
+
+⚙ **A native container hosts visual content.** Put a visual panel inside it (`<native:GroupBox>
+<StackPanel>…</StackPanel></native:GroupBox>`); the runtime paints that content through a nested `VisualHost`
+over the native display rectangle. Several native children are also accepted and wrapped in an implicit vertical
+`StackPanel` in document order; nest an explicit panel for another layout.
+
+⚙ **Opacity/transform need snapshot mode.** A live HWND rejects `WS_EX_LAYERED` and affine transforms. Set
+`IsSnapshot="True"` to paint the control as a bitmap in the visual pass: `Opacity`, `Transform` and `Clip` then
+apply. In a Form, an almost invisible (`Opacity=1/255`) input proxy keeps real mouse/keyboard/IME alive; scale
+re-lays the control out at the scaled size and rotation keeps the transformed polygon interactive (whole-control
+hits exact, item positions approximate). Call `RefreshSnapshot()` after changing it. `CornerRadius` rounds the
+live window's region, and popups cut rectangular holes in that region.
 
 ⚙ **A XAML root derives from `VisualElement` or is a standalone `ResourceDictionary`.** The root tag and the
 `x:Class` base must agree (owner derives from the root type). `x:Class` types must be `partial`.
@@ -142,8 +157,9 @@ CLR auto-property is rejected. Use `[XamlProperty]` for a custom styleable prope
 ⚙ **A style is a declaration, not a live object.** Mutating an applied style's `Setters` does not reapply it;
 replace the style or change a local DP value.
 
-⚙ **`NativeControlHost` is above the visual tree.** It cannot be transformed, clipped or blended, and popups
-cannot cover it. Keep native islands rectangular and axis-aligned.
+⚙ **A native island paints above the visual tree.** A live HWND cannot be transformed, alpha-blended or clipped to
+a shape; popups cover it only through the window-region holes. Keep live native islands rectangular and axis-aligned;
+use `IsSnapshot` when composition is required. A nested content surface is still bounded by the same island.
 
 ⚙ **A focused native TextBox is an island too.** `TextBox.UseNativeEditor = false` keeps the whole field visual
 (templates, DPs, caret, selection, undo) and loses only IME composition and the native accessibility peer.

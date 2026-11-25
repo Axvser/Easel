@@ -1,0 +1,28 @@
+﻿<local:NativeFormsView
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Easel.Test.Fixtures"
+    x:Class="Easel.Test.Fixtures.NativeFormsView"
+    Orientation="Vertical"
+    Spacing="2">
+
+  <native:Button
+      x:Name="okButton"
+      Text="OK"
+      Margin="4"
+      Width="120"
+      HorizontalAlignment="Left"
+      Click="OnOkClick" />
+
+  <native:GroupBox
+      x:Name="group"
+      Text="Host"
+      Width="200"
+      Height="100">
+    <StackPanel x:Name="groupContent">
+      <TextBlock Text="inside" />
+      <native:Label x:Name="leaf" Text="leaf" />
+    </StackPanel>
+  </native:GroupBox>
+
+</local:NativeFormsView>

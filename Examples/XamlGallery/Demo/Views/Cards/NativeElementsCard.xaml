@@ -1,0 +1,38 @@
+﻿<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativeElementsCard"
+    Spacing="8">
+
+  <TextBlock
+      Text="native: controls are wrapped in NativeElement and laid out by the same measure/arrange pass. A native container can host visual content."
+      Width="380"
+      HorizontalAlignment="Left"
+      Foreground="{StaticResource Muted}"
+      Wrap="True" />
+
+  <native:GroupBox
+      x:Name="group"
+      Text="Native GroupBox"
+      Width="280"
+      Height="156"
+      HorizontalAlignment="Left">
+    <StackPanel Spacing="6">
+      <TextBlock Text="A visual StackPanel inside a native GroupBox." />
+      <native:Button
+          x:Name="nativeButton"
+          Text="{Binding ButtonText}"
+          Height="30"
+          Click="OnNativeClick" />
+      <native:Button
+          Text="Snapshot at 50%"
+          Height="30"
+          IsSnapshot="True"
+          Opacity="0.5" />
+    </StackPanel>
+  </native:GroupBox>
+
+  <TextBlock x:Name="clickLabel" Text="Clicks: 0" Foreground="{StaticResource Muted}" />
+
+</local:ThemedStackPanel>

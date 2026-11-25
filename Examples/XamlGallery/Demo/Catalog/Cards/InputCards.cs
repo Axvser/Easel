@@ -1,4 +1,4 @@
-using Demo.Views;
+﻿using Demo.Views;
 
 namespace Demo;
 
@@ -29,13 +29,6 @@ internal static class InputCards
             "Pointer drag and arrow keys change the bounded value.",
             "<Slider Minimum=\"0\" Maximum=\"100\" Value=\"40\" />",
             _ => new SliderCard()),
-        Card(
-            "input.native-host",
-            "Input",
-            "NativeControlHost",
-            "The only native path: a real HWND floats above the visual tree.",
-            "<NativeControlHost Width=\"190\" Height=\"32\" />",
-            _ => new NativeHostCard()),
         Card(
             "input.progress",
             "Input",

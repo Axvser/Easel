@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Easel.Generator;
 using Easel.Test.Infrastructure;
 
@@ -177,14 +177,13 @@ public sealed class PrefixResolutionTests
     }
 
     [TestMethod]
-    public void NativePrefix_IsRejectedOnAVisualRoot()
+    public void NativePrefix_WrapsTheControlInANativeElement()
     {
         const string xaml = """
             <local:ProbeView
                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:local="clr-namespace:Probe"
-                xmlns:native="clr-namespace:System.Windows.Forms;assembly=System.Windows.Forms"
                 x:Class="Probe.ProbeView">
               <native:Label Text="OK" />
             </local:ProbeView>
@@ -196,8 +195,11 @@ public sealed class PrefixResolutionTests
             "PrefixNative",
             new InMemoryAdditionalText("ProbeView.xaml", xaml));
 
-        var diagnostic = AssertSingle(run, "EASEL_XAML004");
-        StringAssert.Contains(diagnostic.GetMessage(), "native WinForms type");
+        Assert.IsEmpty(run.Diagnostics, GeneratorProbe.Describe(run.Diagnostics));
+        StringAssert.Contains(
+            run.GeneratedText(),
+            "new global::Easel.Visuals.Controls.NativeElement<global::System.Windows.Forms.Label>()");
+        StringAssert.Contains(run.GeneratedText(), ".Native.Text = \"OK\";");
     }
 
     [TestMethod]

@@ -1,4 +1,4 @@
-namespace Demo;
+﻿namespace Demo;
 
 /// <summary>Concatenates the per-group card lists into the catalog order the shell walks.</summary>
 internal static class CardCatalog
@@ -15,6 +15,7 @@ internal static class CardCatalog
         cards.AddRange(TextCards.Create());
         cards.AddRange(DataCards.Create(model));
         cards.AddRange(InputCards.Create());
+        cards.AddRange(NativeCards.Create());
         cards.AddRange(GraphicsCards.Create());
         cards.AddRange(OverlayCards.Create());
         cards.AddRange(StylingCards.Create());

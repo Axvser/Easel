@@ -1,4 +1,4 @@
-# Controls catalogue
+﻿# Controls catalogue
 
 Every control derives from `VisualElement`; its properties are dependency properties, so styles, triggers,
 bindings, resources and animations apply uniformly. No control creates a child window (the two explicit native
@@ -34,7 +34,8 @@ This page lists each control's own properties and behaviour.
 | `TabControl` | `Items` (`IList<TabItem>`), `SelectedIndex`, `SelectionChanged` | One page at a time, pointer/arrow switching. Call `Refresh()` after mutating `Items` if the selected page must be rebuilt immediately. |
 | `TabItem` | `Header`, `Content` | One tab page. |
 | `VisualPresenter` | `Content` (`Visual?`) | Gives a lightweight `ContainerVisual`/`ShapeVisual`/`TextVisual` tree a slot; no layout pass inside. |
-| `NativeControlHost` | `Child` (`System.Windows.Forms.Control?`) | The explicit HWND island. The child floats above the visual tree and cannot be transformed/clipped/blended. |
+| `NativeElement<T>` | `Native` (`T`), `Content` (`VisualElement?`), `ContentSurface`, `CornerRadius`, `IsSnapshot`, `RefreshSnapshot()` | The XAML wrapper for a native control. Measures with `GetPreferredSize`, arranges into the native window, paints visual `Content` through a nested `VisualHost`, rounds the live window's region, and can paint a bitmap snapshot (`IsSnapshot`). In a Form the snapshot keeps real input through an almost invisible owned proxy window. |
+| `NativeControlHost` | `Child` (`System.Windows.Forms.Control?`) | The code-behind form of `NativeElement`; it owns the child. Same island limits. |
 | `DropZone` | `Title`, `Detail`, `IsHot`, `Dropped` | Dashed drop surface; accepts files, text and Easel row payloads and raises one `Dropped` event. |
 
 ## Text and images
@@ -113,8 +114,9 @@ selected state.
 
 - `TreeView`, `Calendar`/`DatePicker` initial dates, `ComboBox` items, `DataGridColumn` selectors
   (`TextSelector`/`ColorSelector`/`ProgressSelector`) and `NativeControlHost.Child` need code-behind after
-  `InitializeComponent`. `DataGrid` columns themselves are declarative (`<DataGrid.Columns>…`).
+  `InitializeComponent`. A `<native:…>` element is declarative: `x:Name.Native` gives the typed control.
+  `DataGrid` columns themselves are declarative (`<DataGrid.Columns>…`).
 - `VisualPopup` placement target is a code reference; set it in the click handler.
 - `TabControl.Refresh()` rebuilds the selected page after mutating `Items`.
 - `RichTextBox` content is set with `SetPlainText`/`Select`/formatting methods.
-- Do not add WinForms controls except through `NativeControlHost`.
+- Do not add WinForms controls except through a `native:` element (XAML) or `NativeControlHost` (code-behind).

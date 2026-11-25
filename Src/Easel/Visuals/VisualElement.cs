@@ -1583,6 +1583,16 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         }
     }
 
+    // 原生控件的 Leave 不代表表面逻辑焦点曾经落在本元素上；直接发一次 LostFocus，绑定触发器才可靠。
+    internal void RaiseLostFocus()
+    {
+        _focused = false;
+        _focusVisible = false;
+        InvalidateVisual();
+        OnLostFocus();
+        LostFocus?.Invoke(this, EventArgs.Empty);
+    }
+
     internal void SetFocusVisible(bool visible)
     {
         if (_focusVisible == visible)

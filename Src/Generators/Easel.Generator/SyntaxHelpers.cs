@@ -72,6 +72,7 @@ internal static class SyntaxHelpers
     public const string ControlMetadataName = "System.Windows.Forms.Control";
     public const string DependencyPropertyMetadataName = "Easel.DependencyProperty";
     public const string VisualElementMetadataName = "Easel.Visuals.VisualElement";
+    public const string NativeElementMetadataName = "Easel.Visuals.Controls.NativeElement";
 
     public static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .WithMiscellaneousOptions(
@@ -79,6 +80,10 @@ internal static class SyntaxHelpers
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     public static string TypeName(ITypeSymbol type) => type.ToDisplayString(TypeFormat);
+
+    /// <summary>The wrapper element the XAML compiler emits for a native control.</summary>
+    public static string NativeElementFor(ITypeSymbol nativeType)
+        => $"global::{VisualControlsNamespace}.NativeElement<{TypeName(nativeType)}>";
 
     /// <summary>Type name for <c>typeof</c> and other metadata positions, where nullable annotations are invalid.</summary>
     public static string TypeNameForTypeof(ITypeSymbol type) => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);

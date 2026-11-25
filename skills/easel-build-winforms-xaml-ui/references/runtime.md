@@ -1,4 +1,4 @@
-# Runtime, hosting, layout and input
+﻿# Runtime, hosting, layout and input
 
 ## The one-HWND model
 
@@ -15,10 +15,15 @@ surface.Root = new MyShellView();
 `VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement` gets layout and
 input; a `ContainerVisual` is painted as lightweight decoration.
 
-`NativeControlHost` is the explicit escape hatch: it owns one child HWND placed at the element's absolute
-rectangle. That island floats above the visual tree, cannot be transformed/clipped/blended, and popups cannot
-cover it. The focused visual `TextBox` uses a private host for IME/accessibility; set
-`UseNativeEditor="False"` to keep the field entirely visual.
+`NativeElement` (written `<native:Foo>` in XAML, no `xmlns:native` needed) measures with the native
+`GetPreferredSize`, arranges into one child HWND, and can host visual content through a nested `VisualHost` over
+the native display rectangle. A live island cannot be alpha-blended or transformed; `IsSnapshot="True"` paints a
+bitmap in the visual pass when composition is required. In a Form it pairs the snapshot with an almost invisible
+(`Opacity=1/255`) owned proxy window, so real mouse/keyboard/IME keep working: opacity/translation are exact, scale
+re-lays the control out at the scaled size, and rotation keeps the transformed polygon interactive. Popups cover
+an island by cutting their rectangle out of its window region; `CornerRadius` rounds that region. `NativeControlHost` is the code-behind
+equivalent. The focused visual `TextBox` uses a private host for IME/accessibility; set `UseNativeEditor="False"`
+to keep the field entirely visual.
 
 ## Surface API
 
@@ -125,7 +130,7 @@ form.Controls.Add(new VisualHost { Dock = DockStyle.Fill });
 - `DpiScale` re-reads the device DPI on a resize and on `OnDpiChangedAfterParent`; that override is not compiled
   into the `netframework4.6.1` target, so a monitor change there refreshes on the next resize.
 - Tests and captures pin the scale with `DpiScaleOverride`; `RenderTo` never applies DPI.
-- `NativeControlHost` children keep their own DPI behaviour; Easel only places their rectangles.
+- `NativeElement`/`NativeControlHost` children keep their own DPI behaviour; Easel places their rectangles and hosts nested visual content at the same scale.
 
 ## Lifetime
 

@@ -232,12 +232,22 @@ public sealed class VisualTextEditingTests
         Assert.IsTrue(text.IsUsingNativeEditor, "the field is focused");
         var viewport = scroll.ContentPresenter!.AbsoluteBounds;
         var scale = surface.DeviceDpi / 96f;
-        var editorTop = text.NativeEditor.Bounds.Top / scale;
-        var editorBottom = text.NativeEditor.Bounds.Bottom / scale;
+        var editor = text.NativeEditor;
+        var viewportTop = (int)(viewport.Top * scale);
+        var viewportBottom = (int)(viewport.Bottom * scale);
 
-        // 原生岛是独立 HWND；不按视口裁剪时，它会越过 ScrollViewer 的下边缘盖住滚动条。
-        Assert.IsTrue(editorTop >= viewport.Top - 0.5f, "the island starts inside the viewport");
-        Assert.IsTrue(editorBottom <= viewport.Bottom + 0.5f, "the island ends inside the viewport");
+        // 原生岛是独立 HWND；视口外的部分靠窗口区域裁掉，而不是把窗口缩小——
+        // 缩小会让编辑器的排版尺寸跟着变，滚动时文字会重折行。
+        Assert.IsTrue(editor.Bounds.Top < viewportBottom && editor.Bounds.Bottom > viewportBottom,
+            $"the island spans the viewport edge (editor={editor.Bounds}, viewport={viewportTop}..{viewportBottom})");
+
+        var middle = editor.Bounds.Width / 2;
+        var visibleY = Math.Min(viewportBottom - 1, editor.Bounds.Bottom - 1) - editor.Bounds.Y;
+        var hiddenY = viewportBottom + 2 - editor.Bounds.Y;
+        Assert.IsTrue(NativeWindowRegion.Contains(editor, new Point(middle, visibleY)),
+            "the part inside the viewport stays visible");
+        Assert.IsFalse(NativeWindowRegion.Contains(editor, new Point(middle, hiddenY)),
+            "the part below the viewport is clipped");
     }
 
     [TestMethod]

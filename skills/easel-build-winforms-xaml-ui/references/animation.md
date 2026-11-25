@@ -1,4 +1,4 @@
-# Animation contract
+﻿# Animation contract
 
 Easel owns the **animation contract**, not an engine. Trigger actions and `VisualTransition` call
 `AnimationRuntime.Animator`; the host injects an `IVisualAnimator` implementation. Until then, requesting an
@@ -117,7 +117,7 @@ it is idempotent and leaves a backend the host already supplied in place.
   needs a sampler registration in that backend.
 - Without an injected backend, `AnimationRuntime.HasAnimator` is false and animation requests throw with a
   message pointing at `AnimationRuntime.Animator`.
-- Native islands (the focused `TextBox` editor, `NativeControlHost`) are not part of the visual animation.
+- Native islands (the focused `TextBox` editor, `NativeElement`/`NativeControlHost`) are not part of the visual animation.
 
 ## Animatable properties
 

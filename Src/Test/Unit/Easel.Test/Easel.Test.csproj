@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -32,6 +32,7 @@
     <AdditionalFiles Include="Fixtures\VisualView.xaml" />
     <AdditionalFiles Include="Fixtures\VisualFormsView.xaml" />
     <AdditionalFiles Include="Fixtures\Transform3DView.xaml" />
+    <AdditionalFiles Include="Fixtures\NativeFormsView.xaml" />
   </ItemGroup>
 
   <ItemGroup>

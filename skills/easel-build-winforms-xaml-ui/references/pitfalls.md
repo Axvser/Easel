@@ -1,4 +1,4 @@
-# Pitfalls and diagnostics
+﻿# Pitfalls and diagnostics
 
 Each entry is a failure that Easel's own runtime, tests or gallery has hit. Read the symptom first.
 
@@ -71,9 +71,10 @@ the sash; right/below targets grow toward it (delta inverted). Auto-sized target
 
 ## Native interop
 
-**A WinForms control disappears or paints over everything.** It must be inside `NativeControlHost`, not a visual
-child. A native island is an airspace rectangle above the tree: it cannot be transformed, clipped, blended or
-covered by a popup.
+**A WinForms control disappears or paints over everything.** Declare it as `<native:Foo>` (or assign
+`NativeControlHost.Child`); never add the `Control` itself to a visual parent. A native island is an airspace
+rectangle above the tree: it cannot be transformed, clipped, blended or covered by a popup. Visual content inside
+a native element is painted by a nested surface and is still bounded by that island.
 
 **A focused TextBox editor floats over a scrollbar.** The native editor is clipped to the scroll viewport by the
 host; if you place it in a transformed/clipped subtree, it cannot follow the transform. Use
@@ -81,7 +82,15 @@ host; if you place it in a transformed/clipped subtree, it cannot follow the tra
 
 **The native editor disappears after a layout pass.** A host that skips `ArrangeOverride` for an unchanged size
 still re-places visible islands by absolute bounds; if a custom host re-implements this, keep the
-`NativeControlHost` placement scan.
+`NativeElement` placement scan.
+
+**Opacity or a transform on a live native element does nothing.** A child HWND rejects `WS_EX_LAYERED` and
+`SetLayeredWindowAttributes` fails with `ERROR_INVALID_PARAMETER`; its affine transform is ignored. Set
+`IsSnapshot="True"` to paint it as a bitmap in the visual pass. An almost invisible (`Opacity=1/255`) input proxy
+keeps real input alive; a fully transparent (`Opacity=0`) window is click-through, so do not use zero. A scale
+re-lays the control out at the scaled size; a rotation's internal hit positions and IME candidate stay
+approximate. Nested visual content inside a snapshot container is not interactive. `CornerRadius` and popup
+coverage work on the live window through its region.
 
 **Theme/native color mode.** Native islands choose their dark/light mode when their handles are created. Call
 `Application.SetColorMode` before creating them; changing it late does not repaint existing HWNDs.

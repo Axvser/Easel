@@ -1,0 +1,32 @@
+﻿<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativeBindingCard"
+    Spacing="8">
+
+  <TextBlock
+      Text="A native WinForms TextBox bound two-way through the proxy dependency property. The visual TextBlock follows the same source."
+      Width="400"
+      HorizontalAlignment="Left"
+      Foreground="{StaticResource Muted}"
+      Wrap="True" />
+
+  <native:TextBox
+      x:Name="nativeText"
+      Width="280"
+      Height="30"
+      HorizontalAlignment="Left"
+      Text="{Binding Caption, Mode=TwoWay}" />
+
+  <TextBlock x:Name="mirror" Text="{Binding Caption}" FontSize="14" HorizontalAlignment="Left" />
+
+  <TextBlock
+      Text="Type in the native field: TextChanged writes the proxy property, the binding updates the source, and the visual TextBlock re-renders."
+      Width="400"
+      HorizontalAlignment="Left"
+      Foreground="{StaticResource Muted}"
+      FontSize="11"
+      Wrap="True" />
+
+</local:ThemedStackPanel>

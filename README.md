@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="Assets/easel-logo.png" width="96" height="96" alt="Easel logo">
 
@@ -20,7 +20,8 @@
 
 Easel puts a WPF/Avalonia-shaped control library over a single `VisualHost`. Every control derives
 from `VisualElement`, not from a WinForms control; the only window is the host, and the whole tree is
-painted in one pass. `NativeControlHost` is the explicit native-island escape hatch.
+painted in one pass. `native:` elements (`NativeElement`) place WinForms controls in the same layout pass and can
+host visual content; `NativeControlHost` is the code-behind equivalent.
 
 ```csharp
 ApplicationConfiguration.Initialize();
@@ -72,6 +73,37 @@ public sealed partial class SettingsView : StackPanel
 }
 ```
 
+### Native controls
+
+A `clr-namespace:System.Windows.Forms` prefix declares a native control directly. The compiler wraps it in
+`NativeElement<Foo>`; you never write the host:
+
+```xml
+<StackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    Spacing="12">
+
+  <native:GroupBox x:Name="nativeGroup" Margin="12" Width="280" Text="Native group">
+    <StackPanel Spacing="6">
+      <TextBlock Text="Visual content inside a native container" />
+      <native:Button Text="Native button" Click="OnNativeClick" />
+    </StackPanel>
+  </native:GroupBox>
+</StackPanel>
+```
+
+`Margin`, `Width`/`Height`, `Min`/`Max`, alignment, `Visibility`, `DataContext` and attached properties write the
+wrapper and take part in the normal measure/arrange pass. `Text`, `Padding`, `BackColor`, `AutoSize` and events
+write the native control; a native property can also bind through a proxy property (`Mode=TwoWay` reports back
+through `INotifyPropertyChanged`, `XxxChanged` or an idle fallback; native focus raises the wrapper's logical focus events). `CornerRadius` rounds the live window, popups cut
+rectangular holes in it, and `IsSnapshot="True"` paints the control as a bitmap in the visual pass so `Opacity`
+and `Transform` apply. In a Form an almost invisible input proxy keeps mouse, keyboard and IME working: opacity
+and translation are exact, scale re-lays the control out at the scaled size, and rotation keeps the transformed
+polygon interactive. The wrapper measures with `GetPreferredSize`, places the HWND in physical pixels, and
+re-measures when the native preferred size changes. A native element hosts one visual content root; that content
+is painted by a nested surface over `DisplayRectangle`. The island is still an HWND: it cannot be transformed,
+alpha-blended or clipped to a shape by the outer tree.
+
 ### Compiled bindings
 
 Bindings resolve through `TypeDescriptor` by default. Add `x:DataType` and opt in with `x:CompileBindings` to
@@ -99,6 +131,7 @@ bindings, and a `DataTemplate` sets its own item type with `x:DataType`.
 | **Styling** | Styles, triggers, `ControlTemplate` + `ContentPresenter`, keyed resources, `StaticResource` and `DynamicResource` |
 | **Binding** | One-way/two-way/one-time paths, converters, validation, inherited `DataContext`, commands, compiled `x:DataType` paths |
 | **Visuals** | Brushes, gradients, opacity/clip/effects, opacity masks, cached layers, exact-perspective 3D transforms |
+| **Native** | `native:` elements (`NativeElement<T>`) in the same measure/arrange pass, visual content inside a native container, `NativeControlHost` for code-behind |
 | **Theme** | Dark+/Light+ XAML dictionaries, high contrast, follow-system mode, custom `ResourceDictionary` themes |
 
 ## Themes are resource dictionaries

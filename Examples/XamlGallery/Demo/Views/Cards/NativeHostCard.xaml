@@ -5,7 +5,7 @@
     x:Class="Demo.Views.NativeHostCard"
     Spacing="8">
 
-  <TextBlock Text="WinForms controls are not bridged; the host keeps one rectangle above the visual tree."
+  <TextBlock Text="The code-behind form of a native island: the host keeps one rectangle above the visual tree. Declare &lt;native:…&gt; in XAML for layout participation."
              Width="360"
              Foreground="{StaticResource Muted}"
              Wrap="True" />

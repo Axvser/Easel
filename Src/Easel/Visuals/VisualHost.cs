@@ -1,4 +1,5 @@
 ﻿using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Reflection;
@@ -16,8 +17,8 @@ namespace Easel.Visuals;
 /// <remarks>
 /// <para>
 /// Exactly one HWND is created for the whole tree. Elements are painted in one pass into the double buffer, so a
-/// structural change cannot show half of an old and half of a new tree. Native WinForms controls stay outside the
-/// tree unless an element opts into a child window through <c>NativeControlHost</c>.
+/// structural change cannot show half of an old and half of a new tree. A native WinForms control stays an HWND
+/// island through <see cref="NativeElement"/>; it participates in layout without joining this paint pass.
 /// </para>
 /// <para>
 /// Focus is logical: the surface keeps the native keyboard focus and <see cref="FocusedElement"/> receives key and
@@ -26,7 +27,6 @@ namespace Easel.Visuals;
 /// </remarks>
 public class VisualHost : System.Windows.Forms.Control
 {
-    private const int WsClipChildren = 0x02000000;
 
     private ContainerVisual? _root;
     private VisualElement? _rootElement;
@@ -34,8 +34,14 @@ public class VisualHost : System.Windows.Forms.Control
     private VisualElement? _capture;
     private bool _focusVisible = true;
     private readonly List<VisualElement> _hoverChain = [];
-    private readonly Dictionary<NativeControlHost, System.Windows.Forms.Control> _nativeChildren = [];
-    private readonly HashSet<NativeControlHost> _placedNative = [];
+    private readonly Dictionary<NativeElement, System.Windows.Forms.Control> _nativeChildren = [];
+    private readonly Dictionary<NativeElement, int> _nativeTreeOrder = [];
+    private readonly HashSet<NativeElement> _placedNative = [];
+    private readonly Dictionary<NativeElement, (System.Windows.Forms.Control Child, Rectangle Physical, bool Show, RectangleF Visible)> _pendingPlacements = [];
+    private readonly List<NativeElement> _frozenNatives = [];
+    private bool _rendering;
+    private readonly Dictionary<System.Windows.Forms.Control, (int Width, int Height, float Radius, Rectangle? Clip, Rectangle[] Cuts)> _nativeRegionStates = [];
+    private int _nativeOrderCounter;
     private readonly VisualStyleCollection _styles = new();
     private readonly ResourceDictionary _resources = new();
     private readonly OverlayLayer _overlay = new();
@@ -136,6 +142,17 @@ public class VisualHost : System.Windows.Forms.Control
     /// capture is lost. A synthesized press without a window handle stays active until an explicit release.
     /// </remarks>
     public bool IsPointerGestureActive { get; private set; }
+
+    /// <summary>
+    /// Whether live native islands freeze to the current frame while a pointer gesture is active.
+    /// </summary>
+    /// <remarks>
+    /// A child HWND's position and the parent's frame are committed by the compositor independently, so a fast
+    /// drag can leave the island's picture trailing its card. Freezing swaps the island for a bitmap that moves
+    /// with the visual tree and restores the live control when the pointer is released. Defaults to
+    /// <see langword="true"/>; turn it off when the island must stay interactive during a drag.
+    /// </remarks>
+    public bool FreezeNativeIslandsDuringGestures { get; set; } = true;
 
     /// <summary>Styles applied implicitly to matching elements in this surface's visual tree.</summary>
     /// <remarks>
@@ -269,9 +286,9 @@ public class VisualHost : System.Windows.Forms.Control
     {
         get
         {
-            var parameters = base.CreateParams;
-            parameters.Style |= WsClipChildren;
-            return parameters;
+            // 子 HWND 是独立表面，父窗口再怎么画也不会盖住它；不排除子窗口，父窗口才能在同一帧
+            // 把岛腾出的旧位置一起补画，快速拖动时不会留下画面残条。
+            return base.CreateParams;
         }
     }
 
@@ -962,6 +979,10 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         IsPointerGestureActive = true;
+        if (FreezeNativeIslandsDuringGestures)
+        {
+            FreezeNativeIslands();
+        }
 
         if (inputTarget is not null)
         {
@@ -1024,6 +1045,29 @@ public class VisualHost : System.Windows.Forms.Control
         return args.Handled;
     }
 
+    // 手势期间把所有活体岛冻结成位图：绘制期间它们不移动 HWND，松手后按当前排列矩形恢复。
+    private void FreezeNativeIslands()
+    {
+        _frozenNatives.Clear();
+        foreach (var owner in _nativeChildren.Keys.ToArray())
+        {
+            if (owner.FreezeForGesture())
+            {
+                _frozenNatives.Add(owner);
+            }
+        }
+    }
+
+    private void UnfreezeNativeIslands()
+    {
+        foreach (var owner in _frozenNatives)
+        {
+            owner.UnfreezeAfterGesture();
+        }
+
+        _frozenNatives.Clear();
+    }
+
     // 手势结束：若期间画过低分辨率帧，排一次整面重画换回清晰帧。
     private void EndPointerGesture()
     {
@@ -1033,6 +1077,7 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         IsPointerGestureActive = false;
+        UnfreezeNativeIslands();
         if (_gestureDrewMotionFrame)
         {
             _gestureDrewMotionFrame = false;
@@ -1314,6 +1359,9 @@ public class VisualHost : System.Windows.Forms.Control
 
     private const int WmMouseHWheel = 0x020E;
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
+
     /// <inheritdoc />
     protected override void WndProc(ref Message m)
     {
@@ -1417,45 +1465,208 @@ public class VisualHost : System.Windows.Forms.Control
     }
 
     // bounds 是逻辑单位；原生 HWND 必须按物理客户区像素摆放。
-    internal void PlaceNative(NativeControlHost owner, System.Windows.Forms.Control child, Rectangle bounds)
+    internal void PlaceNative(NativeElement owner, System.Windows.Forms.Control child, Rectangle bounds)
     {
+        if (owner.IsFrozen)
+        {
+            // 冻结期间岛不参与原生摆放；松手时自己重新摆回。
+            return;
+        }
+
         if (!_nativeChildren.TryGetValue(owner, out var existing))
         {
             _nativeChildren[owner] = child;
+            _nativeTreeOrder[owner] = _nativeOrderCounter++;
             Controls.Add(child);
+            ReorderNativeChildren();
         }
         else if (!ReferenceEquals(existing, child))
         {
             Controls.Remove(existing);
+            RestoreNativeRegion(existing);
             _nativeChildren[owner] = child;
             Controls.Add(child);
+            ReorderNativeChildren();
         }
 
         _placedNative.Add(owner);
 
         // 原生岛是独立 HWND，视觉层的 Clip 管不到它；不裁的话，滚动到视口边缘的文本框编辑器
-        // 或 NativeControlHost 会浮在滚动条和其它面板之上。按祖先剪辑矩形与客户区的交集摆放。
+        // 或 NativeElement 会浮在滚动条和其它面板之上。按祖先剪辑矩形与客户区的交集摆放。
         var visible = RectangleF.Intersect(bounds, GetNativeClipBounds(owner));
         if (visible.Width < 1f || visible.Height < 1f)
+        {
+            QueueOrApplyNative(owner, child, Rectangle.Empty, show: false, RectangleF.Empty);
+            return;
+        }
+
+        QueueOrApplyNative(
+            owner,
+            child,
+            ToPhysical(Rectangle.Round(bounds)),
+            show: owner.IsVisible && owner.Visibility == XamlVisibility.Visible,
+            visible);
+    }
+
+    // 绘制期间的摆放先排队，等父窗口这一帧画完、交给 WinForms 贴屏之前再统一移动子 HWND。
+    // 岛若在绘制中途就挪走，长一帧里屏幕会同时出现"新位置的岛 + 旧一帧的卡片"，看起来就是画面拖影。
+    private void QueueOrApplyNative(NativeElement owner, System.Windows.Forms.Control child, Rectangle physical, bool show, RectangleF visible)
+    {
+        if (_rendering)
+        {
+            _pendingPlacements[owner] = (child, physical, show, visible);
+            return;
+        }
+
+        ApplyNativePlacement(owner, child, physical, show, visible);
+    }
+
+    private void ApplyNativePlacement(NativeElement owner, System.Windows.Forms.Control child, Rectangle physical, bool show, RectangleF visible)
+    {
+        if (!show)
         {
             child.Visible = false;
             return;
         }
 
-        var physical = ToPhysical(Rectangle.Round(visible));
-        if (child.Bounds != physical)
+        owner.IsBeingPlaced = true;
+        try
         {
-            child.Bounds = physical;
+            var previous = child.Bounds;
+            if (previous != physical)
+            {
+                child.Bounds = physical;
+                // 岛占的屏幕区域不会被父窗口绘制（WS_CLIPCHILDREN）；移动后把新旧矩形都标脏，
+                // 下一次父窗口绘制才会把旧位置补画干净。
+                Invalidate(Rectangle.Union(previous, physical));
+            }
+        }
+        finally
+        {
+            owner.IsBeingPlaced = false;
         }
 
-        child.Visible = owner.IsVisible && owner.Visibility == XamlVisibility.Visible;
+        child.Visible = true;
+
+        // 可见交集用窗口区域表达，而不是把窗口本身缩小：缩小会连原生内容一起重排
+        // （视频会被缩放、文本框会重折行），拖动分割条时就会看到画面尺寸跳变。
+        var actual = child.Bounds;
+        var physicalVisible = Rectangle.Intersect(actual, ToPhysical(Rectangle.Round(visible)));
+        var localVisible = new Rectangle(
+            physicalVisible.X - actual.X,
+            physicalVisible.Y - actual.Y,
+            physicalVisible.Width,
+            physicalVisible.Height);
+        var clip = localVisible.Left <= 0
+                   && localVisible.Top <= 0
+                   && localVisible.Right >= child.Width
+                   && localVisible.Bottom >= child.Height
+            ? (Rectangle?)null
+            : localVisible;
+        ApplyNativeRegion(owner, child, clip);
     }
 
-    private RectangleF GetNativeClipBounds(NativeControlHost owner)
+    private void FlushNativePlacements()
+    {
+        if (_pendingPlacements.Count == 0)
+        {
+            return;
+        }
+
+        var pending = _pendingPlacements.ToArray();
+        _pendingPlacements.Clear();
+        foreach (var pair in pending)
+        {
+            if (_nativeChildren.TryGetValue(pair.Key, out var current)
+                && ReferenceEquals(current, pair.Value.Child))
+            {
+                ApplyNativePlacement(
+                    pair.Key,
+                    pair.Value.Child,
+                    pair.Value.Physical,
+                    pair.Value.Show,
+                    pair.Value.Visible);
+            }
+        }
+    }
+
+    // 弹层画在主表面的覆盖层里，子 HWND 永远盖在它上面；把弹层的物理矩形从岛的窗口区域里挖掉，
+    // 弹层就能从洞里露出来。CornerRadius > 0 时区域换成圆角矩形。
+    private void ApplyNativeRegion(NativeElement owner, System.Windows.Forms.Control child, Rectangle? clip = null)
+    {
+        if (!child.IsHandleCreated)
+        {
+            return;
+        }
+
+        var childBounds = child.Bounds;
+        var client = new Rectangle(0, 0, child.Width, child.Height);
+        var cuts = new List<Rectangle>();
+        foreach (var popup in _openPopups)
+        {
+            var logical = popup.Bounds;
+            if (logical.Width <= 0f || logical.Height <= 0f)
+            {
+                continue;
+            }
+
+            var physical = ToPhysical(Rectangle.Round(logical));
+            var relative = new Rectangle(
+                physical.X - childBounds.X,
+                physical.Y - childBounds.Y,
+                physical.Width,
+                physical.Height);
+            var overlap = Rectangle.Intersect(relative, client);
+            if (overlap.Width > 0 && overlap.Height > 0)
+            {
+                cuts.Add(overlap);
+            }
+        }
+
+        var corner = (float)(owner.CornerRadius * DpiScale);
+        var current = (Width: child.Width, Height: child.Height, Radius: corner, Clip: clip, Cuts: cuts.ToArray());
+        if (_nativeRegionStates.TryGetValue(child, out var previous)
+            && previous.Width == current.Width
+            && previous.Height == current.Height
+            && previous.Radius.Equals(current.Radius)
+            && Nullable.Equals(previous.Clip, current.Clip)
+            && previous.Cuts.SequenceEqual(current.Cuts))
+        {
+            return;
+        }
+
+        _nativeRegionStates[child] = current;
+        NativeWindowRegion.Apply(child, corner, current.Cuts, clip);
+    }
+
+    internal void RefreshNativeRegions()
+    {
+        foreach (var pair in _nativeChildren)
+        {
+            Rectangle? clip = _nativeRegionStates.TryGetValue(pair.Value, out var state) ? state.Clip : null;
+            ApplyNativeRegion(pair.Key, pair.Value, clip);
+        }
+    }
+
+    private void RestoreNativeRegion(System.Windows.Forms.Control child)
+    {
+        if (_nativeRegionStates.Remove(child))
+        {
+            NativeWindowRegion.Restore(child);
+        }
+    }
+
+    private RectangleF GetNativeClipBounds(NativeElement owner)
     {
         var clip = new RectangleF(0f, 0f, LogicalClientSize.Width, LogicalClientSize.Height);
         for (var current = (VisualElement?)owner; current is not null; current = current.ParentElement)
         {
+            // HWND 不继承视觉树的可见性/透明度；祖先一藏，岛必须整块摘掉。
+            if (!current.IsVisible || current.Opacity <= 0d)
+            {
+                return RectangleF.Empty;
+            }
+
             if (current.ClipToBounds)
             {
                 clip = RectangleF.Intersect(clip, current.AbsoluteBounds);
@@ -1481,7 +1692,7 @@ public class VisualHost : System.Windows.Forms.Control
         return clip;
     }
 
-    internal void RemoveNative(NativeControlHost owner)
+    internal void RemoveNative(NativeElement owner)
     {
         if (!_nativeChildren.TryGetValue(owner, out var child))
         {
@@ -1489,10 +1700,39 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         _nativeChildren.Remove(owner);
+        _nativeTreeOrder.Remove(owner);
         _placedNative.Remove(owner);
+        RestoreNativeRegion(child);
         if (!child.IsDisposed && Controls.Contains(child))
         {
             Controls.Remove(child);
+        }
+    }
+
+    // 岛与岛之间的 z 序按 Panel.ZIndex，再按第一次进入树的顺序；岛整体仍在所有视觉内容之上。
+    internal void ReorderNativeChildren()
+    {
+        if (_nativeChildren.Count < 2)
+        {
+            return;
+        }
+
+        var ordered = _nativeChildren
+            .OrderBy(static pair => Easel.Visuals.Controls.Panel.GetZIndex(pair.Key))
+            .ThenBy(pair => _nativeTreeOrder.TryGetValue(pair.Key, out var order) ? order : int.MaxValue)
+            .ToList();
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            var child = ordered[index].Value;
+            if (!Controls.Contains(child))
+            {
+                continue;
+            }
+
+            if (Controls.GetChildIndex(child) != index)
+            {
+                Controls.SetChildIndex(child, index);
+            }
         }
     }
 
@@ -1516,7 +1756,24 @@ public class VisualHost : System.Windows.Forms.Control
             e.Graphics.FillRectangle(background, damage);
         }
 
-        RenderPhysical(e.Graphics, damage);
+        _rendering = true;
+        try
+        {
+            RenderPhysical(e.Graphics, damage);
+        }
+        finally
+        {
+            _rendering = false;
+        }
+
+        // WinForms 在 OnPaint 返回后才把这一帧贴到屏幕；子 HWND 必须赶在那一刻之前落位。
+        FlushNativePlacements();
+
+        // 拖动期间等合成器提交这一帧，子 HWND 的位置和父窗口的新画面才会一起上屏。
+        if (IsPointerGestureActive)
+        {
+            _ = DwmFlush();
+        }
 
         _damage = Rectangle.Empty;
         _damageFull = false;
@@ -1815,10 +2072,17 @@ public class VisualHost : System.Windows.Forms.Control
         if (!_openPopups.Contains(popup))
         {
             _openPopups.Add(popup);
+            RefreshNativeRegions();
         }
     }
 
-    internal void UnregisterPopup(VisualPopup popup) => _openPopups.Remove(popup);
+    internal void UnregisterPopup(VisualPopup popup)
+    {
+        if (_openPopups.Remove(popup))
+        {
+            RefreshNativeRegions();
+        }
+    }
 
     private void CloseAllPopups()
     {
@@ -1846,6 +2110,7 @@ public class VisualHost : System.Windows.Forms.Control
     {
         foreach (var child in _nativeChildren.Values)
         {
+            RestoreNativeRegion(child);
             if (!child.IsDisposed && Controls.Contains(child))
             {
                 Controls.Remove(child);
@@ -1853,7 +2118,9 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         _nativeChildren.Clear();
+        _nativeTreeOrder.Clear();
         _placedNative.Clear();
+        _nativeRegionStates.Clear();
     }
 
     private void UpdateHover(PointF? point, VisualElement? target)
@@ -1968,6 +2235,7 @@ public class VisualHost : System.Windows.Forms.Control
             }
         }
 
+        RefreshNativeRegions();
         _layoutSize = size;
         LayoutUpdated?.Invoke(this, EventArgs.Empty);
     }
