@@ -121,39 +121,63 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
     public void SetValue(DependencyProperty property, object? value, BindingPriority priority = BindingPriority.LocalValue)
     {
         if (property is null) throw new ArgumentNullException(nameof(property));
-        var oldValue = GetValue(property);
-        value = property.CoerceFor(this, value);
 
+        // 快速路径：新建元素第一次写、或同一层直接覆盖。旧/新有效值都能从槽位直接得到，
+        // 不必为每次写入先读两遍表；叠层与继承仍走完整路径。
         if (!_values.TryGetValue(property, out var layers))
         {
+            var oldValue = property.Metadata.Inherits ? GetValue(property) : property.DefaultValue;
+            value = property.CoerceFor(this, value);
             _values[property] = new LayerValue { Priority = priority, Value = value };
+            if (!Equals(oldValue, value))
+            {
+                RaisePropertyChanged(property, oldValue, value, priority);
+            }
+
+            return;
+        }
+
+        if (layers.Extra is null && layers.Priority == priority)
+        {
+            value = property.CoerceFor(this, value);
+            var oldValue = layers.Value;
+            if (Equals(oldValue, value))
+            {
+                return;
+            }
+
+            layers.Value = value;
+            _values[property] = layers;
+            RaisePropertyChanged(property, oldValue, value, priority);
+            return;
+        }
+
+        var previous = GetValue(property);
+        value = property.CoerceFor(this, value);
+
+        if (layers.Priority == priority)
+        {
+            layers.Value = value;
+        }
+        else if (layers.Extra is { } extra)
+        {
+            extra[priority] = value;
         }
         else
         {
-            if (layers.Priority == priority)
+            // Extra 只存「除主层以外」的层；主层永远留在内联槽位，避免同一个优先级出现两份。
+            layers.Extra = new Dictionary<BindingPriority, object?>
             {
-                layers.Value = value;
-            }
-            else if (layers.Extra is { } extra)
-            {
-                extra[priority] = value;
-            }
-            else
-            {
-                // Extra 只存「除主层以外」的层；主层永远留在内联槽位，避免同一个优先级出现两份。
-                layers.Extra = new Dictionary<BindingPriority, object?>
-                {
-                    [priority] = value,
-                };
-            }
-
-            _values[property] = layers;
+                [priority] = value,
+            };
         }
 
+        _values[property] = layers;
+
         var newValue = GetValue(property);
-        if (!Equals(oldValue, newValue))
+        if (!Equals(previous, newValue))
         {
-            RaisePropertyChanged(property, oldValue, newValue, priority);
+            RaisePropertyChanged(property, previous, newValue, priority);
         }
     }
 

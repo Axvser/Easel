@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -41,6 +42,10 @@ public static class VisualBindingOperations
     /// <remarks>Path misses and a missing data context are normal and do not raise this event.</remarks>
     public static event EventHandler<BindingFailureEventArgs>? BindingFailed;
 
+    // 模板里的普通 {TemplateBinding} 是一次单段读取：专用表达式省掉路径解析、节点列表与
+    // ActiveExpressions 追踪。带转换器/格式/回退/两向的仍走通用表达式。
+    private static readonly ConcurrentDictionary<(Type Type, string Name), PropertyInfo?> TemplatePropertyCache = new();
+
     /// <summary>Binds <paramref name="property"/> on <paramref name="target"/> to <paramref name="binding"/>.</summary>
     /// <param name="target">The visual-backend object receiving values.</param>
     /// <param name="property">The property to write.</param>
@@ -51,6 +56,12 @@ public static class VisualBindingOperations
         if (target is null) throw new ArgumentNullException(nameof(target));
         if (property is null) throw new ArgumentNullException(nameof(property));
         if (binding is null) throw new ArgumentNullException(nameof(binding));
+
+        if (TemplateBindingExpression.TryCreate(target, property, binding, out var templateBinding))
+        {
+            templateBinding.Attach();
+            return templateBinding;
+        }
 
         var expression = new VisualBindingExpression(target, property, binding);
         expression.Attach();
@@ -63,6 +74,18 @@ public static class VisualBindingOperations
 
         return expression;
     }
+
+    internal static PropertyInfo? FindTemplateProperty(Type type, string name)
+        => TemplatePropertyCache.GetOrAdd(
+            (type, name),
+            static key =>
+            {
+                // 模板部件的属性名来自 XAML，反射在这里是带类型的固定成员查找；
+                // 与 BindingPath 的描述符缓存一样，裁剪分析无法证明这一点。
+#pragma warning disable IL2080
+                return key.Type.GetProperty(key.Name, BindingFlags.Instance | BindingFlags.Public);
+#pragma warning restore IL2080
+            });
 
     /// <summary>
     /// Writes the target's current value back to the source for every live binding of
@@ -307,6 +330,230 @@ public static class Validation
         }
 
         handler(target, new ValidationErrorEventArgs(error, action) { Source = target });
+    }
+}
+
+// 模板部件最常见的绑定：源固定是 TemplatedParent，路径是单段属性名，无转换器/格式/回退/两向。
+// 这条路径只订阅施模板控件，不做路径拆分、节点列表或 ActiveExpressions 登记。
+// 源实现校验接口或属性名不是公开 CLR 属性时，第一次解析就换成通用表达式，行为与未优化时一致。
+internal sealed class TemplateBindingExpression : IVisualBindingExpression
+{
+    private readonly VisualElement _target;
+    private readonly DependencyProperty _property;
+    private readonly Binding _binding;
+    private readonly string _path;
+    private VisualBindingExpression? _fallback;
+    private VisualElement? _source;
+    private PropertyInfo? _getter;
+    private PropertyChangedEventHandler? _sourceChangedHandler;
+    private bool _disposed;
+
+    private TemplateBindingExpression(VisualElement target, DependencyProperty property, Binding binding, string path)
+    {
+        _target = target;
+        _property = property;
+        _binding = binding;
+        _path = path;
+    }
+
+    internal static bool TryCreate(
+        IWinformsObject target,
+        DependencyProperty property,
+        Binding binding,
+        out TemplateBindingExpression expression)
+    {
+        expression = null!;
+        if (binding is not TemplateBinding
+            || target is not VisualElement element
+            || binding.Mode != BindingMode.OneWay
+            || binding.RelativeSource?.Mode != RelativeSourceMode.TemplatedParent
+            || binding.Source is not null
+            || !string.IsNullOrEmpty(binding.ElementName)
+            || binding.Converter is not null
+            || !string.IsNullOrEmpty(binding.StringFormat)
+            || binding.FallbackValue is not null
+            || binding.TargetNullValue is not null
+            || binding.ValidatesOnExceptions
+            || binding.NotifyOnValidationError)
+        {
+            return false;
+        }
+
+        var path = binding.Path;
+        if (string.IsNullOrEmpty(path) || path.IndexOf('.') >= 0 || path.IndexOf('[') >= 0)
+        {
+            return false;
+        }
+
+        expression = new TemplateBindingExpression(element, property, binding, path);
+        return true;
+    }
+
+    public void Attach()
+    {
+        _target.PropertyChanged += OnTargetPropertyChanged;
+        UpdateTarget();
+    }
+
+    public bool UpdateSource() => _fallback?.UpdateSource() ?? false;
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _target.PropertyChanged -= OnTargetPropertyChanged;
+        UnsubscribeSource();
+        _fallback?.Dispose();
+        _fallback = null;
+    }
+
+    private void OnTargetPropertyChanged(object? sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (_disposed || _fallback is not null)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(e.Property, VisualElement.TemplatedParentProperty))
+        {
+            UpdateTarget();
+        }
+    }
+
+    private PropertyChangedEventHandler SourceChangedHandler
+        => _sourceChangedHandler ??= OnSourcePropertyChanged;
+
+    private void OnSourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!_disposed)
+        {
+            Apply();
+        }
+    }
+
+    private void UpdateTarget()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var source = _target.TemplatedParent;
+        if (ReferenceEquals(source, _source))
+        {
+            // TemplatedParent 没变（重复通知）或源仍是空：已经订阅过的源不必重挂。
+            if (source is not null)
+            {
+                Apply();
+            }
+
+            return;
+        }
+
+        UnsubscribeSource();
+        _source = source;
+        if (source is null)
+        {
+            _getter = null;
+            _target.ClearValue(_property);
+            return;
+        }
+
+        if (source is IDataErrorInfo || source is INotifyDataErrorInfo)
+        {
+            // 通用表达式负责校验接口；这里只做转交，避免两条路径行为分叉。
+            SwitchToFallback();
+            return;
+        }
+
+        var getter = VisualBindingOperations.FindTemplateProperty(source.GetType(), _path);
+        if (getter is null)
+        {
+            SwitchToFallback();
+            return;
+        }
+
+        _getter = getter;
+        ((INotifyPropertyChanged)source).PropertyChanged += SourceChangedHandler;
+        Apply();
+    }
+
+    private void SwitchToFallback()
+    {
+        UnsubscribeSource();
+        _target.PropertyChanged -= OnTargetPropertyChanged;
+        _fallback = new VisualBindingExpression(_target, _property, _binding);
+        _fallback.Attach();
+    }
+
+    private void UnsubscribeSource()
+    {
+        if (_source is { } source && _sourceChangedHandler is { } handler)
+        {
+            ((INotifyPropertyChanged)source).PropertyChanged -= handler;
+        }
+
+        _source = null;
+    }
+
+    private void Apply()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        object? value;
+        try
+        {
+            value = _getter!.GetValue(_source);
+        }
+        catch (Exception ex)
+        {
+            VisualBindingOperations.ReportFailure(
+                _target,
+                _property,
+                _binding,
+                "Reading or converting the binding source threw.",
+                ex);
+            _target.ClearValue(_property);
+            return;
+        }
+
+        // TemplateBinding 的空值不覆盖部件自己的默认值（主题刷/字体）。
+        if (value is null)
+        {
+            _target.ClearValue(_property);
+            return;
+        }
+
+        if (value is System.Drawing.Color color && color.IsEmpty)
+        {
+            _target.ClearValue(_property);
+            return;
+        }
+
+        try
+        {
+            var converted = _property.PropertyType.IsInstanceOfType(value)
+                ? value
+                : XamlRuntime.ConvertValue(value, _property.PropertyType);
+            _target.SetValue(_property, converted);
+        }
+        catch (Exception ex)
+        {
+            VisualBindingOperations.ReportFailure(
+                _target,
+                _property,
+                _binding,
+                "Converting or assigning the target value threw.",
+                ex);
+            _target.ClearValue(_property);
+        }
     }
 }
 

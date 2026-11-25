@@ -7,8 +7,8 @@ namespace Easel.Visuals;
 /// </remarks>
 public sealed class VisualNameScope
 {
-    // 多数模板实例没有 x:Name；字典按需创建，省掉每个实例一次空字典分配。
-    private Dictionary<string, object>? _names;
+    // 模板一般只有几个 x:Name；线性表比哈希表小，注册/查找也不用算哈希。
+    private List<(string Name, object Value)>? _names;
 
     /// <summary>Registers <paramref name="value"/> under <paramref name="name"/>.</summary>
     /// <param name="name">The part name declared with <c>x:Name</c>.</param>
@@ -18,7 +18,18 @@ public sealed class VisualNameScope
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
         if (value is null) throw new ArgumentNullException(nameof(value));
-        (_names ??= new Dictionary<string, object>(StringComparer.Ordinal))[name] = value;
+
+        var names = _names ??= [];
+        for (var index = 0; index < names.Count; index++)
+        {
+            if (string.Equals(names[index].Name, name, StringComparison.Ordinal))
+            {
+                names[index] = (name, value);
+                return;
+            }
+        }
+
+        names.Add((name, value));
     }
 
     /// <summary>Returns the object registered under <paramref name="name"/>, or <see langword="null"/>.</summary>
@@ -26,7 +37,7 @@ public sealed class VisualNameScope
     public object? Find(string name)
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
-        return _names is not null && _names.TryGetValue(name, out var value) ? value : null;
+        return _names is { } names ? FindCore(names, name) : null;
     }
 
     /// <summary>Returns the object registered under <paramref name="name"/> when it is a <typeparamref name="T"/>.</summary>
@@ -35,7 +46,20 @@ public sealed class VisualNameScope
     public T? Find<T>(string name) where T : class
     {
         if (name is null) throw new ArgumentNullException(nameof(name));
-        return _names is not null && _names.TryGetValue(name, out var value) ? value as T : null;
+        return _names is { } names ? FindCore(names, name) as T : null;
+    }
+
+    private static object? FindCore(List<(string Name, object Value)> names, string name)
+    {
+        for (var index = 0; index < names.Count; index++)
+        {
+            if (string.Equals(names[index].Name, name, StringComparison.Ordinal))
+            {
+                return names[index].Value;
+            }
+        }
+
+        return null;
     }
 }
 
@@ -197,7 +221,8 @@ internal sealed class ResourceBinding : IDisposable
     private readonly Action? _onMissing;
     private readonly object? _targetToken;
     private readonly List<VisualElement> _chain = [];
-    private readonly List<ResourceDictionary> _dictionaries = [];
+    // 多数动态资源只链到元素自己：字典订阅表按需创建。
+    private List<ResourceDictionary>? _dictionaries;
     // 订阅/退订复用同一个委托实例，避免每次链变化都新分配一个方法组委托。
     private readonly Action _chainObserver;
     private readonly Action<object?> _dictionaryChangedHandler;
@@ -269,6 +294,16 @@ internal sealed class ResourceBinding : IDisposable
 
     private void RefreshValue()
     {
+        // 造模板时元素还没挂父级、也没有表面与自有字典：此刻什么都解析不到，也不必给每个部件建空字典。
+        // 曾经解析到值的绑定不能省这一步：脱离父链后要走下面的 onMissing 把旧值撤掉。
+        if (!_hadValue
+            && _element.ParentElement is null
+            && _element.Surface is null
+            && _element.ResourcesOrNull is null)
+        {
+            return;
+        }
+
         var surface = _element.Surface;
         var found = Resolve(surface, out var value, out var source);
         SyncDictionarySubscriptions(surface, source);
@@ -285,6 +320,9 @@ internal sealed class ResourceBinding : IDisposable
             _onMissing?.Invoke();
         }
     }
+
+    // 元素的 Resources 是延迟创建的；拿到字典后补一次解析，晚了加进去的键也能命中。
+    internal void OnOwnerResourcesCreated() => RefreshValue();
 
     // 父链通常只在根上追加祖先（模板部件挂到列表/弹层）。按公共前缀增量地退订/订阅，
     // 避免每次父级变化都把整条链退订再重挂；链被截断时也只摘掉消失的尾段。
@@ -369,8 +407,12 @@ internal sealed class ResourceBinding : IDisposable
     private void SyncDictionarySubscriptions(VisualHost? surface, ResourceDictionary? source)
     {
         var root = _chain.Count > 0 ? _chain[_chain.Count - 1] : null;
-        // 订阅必须拿到实例：元素/链根还没有字典时先建出来，之后加键才能通知到；读取路径仍走 ResourcesOrNull。
-        var rootResources = root?.Resources;
+        // 元素自己的字典延迟创建，出现时会回调 OnOwnerResourcesCreated；链根的祖先字典没有这个回调，
+        // 只有它不是本元素时才按需建出来，供整条链的引用共享。
+        var elementResources = _element.ResourcesOrNull;
+        var rootResources = root is null || ReferenceEquals(root, _element)
+            ? elementResources
+            : root.Resources;
         var surfaceResources = surface?.Resources;
         if (ReferenceEquals(rootResources, _rootResources)
             && ReferenceEquals(surfaceResources, _surfaceResources)
@@ -379,32 +421,27 @@ internal sealed class ResourceBinding : IDisposable
             return;
         }
 
-        var elementResources = _element.Resources;
         AddDictionary(elementResources);
-        if (rootResources is not null)
+        if (!ReferenceEquals(rootResources, elementResources))
         {
             AddDictionary(rootResources);
         }
 
-        if (source is not null)
-        {
-            AddDictionary(source);
-        }
+        AddDictionary(source);
+        AddDictionary(surfaceResources);
 
-        if (surfaceResources is not null)
+        if (_dictionaries is { } dictionaries)
         {
-            AddDictionary(surfaceResources);
-        }
-
-        for (var index = _dictionaries.Count - 1; index >= 0; index--)
-        {
-            var dictionary = _dictionaries[index];
-            if (!ReferenceEquals(dictionary, elementResources)
-                && !ReferenceEquals(dictionary, rootResources)
-                && !ReferenceEquals(dictionary, source)
-                && !ReferenceEquals(dictionary, surfaceResources))
+            for (var index = dictionaries.Count - 1; index >= 0; index--)
             {
-                RemoveDictionary(dictionary);
+                var dictionary = dictionaries[index];
+                if (!ReferenceEquals(dictionary, elementResources)
+                    && !ReferenceEquals(dictionary, rootResources)
+                    && !ReferenceEquals(dictionary, source)
+                    && !ReferenceEquals(dictionary, surfaceResources))
+                {
+                    RemoveDictionary(dictionary);
+                }
             }
         }
 
@@ -424,20 +461,26 @@ internal sealed class ResourceBinding : IDisposable
         }
     }
 
-    private void AddDictionary(ResourceDictionary dictionary)
+    private void AddDictionary(ResourceDictionary? dictionary)
     {
-        if (_dictionaries.Contains(dictionary))
+        if (dictionary is null)
         {
             return;
         }
 
-        _dictionaries.Add(dictionary);
+        var dictionaries = _dictionaries ??= [];
+        if (dictionaries.Contains(dictionary))
+        {
+            return;
+        }
+
+        dictionaries.Add(dictionary);
         dictionary.AddChangedObserver(_dictionaryChangedHandler);
     }
 
     private void RemoveDictionary(ResourceDictionary dictionary)
     {
-        if (_dictionaries.Remove(dictionary))
+        if (_dictionaries is { } dictionaries && dictionaries.Remove(dictionary))
         {
             dictionary.RemoveChangedObserver(_dictionaryChangedHandler);
         }
@@ -458,12 +501,15 @@ internal sealed class ResourceBinding : IDisposable
             _surfaceRoot = null;
         }
 
-        foreach (var dictionary in _dictionaries)
+        if (_dictionaries is { } dictionaries)
         {
-            dictionary.RemoveChangedObserver(_dictionaryChangedHandler);
-        }
+            foreach (var dictionary in dictionaries)
+            {
+                dictionary.RemoveChangedObserver(_dictionaryChangedHandler);
+            }
 
-        _dictionaries.Clear();
+            dictionaries.Clear();
+        }
         _rootResources = null;
         _surfaceResources = null;
         _source = null;

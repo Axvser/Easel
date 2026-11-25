@@ -602,7 +602,39 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// Style resources are ordinary entries; <see cref="VisualResourceLookup.Get{T}"/> converts a stored string to
     /// the requested type.
     /// </remarks>
-    public ResourceDictionary Resources => _resources ??= new ResourceDictionary();
+    public ResourceDictionary Resources
+    {
+        get
+        {
+            if (_resources is { } existing)
+            {
+                return existing;
+            }
+
+            var resources = new ResourceDictionary();
+            _resources = resources;
+            // 动态资源在字典出现前不订阅它；第一次真正拿到字典时补一次解析。
+            NotifyResourcesCreated();
+            return resources;
+        }
+    }
+
+    private void NotifyResourcesCreated()
+    {
+        var bindings = _resourceBindings;
+        if (bindings is null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < bindings.Count; index++)
+        {
+            if (bindings[index] is ResourceBinding binding)
+            {
+                binding.OnOwnerResourcesCreated();
+            }
+        }
+    }
 
     // 非创建访问器：资源探测不应给每个模板元素永久挂上空字典。
     internal ResourceDictionary? ResourcesOrNull => _resources;
@@ -1376,8 +1408,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         base.OnPropertyChanged(e);
 
         // 根节点只有位移变化时，整帧像素就是平移；本地记录平移量，避免把整棵树重画一遍。
+        // 只有变换与绘制属性才需要沿父链找表面；模板初始化写 TemplatedParent 这类属性不该付这次查找。
         var rootTranslation = false;
-        if (Surface is { } rootSurface && ReferenceEquals(rootSurface.Root, this))
+        var affectsRender = e.Property.Metadata.AffectsRender;
+        if ((affectsRender || ReferenceEquals(e.Property, TransformProperty))
+            && Surface is { } rootSurface && ReferenceEquals(rootSurface.Root, this))
         {
             if (ReferenceEquals(e.Property, TransformProperty)
                 && TryGetTranslationDelta(e.OldValue as Matrix, e.NewValue as Matrix, out var panDx, out var panDy))
@@ -1385,7 +1420,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
                 rootTranslation = true;
                 rootSurface.RecordRootTranslation(panDx, panDy);
             }
-            else if (e.Property.Metadata.AffectsRender)
+            else if (affectsRender)
             {
                 // 根自身的其它绘制属性变化不能被当成平移的一部分吞掉。
                 rootSurface.NotifyRootContentChanged();
@@ -1742,11 +1777,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             Theme.Changed += OnAnyThemeChanged;
         }
 
-        if (!s_themeMetricElements.Contains(this))
-        {
-            s_themeMetricElements.Add(this);
-        }
-
+        // 调用点只在 _themeMetricsSubscribed == false 时进来；已登记过的元素不会走到这里。
+        s_themeMetricElements.Add(this);
         _themeMetricsSubscribed = true;
     }
 

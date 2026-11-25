@@ -141,8 +141,25 @@ public sealed class VisualStyle
     /// <summary>The element type this style matches, or <see langword="null"/> to match nothing.</summary>
     public Type? TargetType { get; set; }
 
+    private VisualStyle? _basedOn;
+    private List<VisualStyle>? _flattened;
+
     /// <summary>A base style whose setters and triggers are applied first, or <see langword="null"/>.</summary>
-    public VisualStyle? BasedOn { get; set; }
+    /// <remarks>Assigning a different base discards the cached base-first chain.</remarks>
+    public VisualStyle? BasedOn
+    {
+        get => _basedOn;
+        set
+        {
+            if (ReferenceEquals(_basedOn, value))
+            {
+                return;
+            }
+
+            _basedOn = value;
+            _flattened = null;
+        }
+    }
 
     /// <summary>The setters applied while the style is active.</summary>
     public IList<VisualSetter> Setters { get; } = new Collection<VisualSetter>();
@@ -168,8 +185,14 @@ public sealed class VisualStyle
     }
 
     // BasedOn 链展开成 base-first 列表；环引用在重复处截断，恶意/手误的链不会把应用过程挂死。
+    // 链是只读缓存：BasedOn 一换就作废，setter/trigger 的后续改动本来也不重应用。
     internal List<VisualStyle> Flatten()
     {
+        if (_flattened is { } cached)
+        {
+            return cached;
+        }
+
         var chain = new List<VisualStyle>();
         var visited = new HashSet<VisualStyle>();
         for (var current = this; current is not null; current = current.BasedOn)
@@ -183,6 +206,7 @@ public sealed class VisualStyle
         }
 
         chain.Reverse();
+        _flattened = chain;
         return chain;
     }
 }
@@ -245,12 +269,13 @@ public sealed class VisualStyleCollection : Collection<VisualStyle>
 internal sealed class VisualStyleApplication
 {
     private readonly VisualElement _element;
-    private readonly List<VisualTrigger> _triggers = [];
-    private readonly HashSet<(IWinformsObject Target, DependencyProperty Property)> _styleProperties = [];
-    private readonly HashSet<(IWinformsObject Target, DependencyProperty Property)> _triggerProperties = [];
-    private readonly HashSet<VisualTrigger> _activeTriggers = [];
-    private readonly List<IDisposable> _bindings = [];
-    private readonly List<(IWinformsObject Target, DependencyProperty Property)> _bindingProperties = [];
+    // 多数样式只写几个 setter、没有 trigger：集合按需创建，别让每个元素都背六份空集合。
+    private List<VisualTrigger>? _triggers;
+    private HashSet<(IWinformsObject Target, DependencyProperty Property)>? _styleProperties;
+    private HashSet<(IWinformsObject Target, DependencyProperty Property)>? _triggerProperties;
+    private HashSet<VisualTrigger>? _activeTriggers;
+    private List<IDisposable>? _bindings;
+    private List<(IWinformsObject Target, DependencyProperty Property)>? _bindingProperties;
     private VisualStyle? _style;
     private bool _subscribed;
     private bool _evaluating;
@@ -275,14 +300,15 @@ internal sealed class VisualStyleApplication
         ClearStyleLayer();
 
         _style = style;
-        _triggers.Clear();
-        _triggerProperties.Clear();
+        _triggers?.Clear();
+        _triggerProperties?.Clear();
 
         VisualControlTemplate? template = null;
-        if (style is not null)
+        var chain = style?.Flatten();
+        if (chain is not null)
         {
             // 模板跟 setter 一样按 BasedOn 链 base-first 展开，派生样式最后声明的那一个生效。
-            foreach (var link in style.Flatten())
+            foreach (var link in chain)
             {
                 if (link.Template is not null)
                 {
@@ -293,14 +319,14 @@ internal sealed class VisualStyleApplication
 
         _element.ApplyStyleTemplate(template);
 
-        if (style is null)
+        if (chain is null)
         {
             return;
         }
 
-        var values = new Dictionary<(IWinformsObject Target, DependencyProperty Property), object?>();
-        var bindings = new List<(IWinformsObject Target, DependencyProperty Property, Binding Binding)>();
-        foreach (var link in style.Flatten())
+        Dictionary<(IWinformsObject Target, DependencyProperty Property), object?>? values = null;
+        List<(IWinformsObject Target, DependencyProperty Property, Binding Binding)>? bindings = null;
+        foreach (var link in chain)
         {
             foreach (var setter in link.Setters)
             {
@@ -318,11 +344,11 @@ internal sealed class VisualStyleApplication
 
                 if (setter.Binding is not null)
                 {
-                    bindings.Add((target, setter.Property, setter.Binding));
+                    (bindings ??= []).Add((target, setter.Property, setter.Binding));
                 }
                 else
                 {
-                    values[(target, setter.Property)] = setter.Value;
+                    (values ??= [])[(target, setter.Property)] = setter.Value;
                 }
             }
 
@@ -333,7 +359,7 @@ internal sealed class VisualStyleApplication
                     continue;
                 }
 
-                _triggers.Add(trigger);
+                (_triggers ??= []).Add(trigger);
                 foreach (var setter in trigger.Setters)
                 {
                     if (setter?.Property is null)
@@ -345,25 +371,34 @@ internal sealed class VisualStyleApplication
                     var target = ResolveTarget(setter.TargetName ?? trigger.TargetName);
                     if (target is not null)
                     {
-                        _triggerProperties.Add((target, setter.Property));
+                        (_triggerProperties ??= []).Add((target, setter.Property));
                     }
                 }
             }
         }
 
-        foreach (var pair in values)
+        if (values is not null)
         {
-            pair.Key.Property.SetValue(pair.Key.Target, pair.Value, BindingPriority.Style);
-            _styleProperties.Add(pair.Key);
+            _styleProperties ??= [];
+            foreach (var pair in values)
+            {
+                pair.Key.Property.SetValue(pair.Key.Target, pair.Value, BindingPriority.Style);
+                _styleProperties.Add(pair.Key);
+            }
         }
 
-        foreach (var (target, property, binding) in bindings)
+        if (bindings is not null)
         {
-            _bindings.Add(VisualBindingOperations.Bind(target, property, binding));
-            _bindingProperties.Add((target, property));
+            _bindings ??= [];
+            _bindingProperties ??= [];
+            foreach (var (target, property, binding) in bindings)
+            {
+                _bindings.Add(VisualBindingOperations.Bind(target, property, binding));
+                _bindingProperties.Add((target, property));
+            }
         }
 
-        if (_triggers.Count > 0)
+        if (_triggers is { Count: > 0 })
         {
             _element.PropertyChanged += OnElementPropertyChanged;
             _subscribed = true;
@@ -394,63 +429,74 @@ internal sealed class VisualStyleApplication
         try
         {
             Dictionary<(IWinformsObject Target, DependencyProperty Property), object?>? active = null;
-            var nowActive = new HashSet<VisualTrigger>();
-            foreach (var trigger in _triggers)
+            HashSet<VisualTrigger>? nowActive = null;
+            if (_triggers is { } triggers)
             {
-                if (!trigger.Matches(_element))
+                foreach (var trigger in triggers)
                 {
-                    continue;
-                }
-
-                nowActive.Add(trigger);
-                foreach (var setter in trigger.Setters)
-                {
-                    if (setter?.Property is null)
+                    if (!trigger.Matches(_element))
                     {
                         continue;
                     }
 
-                    var target = ResolveTarget(setter.TargetName ?? trigger.TargetName);
-                    if (target is null)
+                    (nowActive ??= []).Add(trigger);
+                    foreach (var setter in trigger.Setters)
                     {
-                        continue;
+                        if (setter?.Property is null)
+                        {
+                            continue;
+                        }
+
+                        var target = ResolveTarget(setter.TargetName ?? trigger.TargetName);
+                        if (target is null)
+                        {
+                            continue;
+                        }
+
+                        active ??= [];
+                        active[(target, setter.Property)] = setter.Value;
                     }
-
-                    active ??= [];
-                    active[(target, setter.Property)] = setter.Value;
                 }
             }
 
-            foreach (var pair in _triggerProperties)
+            if (_triggerProperties is { } triggerProperties)
             {
-                if (active is not null && active.TryGetValue(pair, out var value))
+                foreach (var pair in triggerProperties)
                 {
-                    pair.Property.SetValue(pair.Target, value, BindingPriority.StyleTrigger);
-                }
-                else
-                {
-                    pair.Property.ClearValue(pair.Target, BindingPriority.StyleTrigger);
+                    if (active is not null && active.TryGetValue(pair, out var value))
+                    {
+                        pair.Property.SetValue(pair.Target, value, BindingPriority.StyleTrigger);
+                    }
+                    else
+                    {
+                        pair.Property.ClearValue(pair.Target, BindingPriority.StyleTrigger);
+                    }
                 }
             }
 
-            foreach (var trigger in nowActive)
+            if (nowActive is not null)
             {
-                if (!_activeTriggers.Contains(trigger))
+                foreach (var trigger in nowActive)
                 {
-                    (entered ??= []).Add(trigger);
+                    if (_activeTriggers?.Contains(trigger) != true)
+                    {
+                        (entered ??= []).Add(trigger);
+                    }
                 }
             }
 
-            foreach (var trigger in _activeTriggers)
+            if (_activeTriggers is { } wasActive)
             {
-                if (!nowActive.Contains(trigger))
+                foreach (var trigger in wasActive)
                 {
-                    (exited ??= []).Add(trigger);
+                    if (nowActive?.Contains(trigger) != true)
+                    {
+                        (exited ??= []).Add(trigger);
+                    }
                 }
             }
 
-            _activeTriggers.Clear();
-            _activeTriggers.UnionWith(nowActive);
+            _activeTriggers = nowActive;
         }
         finally
         {
@@ -478,14 +524,14 @@ internal sealed class VisualStyleApplication
     // 卸载样式时把仍处于激活态的触发器补一次退出动作；集合先清空，动作里的属性变化不会再触发求值。
     private void ExitActiveTriggers()
     {
-        if (_activeTriggers.Count == 0)
+        if (_activeTriggers is not { Count: > 0 } active)
         {
             return;
         }
 
-        var active = _activeTriggers.ToArray();
-        _activeTriggers.Clear();
-        foreach (var trigger in active)
+        var snapshot = active.ToArray();
+        _activeTriggers = null;
+        foreach (var trigger in snapshot)
         {
             trigger.ExitAction?.Invoke(_element);
         }
@@ -494,18 +540,24 @@ internal sealed class VisualStyleApplication
     // 样式 setter 的绑定写在 Local 层；卸载时必须连绑定和它写过的本地值一起摘掉，否则值会留在元素上。
     private void ClearBindings()
     {
-        foreach (var binding in _bindings)
+        if (_bindings is { } bindings)
         {
-            binding.Dispose();
+            foreach (var binding in bindings)
+            {
+                binding.Dispose();
+            }
         }
 
-        _bindings.Clear();
-        foreach (var pair in _bindingProperties)
+        _bindings?.Clear();
+        if (_bindingProperties is { } bindingProperties)
         {
-            pair.Property.ClearValue(pair.Target);
-        }
+            foreach (var pair in bindingProperties)
+            {
+                pair.Property.ClearValue(pair.Target);
+            }
 
-        _bindingProperties.Clear();
+            bindingProperties.Clear();
+        }
     }
 
     private void Unsubscribe()
@@ -521,17 +573,27 @@ internal sealed class VisualStyleApplication
 
     private void ClearStyleLayer()
     {
-        foreach (var pair in _styleProperties)
+        if (_styleProperties is not { } styleProperties)
+        {
+            return;
+        }
+
+        foreach (var pair in styleProperties)
         {
             pair.Property.ClearValue(pair.Target, BindingPriority.Style);
         }
 
-        _styleProperties.Clear();
+        styleProperties.Clear();
     }
 
     private void ClearTriggerLayer()
     {
-        foreach (var pair in _triggerProperties)
+        if (_triggerProperties is not { } triggerProperties)
+        {
+            return;
+        }
+
+        foreach (var pair in triggerProperties)
         {
             pair.Property.ClearValue(pair.Target, BindingPriority.StyleTrigger);
         }
