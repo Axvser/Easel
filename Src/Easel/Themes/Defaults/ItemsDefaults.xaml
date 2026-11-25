@@ -64,9 +64,20 @@
   </Style>
 
   <Style TargetType="ListBoxItem">
+    <Style.Setters>
+      <!-- Idle bands hide by opacity: paint skips them and hover only dirties pixels; Collapsed would force
+           a measure pass. -->
+      <Setter TargetName="HoverBand" Property="Opacity" Value="0" />
+      <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+    </Style.Setters>
     <Style.Template>
       <ControlTemplate TargetType="ListBoxItem">
+        <!-- An auto row avoids the star-track second measure; the presenter carries Padding, so the row needs
+             no wrapper. -->
         <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
           <Border x:Name="HoverBand"
                   Background="{DynamicResource Hover}"
                   CornerRadius="{TemplateBinding CornerRadius}"
@@ -75,9 +86,7 @@
                   Background="{DynamicResource Selection}"
                   CornerRadius="{TemplateBinding CornerRadius}"
                   IsHitTestVisible="False" />
-          <Border Padding="{TemplateBinding Padding}" IsHitTestVisible="False">
-            <ContentPresenter IsHitTestVisible="False" />
-          </Border>
+          <ContentPresenter Padding="{TemplateBinding Padding}" IsHitTestVisible="False" />
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsPointerOver" Value="False">
