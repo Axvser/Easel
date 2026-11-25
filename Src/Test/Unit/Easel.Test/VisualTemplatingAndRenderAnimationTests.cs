@@ -346,13 +346,13 @@ public sealed class VisualTemplatingAndRenderAnimationTests
         Layout(surface, 240, 120);
 
         var restored = box.AbsoluteBounds;
-        Assert.IsNull(box.TemplateRoot, "clearing the template removes the part scope");
-        Assert.IsNull(box.GetTemplateChild<VC.TextBoxContentHost>("PART_ContentHost"));
+        Assert.IsNotNull(box.TemplateRoot, "clearing the direct template falls back to the default style template");
+        Assert.IsNotNull(box.GetTemplateChild<VC.TextBoxContentHost>("PART_ContentHost"));
         Assert.IsNull(box.TemplateDiagnostic);
         Assert.AreNotEqual(
             Color.Lime.ToArgb(),
             RenderPixel(surface, (int)restored.Right - 4, (int)restored.Bottom - 4).ToArgb(),
-            "clearing the template restores the self-drawn chrome");
+            "clearing the direct template removes its lime chrome");
     }
 
     [TestMethod]
@@ -387,11 +387,11 @@ public sealed class VisualTemplatingAndRenderAnimationTests
         box.Style = null;
         Layout(surface, 240, 120);
 
-        Assert.IsNull(box.TemplateRoot, "clearing the style removes its template");
+        Assert.IsNotNull(box.TemplateRoot, "clearing the explicit style falls back to the default style template");
         Assert.AreNotEqual(
             Color.Aqua.ToArgb(),
             RenderPixel(surface, (int)bounds.Right - 4, (int)bounds.Bottom - 4).ToArgb(),
-            "clearing the style restores the self-drawn chrome");
+            "clearing the explicit style removes its aqua chrome");
     }
 
     [TestMethod]
@@ -577,8 +577,8 @@ public sealed class VisualTemplatingAndRenderAnimationTests
         rich.Template = null;
         Layout(surface, 320, 180);
 
-        Assert.IsNull(rich.TemplateRoot, "clearing the template removes the part scope");
-        Assert.IsNull(rich.GetTemplateChild<VC.RichTextContentHost>("PART_ContentHost"));
+        Assert.IsNotNull(rich.TemplateRoot, "clearing the direct template falls back to the default style template");
+        Assert.IsNotNull(rich.GetTemplateChild<VC.RichTextContentHost>("PART_ContentHost"));
         Assert.IsNull(rich.TemplateDiagnostic);
     }
 
