@@ -25,6 +25,12 @@ namespace Easel.Visuals.Controls;
 /// is inside a <see cref="Form"/> it resolves <see cref="Target"/> and attaches automatically; set
 /// <see cref="AutoAttachChrome"/> to <see langword="false"/> to opt out, or assign <see cref="Target"/> directly.
 /// </para>
+/// <para>
+/// While a target window is resolved, the bar is window chrome: it stretches horizontally to the window client area
+/// during arrange, whatever slot its parent offered. A fixed <see cref="VisualElement.Width"/> or a non-stretching
+/// container (a <see cref="Canvas"/>, a <see cref="StackPanel"/>) therefore cannot leave the title area, the caption
+/// buttons or the drag strip behind when the window is resized.
+/// </para>
 /// </remarks>
 public class VisualTitleBar : TemplatedControl
 {
@@ -244,6 +250,8 @@ public class VisualTitleBar : TemplatedControl
     {
         UpdateTargetFromSurface();
 
+        availableSize = WidenToWindow(availableSize);
+
         if (IsTemplated)
         {
             return MeasureTemplate(availableSize);
@@ -273,15 +281,22 @@ public class VisualTitleBar : TemplatedControl
     {
         UpdateTargetFromSurface();
 
+        var width = ResolveWindowWidth(finalSize.Width);
+        if (width > 0f && Math.Abs(Bounds.Width - width) > 0.01f)
+        {
+            // 父级按自己的槽位排过一次；窗口 chrome 以窗口客户区为准，右端必须贴住窗口右缘。
+            Bounds = new RectangleF(Bounds.X, Bounds.Y, width, Bounds.Height);
+        }
+
         if (IsTemplated)
         {
-            ArrangeTemplate(finalSize);
-            ArrangeIcon(finalSize, templated: true);
+            ArrangeTemplate(new Size((int)Math.Ceiling(width), finalSize.Height));
+            ArrangeIcon(new Size((int)Math.Ceiling(width), finalSize.Height), templated: true);
             return;
         }
 
         var height = finalSize.Height > 0 ? (float)finalSize.Height : ResolveHeight();
-        var right = (float)finalSize.Width;
+        var right = width;
         foreach (var button in DefaultButtonsRightToLeft())
         {
             if (button.Visibility == XamlVisibility.Collapsed)
@@ -480,6 +495,42 @@ public class VisualTitleBar : TemplatedControl
         return double.IsNaN(height) || height <= 0d ? (float)DefaultHeight : (float)height;
     }
 
+    // 窗口 chrome 的可用宽度至少是窗口客户区：Canvas 之类的容器按 Size.Empty 量一次，
+    // 否则标题栏只拿到零宽，右侧按钮根本没有落脚点。
+    private Size WidenToWindow(Size availableSize)
+    {
+        if (_hookedTarget is null || Surface is not { } surface)
+        {
+            return availableSize;
+        }
+
+        var client = surface.LogicalClientSize;
+        if (client.Width <= 0 || availableSize.Width >= client.Width)
+        {
+            return availableSize;
+        }
+
+        return new Size(client.Width, availableSize.Height);
+    }
+
+    // 已挂到窗口上时，标题栏的右端必须落在窗口客户区右缘，与父级给的槽位无关。
+    private float ResolveWindowWidth(float arrangedWidth)
+    {
+        if (_hookedTarget is null || Surface is not { } surface)
+        {
+            return arrangedWidth;
+        }
+
+        var clientWidth = surface.LogicalClientSize.Width;
+        if (clientWidth <= 0)
+        {
+            return arrangedWidth;
+        }
+
+        var left = AbsoluteBounds.X;
+        return Math.Max(0f, clientWidth - left);
+    }
+
     private Font GetTitleFont()
     {
         var family = Theme.Current.FontFamily;
@@ -557,6 +608,7 @@ public class VisualTitleBar : TemplatedControl
         }
 
         RefreshMaximizedState();
+        InvalidateMeasure();
         InvalidateVisual();
     }
 
@@ -566,6 +618,8 @@ public class VisualTitleBar : TemplatedControl
     private void OnTargetResize(object? sender, EventArgs e)
     {
         RefreshMaximizedState();
+        // 非拉伸容器（Canvas/StackPanel）不会因为窗口变大而重新量标题栏，必须由窗口这边推一次。
+        InvalidateMeasure();
         InvalidateVisual();
     }
 

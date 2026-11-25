@@ -21,6 +21,64 @@ public sealed class WindowChromeTests
     private static readonly Color CloseHover = Color.FromArgb(0xE8, 0x11, 0x23);
 
     [TestMethod]
+    public void WindowChromeBarFillsTheClientWidthInsideANonStretchingCanvas()
+    {
+        using var form = new Form { ClientSize = new Size(800, 600) };
+        using var host = new VisualHost { Size = new Size(800, 600), DpiScaleOverride = 1f };
+        form.Controls.Add(host);
+
+        var root = new VC.Canvas { Background = new SolidColorBrush(Theme.Current.WindowBackground) };
+        using var bar = new VC.VisualTitleBar { Width = 800, Height = 32, Title = "Chrome probe" };
+        VC.Canvas.SetLeft(bar, 0);
+        VC.Canvas.SetTop(bar, 0);
+        root.Add(bar);
+        host.Root = root;
+
+        Layout(host);
+        AssertBarTracksClientWidth(host, bar, verifyHitTest: false);
+
+        // 窗口变大：Canvas 量子项时永远给 Size.Empty，只能靠 Form.Resize 把标题栏重新推一遍。
+        form.ClientSize = new Size(1200, 700);
+        host.Size = form.ClientSize;
+        Layout(host);
+        AssertBarTracksClientWidth(host, bar, verifyHitTest: false);
+
+        // 窗口比标题栏声明的 800 还窄时，右侧按钮仍要贴着窗口右缘。
+        form.ClientSize = new Size(600, 500);
+        host.Size = form.ClientSize;
+        Layout(host);
+        AssertBarTracksClientWidth(host, bar, verifyHitTest: false);
+    }
+
+    [TestMethod]
+    public void TitleBarTracksTheClientWidthOnTheSecondaryScreen()
+    {
+        using var form = CreateForm(out var host, out var bar);
+        try
+        {
+            var screen = Screen.AllScreens.FirstOrDefault(static candidate => !candidate.Primary)
+                         ?? Screen.PrimaryScreen!;
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(screen.WorkingArea.Left + 40, screen.WorkingArea.Top + 40);
+            form.Show();
+            XamlTestSurface.PumpUntil(() => WindowChrome.IsAttached(form) && host.IsHandleCreated);
+            XamlTestSurface.Pump(120);
+
+            AssertBarTracksClientWidth(host, bar);
+
+            ResizeWindow(form, host, 1200, 800);
+            AssertBarTracksClientWidth(host, bar);
+
+            ResizeWindow(form, host, 640, 520);
+            AssertBarTracksClientWidth(host, bar);
+        }
+        finally
+        {
+            form.Close();
+        }
+    }
+
+    [TestMethod]
     public void DefaultTitleBarPaintsBackgroundBorderIconTitleAndGlyphs()
     {
         var previous = Theme.Mode;
@@ -463,7 +521,7 @@ public sealed class WindowChromeTests
     [TestMethod]
     public void DraggingAnEdgeResizesTheWindow()
     {
-        using var form = CreateForm(out var host, out _);
+        using var form = CreateForm(out var host, out var bar);
         try
         {
             form.StartPosition = FormStartPosition.Manual;
@@ -487,6 +545,10 @@ public sealed class WindowChromeTests
             Assert.IsTrue(
                 resized,
                 $"dragging the left edge widens the window (before={before}, after={form.Bounds})");
+
+            // 拖动期间窗口一直在变宽，标题栏必须跟到最后一帧的客户区宽度。
+            XamlTestSurface.Pump(120);
+            AssertBarTracksClientWidth(host, bar);
         }
         catch (AssertInconclusiveException)
         {
@@ -521,6 +583,52 @@ public sealed class WindowChromeTests
             Assert.AreNotEqual(0L, style & 0x00020000L, "WS_MINIMIZEBOX survives the show sequence");
             Assert.AreNotEqual(0L, style & 0x00010000L, "WS_MAXIMIZEBOX survives the show sequence");
         }
+    }
+
+    private static void Layout(VisualHost host)
+    {
+        host.InvalidateSurface();
+        using var bitmap = new Bitmap(1, 1);
+        using var graphics = Graphics.FromImage(bitmap);
+        host.RenderTo(graphics, host.LogicalClientSize);
+    }
+
+    private static void AssertBarTracksClientWidth(VisualHost host, VC.VisualTitleBar bar, bool verifyHitTest = true)
+    {
+        var clientWidth = host.LogicalClientSize.Width;
+        var close = bar.Children.OfType<VC.Button>().Last();
+
+        Assert.AreEqual(clientWidth, bar.AbsoluteBounds.Width, 0.5f,
+            $"the title bar spans the client width (client={clientWidth}, bar={bar.AbsoluteBounds})");
+        Assert.AreEqual(clientWidth, close.AbsoluteBounds.Right, 0.5f,
+            $"the close button sits on the right window edge (client={clientWidth}, close={close.AbsoluteBounds})");
+        Assert.IsTrue(bar.ContainsDragArea(new PointF(clientWidth / 2f, 16f)),
+            "the empty title area stays draggable across the whole window width");
+        if (!verifyHitTest)
+        {
+            return;
+        }
+
+        Assert.AreEqual(
+            HTCAPTION,
+            HitTest(host.FindForm()!, host, clientWidth / 2f, 16f),
+            "the middle of the title area answers HTCAPTION");
+        Assert.AreEqual(
+            HTCLIENT,
+            HitTest(host.FindForm()!, host, clientWidth - 23f, 16f),
+            "the close button answers HTCLIENT");
+    }
+
+    private static void ResizeWindow(Form form, VisualHost host, int width, int height)
+    {
+        const uint SwpNoMove = 0x0002;
+        const uint SwpNoZOrder = 0x0004;
+        const uint SwpNoActivate = 0x0010;
+        SetWindowPos(form.Handle, IntPtr.Zero, 0, 0, width, height, SwpNoMove | SwpNoZOrder | SwpNoActivate);
+        XamlTestSurface.PumpUntil(
+            () => form.ClientSize.Width == width && host.ClientSize.Width == width,
+            2000);
+        XamlTestSurface.Pump(120);
     }
 
     private static Form CreateForm(out VisualHost host, out VC.VisualTitleBar bar, bool autoAttach = true)
@@ -690,6 +798,16 @@ public sealed class WindowChromeTests
 
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        IntPtr hwnd,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 
     [DllImport("user32.dll")]
     private static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
