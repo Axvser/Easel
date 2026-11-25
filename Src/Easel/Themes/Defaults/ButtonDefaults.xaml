@@ -4,7 +4,17 @@
     x:Class="Easel.Themes.Defaults.ButtonDefaults">
 
   <!-- Built-in fallback appearance for Button family; added to the implicit style table by Theme.DefaultStyles. -->
-<Style TargetType="Button">
+
+  <!-- The chrome is shared by the exact-type implicit styles below: RepeatButton derives Button, so it needs its own
+       style, and BasedOn keeps both buttons painting the same template. -->
+  <Style x:Key="ButtonChromeStyle" TargetType="Button">
+    <!-- The hidden state layers start at style priority so the template triggers, one layer below, can reveal them;
+         a local Opacity in the template would win over every trigger. -->
+    <Style.Setters>
+      <Setter TargetName="Hover" Property="Opacity" Value="0" />
+      <Setter TargetName="Pressed" Property="Opacity" Value="0" />
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+    </Style.Setters>
     <Style.Template>
       <ControlTemplate TargetType="Button">
         <Grid x:Name="Root" IsHitTestVisible="False">
@@ -41,39 +51,283 @@
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsPointerOver" Value="True">
-            <Trigger.Setters>
+            <Setters>
               <Setter TargetName="Hover" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsPointerOver" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="Hover" Property="Opacity" Value="0" />
-            </Trigger.Setters>
+            </Setters>
           </Trigger>
           <Trigger Property="IsPressed" Value="True">
-            <Trigger.Setters>
+            <Setters>
               <Setter TargetName="Pressed" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsPressed" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="Pressed" Property="Opacity" Value="0" />
-            </Trigger.Setters>
+            </Setters>
           </Trigger>
           <Trigger Property="IsFocusVisible" Value="True">
-            <Trigger.Setters>
+            <Setters>
               <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsFocusVisible" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
-            </Trigger.Setters>
+            </Setters>
           </Trigger>
           <Trigger Property="IsEnabled" Value="False">
-            <Trigger.Setters>
+            <Setters>
               <Setter TargetName="Root" Property="Opacity" Value="0.55" />
-            </Trigger.Setters>
+            </Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="Button" BasedOn="{StaticResource ButtonChromeStyle}" />
+
+  <Style TargetType="RepeatButton" BasedOn="{StaticResource ButtonChromeStyle}" />
+
+  <Style TargetType="ToggleButton">
+    <Style.Setters>
+      <Setter TargetName="Hover" Property="Opacity" Value="0" />
+      <Setter TargetName="Pressed" Property="Opacity" Value="0" />
+      <Setter TargetName="Checked" Property="Opacity" Value="0" />
+      <Setter TargetName="KnobOn" Property="Opacity" Value="0" />
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="ToggleButton">
+        <Grid x:Name="Root" Width="56" Height="28" IsHitTestVisible="False">
+          <Grid Width="44" Height="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False">
+            <Border x:Name="Track"
+                    IsHitTestVisible="False"
+                    Background="{DynamicResource Input}"
+                    BorderBrush="{DynamicResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="10" />
+            <Border x:Name="Hover"
+                    IsHitTestVisible="False"
+                    Background="{DynamicResource Hover}"
+                    CornerRadius="10" />
+            <Border x:Name="Pressed"
+                    IsHitTestVisible="False"
+                    Background="{DynamicResource Pressed}"
+                    CornerRadius="10" />
+            <Border x:Name="Checked"
+                    IsHitTestVisible="False"
+                    Background="{DynamicResource Accent}"
+                    BorderBrush="{DynamicResource Accent}"
+                    BorderThickness="1"
+                    CornerRadius="10" />
+            <Ellipse x:Name="KnobOff"
+                     Width="14"
+                     Height="14"
+                     Fill="{DynamicResource Muted}"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Center"
+                     Margin="3,0,0,0" />
+            <Ellipse x:Name="KnobOn"
+                     Width="14"
+                     Height="14"
+                     Fill="{DynamicResource AccentText}"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Center"
+                     Margin="0,0,3,0" />
+          </Grid>
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  Width="48"
+                  Height="24"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="11" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Setters>
+              <Setter TargetName="Hover" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="True">
+            <Setters>
+              <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="True">
+            <Setters>
+              <Setter TargetName="Checked" Property="Opacity" Value="1" />
+              <Setter TargetName="KnobOff" Property="Opacity" Value="0" />
+              <Setter TargetName="KnobOn" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="CheckBox">
+    <Style.Setters>
+      <Setter TargetName="Hover" Property="Opacity" Value="0" />
+      <Setter TargetName="Pressed" Property="Opacity" Value="0" />
+      <Setter TargetName="CheckedBox" Property="Opacity" Value="0" />
+      <Setter TargetName="Mark" Property="Opacity" Value="0" />
+      <Setter TargetName="Dash" Property="Opacity" Value="0" />
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="CheckBox">
+        <Grid x:Name="Root" Width="22" Height="22" IsHitTestVisible="False">
+          <Grid Width="20" Height="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False">
+            <Rectangle x:Name="Box"
+                       Fill="{DynamicResource Input}"
+                       Stroke="{DynamicResource Border}"
+                       StrokeThickness="1"
+                       CornerRadius="3" />
+            <Rectangle x:Name="Hover"
+                       Fill="{DynamicResource Hover}"
+                       CornerRadius="3" />
+            <Rectangle x:Name="Pressed"
+                       Fill="{DynamicResource Pressed}"
+                       CornerRadius="3" />
+            <Rectangle x:Name="CheckedBox"
+                       Fill="{DynamicResource Accent}"
+                       Stroke="{DynamicResource Accent}"
+                       StrokeThickness="1"
+                       CornerRadius="3" />
+            <Polyline x:Name="Mark"
+                      Points="4,10 8,14 15,5"
+                      Stroke="{DynamicResource AccentText}"
+                      StrokeThickness="2" />
+            <Polyline x:Name="Dash"
+                      Points="5,10 15,10"
+                      Stroke="{DynamicResource Text}"
+                      StrokeThickness="2" />
+          </Grid>
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  Width="22"
+                  Height="22"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="4" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Setters>
+              <Setter TargetName="Hover" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="True">
+            <Setters>
+              <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="True">
+            <Setters>
+              <Setter TargetName="CheckedBox" Property="Opacity" Value="1" />
+              <Setter TargetName="Mark" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="{x:Null}">
+            <Setters>
+              <Setter TargetName="Dash" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="RadioButton">
+    <Style.Setters>
+      <Setter TargetName="Hover" Property="Opacity" Value="0" />
+      <Setter TargetName="Pressed" Property="Opacity" Value="0" />
+      <Setter TargetName="CheckedRing" Property="Opacity" Value="0" />
+      <Setter TargetName="Dot" Property="Opacity" Value="0" />
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+    </Style.Setters>
+    <Style.Template>
+      <ControlTemplate TargetType="RadioButton">
+        <Grid x:Name="Root" Width="22" Height="22" IsHitTestVisible="False">
+          <Grid Width="20" Height="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False">
+            <Ellipse x:Name="Ring"
+                     Fill="{DynamicResource Input}"
+                     Stroke="{DynamicResource Border}"
+                     StrokeThickness="1.4" />
+            <Ellipse x:Name="Hover"
+                     Fill="{DynamicResource Hover}" />
+            <Ellipse x:Name="Pressed"
+                     Fill="{DynamicResource Pressed}" />
+            <Ellipse x:Name="CheckedRing"
+                     Stroke="{DynamicResource Accent}"
+                     StrokeThickness="2" />
+            <Ellipse x:Name="Dot"
+                     Width="10"
+                     Height="10"
+                     Fill="{DynamicResource Accent}"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center" />
+          </Grid>
+          <Ellipse x:Name="FocusRing"
+                   IsHitTestVisible="False"
+                   Width="22"
+                   Height="22"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Stroke="{DynamicResource Focus}"
+                   StrokeThickness="1.5" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Setters>
+              <Setter TargetName="Hover" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="True">
+            <Setters>
+              <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsChecked" Value="True">
+            <Setters>
+              <Setter TargetName="CheckedRing" Property="Opacity" Value="1" />
+              <Setter TargetName="Dot" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Setters>
           </Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate>
