@@ -150,23 +150,30 @@ treat small deltas as noise.
 
 | scenario | pre-templating median | pre-templating p95 | current median | current p95 | delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `slider-value` | 1.769 | 2.300 | 1.678 | 2.163 | -5.1% |
-| `splitter-resize` | 4.184 | 5.170 | 5.877 | 7.810 | +40.5% |
-| `full-frame` | 3.391 | 4.268 | 4.249 | 4.615 | +25.3% |
-| `theme-toggle` | 3.360 | 3.766 | 4.518 | 4.811 | +34.4% |
-| `build-page` | 7.022 | 7.356 | 166.565 | 273.986 | +2272.0% |
-| `theme-rebuild` | 6.806 | 7.047 | 135.605 | 151.502 | +1892.3% |
+| `slider-value` | 1.476 | 1.834 | 1.486 | 2.017 | +0.7% |
+| `splitter-resize` | 4.155 | 6.605 | 2.553 | 3.824 | -38.6% |
+| `full-frame` | 3.210 | 3.800 | 2.383 | 2.990 | -25.8% |
+| `theme-toggle` | 3.253 | 3.694 | 2.498 | 3.181 | -23.2% |
+| `build-page` | 7.246 | 7.598 | 19.699 | 21.660 | +171.9% |
+| `theme-rebuild` | 7.094 | 7.937 | 20.054 | 26.829 | +182.7% |
+
+The slider number is the median of three consecutive runs (1.461/1.484/1.486 ms); the other rows are one run of the
+same binary. Interaction and palette switching are now at or below the pre-templating baseline. Page build remains
+2.7–2.8× the baseline: the baseline realizes 200 flat rows, while the decoupled ListBox keeps 200 index-stable
+`ListBoxItem` containers and materializes the row template only for the ~26 visible ones. With the list removed
+(`ITEMS=0`) the same page builds in ~17 ms, which is the floor for this page with templates; true window
+virtualization (detaching offscreen containers and using spacers) is the remaining lever.
 
 Visual-tree shape of the canonical page:
 
-| counter | pre-templating `886ab07` | current `88e180d` |
+| counter | pre-templating `886ab07` | current |
 | --- | ---: | ---: |
-| nodes | 286 | 1764 |
-| template-created nodes | 4 | 1282 |
-| template roots | 1 | 248 |
-| templated controls | 1 | 247 |
-| arranged nodes | 276 | 1734 |
-| visible nodes | 278 | 1752 |
+| nodes | 286 | 880 |
+| template-created nodes | 4 | 398 |
+| template roots | 1 | 77 |
+| templated controls | 1 | 76 |
+| arranged nodes | 276 | 850 |
+| visible nodes | 278 | 868 |
 
 Work counters over the measured samples. Layout, paint and trees-built counts are identical on both sides because
 the scenario iteration counts match; the node columns describe the current tree (the baseline tree has 286 nodes
@@ -188,15 +195,17 @@ extra nodes they must measure and paint, not by a change in the slider's own pai
 
 ## Interpretation
 
-- A single slider drag remains at or below the pre-templating baseline: nothing in the default templates is on its
-  damaged repaint path.
-- Resize, full-frame repaint and palette switching are 25–40% slower in this run because the current tree is about
-  six times larger and every layout/paint walk crosses 1282 template-created nodes.
-- Building a page is roughly 20× slower. Almost all of the new cost is instantiating the default control templates
-  (1282 template nodes for 247 templated controls), not markup or margins. The counter to move is template
-  instantiation, for example lazy/virtualized item realization; changing brushes or margins will not move it.
-- The palette toggle stays in the same order of magnitude because shared brushes are mutated in place; the rebuild
-  scenario shows what a full re-instantiation costs.
+- A single slider drag matches the pre-templating baseline: its value change damages a rectangle and never arranges
+  the list.
+- Resize, full-frame repaint and palette switching are now faster than the pre-templating baseline: the shared-brush
+  mutation, full-frame visible-clip culling and per-node state-stack removal more than pay for the extra template
+  nodes on the paint path.
+- Building a page is ~2.7× slower. The baseline has 200 flat rows; the decoupled ListBox keeps 200 index-stable
+  `ListBoxItem` containers and expands the row template only for the ~26 rows inside the viewport (lazy realization).
+  With the list removed the same page builds in ~17 ms, which is the floor of the current design; going below needs
+  true window virtualization with spacers, not more template trimming.
+- The palette toggle is faster than the baseline because shared brushes are mutated in place and the frame is
+  painted directly; the synthetic rebuild scenario measures a path the Gallery no longer uses.
 
 ## Limitations
 
