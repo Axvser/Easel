@@ -366,6 +366,98 @@ public sealed class VisualTextEditingTests
         form.Close();
     }
 
+    [TestMethod]
+    public void TextBox_PaintsCustomSelectionAndCaret()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 80) };
+        var text = new VC.TextBox
+        {
+            Width = 220,
+            Height = 36,
+            Text = "WWWW",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            SelectionBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0x22, 0x44, 0xAA)),
+            SelectionForeground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+            CaretBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            CaretThickness = 3d,
+            CaretBlinkInterval = 0,
+        };
+        surface.Root = text;
+        Layout(surface, 260, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.A, Keys.Control);
+        Assert.AreEqual(4, text.SelectionLength);
+
+        using var bitmap = Render(surface, 260, 80);
+
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0x22, 0x44, 0xAA)),
+            "the custom selection brush is painted");
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+            "selected text uses the custom selection foreground");
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            "the custom caret brush is painted");
+    }
+
+    [TestMethod]
+    public void RichTextBox_PaintsCustomSelectionAndCaret()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 80) };
+        var text = new VC.RichTextBox
+        {
+            Width = 220,
+            Height = 36,
+            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            SelectionBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0x22, 0x44, 0xAA)),
+            SelectionForeground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+            CaretBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            CaretThickness = 3d,
+            CaretBlinkInterval = 0,
+        };
+        text.Text = "WWWW";
+        surface.Root = text;
+        Layout(surface, 260, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.A, Keys.Control);
+        Assert.AreEqual(4, text.SelectionLength);
+
+        using var bitmap = Render(surface, 260, 80);
+
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0x22, 0x44, 0xAA)),
+            "the custom selection brush is painted");
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0x00, 0xFF, 0x00)),
+            "selected text uses the custom selection foreground");
+        Assert.IsTrue(ContainsColor(bitmap, Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            "the custom caret brush is painted");
+    }
+
+    private static Bitmap Render(VisualHost surface, int width, int height)
+    {
+        var bitmap = new Bitmap(width, height);
+        using var graphics = Graphics.FromImage(bitmap);
+        surface.RenderTo(graphics, new Size(width, height));
+        return bitmap;
+    }
+
+    private static bool ContainsColor(Bitmap bitmap, Color color)
+    {
+        var target = color.ToArgb();
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).ToArgb() == target)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
 

@@ -43,9 +43,9 @@ This page lists each control's own properties and behaviour.
 | Control | Key members | Notes |
 | --- | --- | --- |
 | `TextBlock` | `Text`, `Font`, `Foreground` (Brush-backed), `Wrap`, `TextAlignment` | Single line by default; `Wrap` measures wrapped height. `Foreground` accepts a Brush, including gradients. |
-| `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, `SelectionStart`, `SelectionLength`, `CaretIndex` | Self-drawn editing. While focused it uses a private native editor for IME/accessibility; `UseNativeEditor=false` keeps everything visual. |
+| `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, `SelectionStart`, `SelectionLength`, `CaretIndex`, `SelectionBrush`, `SelectionForeground`, `CaretBrush`, `CaretThickness`, `CaretBlinkInterval` | Self-drawn editing. While focused it uses a private native editor for IME/accessibility; `UseNativeEditor=false` keeps everything visual. The selection and caret properties paint only the visual path; the native island draws the OS selection and caret. |
 | `TextBoxContentHost` | — | The `PART_ContentHost` for a custom `ControlTemplate` on `TextBox`. |
-| `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
+| `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged`, `SelectionBrush`, `SelectionForeground`, `CaretBrush`, `CaretThickness`, `CaretBlinkInterval` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
 | `Image` | `Source` (`System.Drawing.Image?`), `Stretch` | Draws a bitmap in the tree. `BitmapImage`/`DrawingImage` also implement `ImageSource` for brushes/hosts. |
 
 ## Selection and range

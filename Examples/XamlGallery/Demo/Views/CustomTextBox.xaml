@@ -26,6 +26,9 @@
         <TextBoxContentHost x:Name="PART_ContentHost" />
       </Border>
     </ControlTemplate>
+    <SolidColorBrush x:Key="DemoSelection" Color="#FF6A3DFF" />
+    <SolidColorBrush x:Key="DemoSelectionText" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="DemoCaret" Color="#FFFFB020" />
   </StackPanel.Resources>
 
   <TextBlock Text="A templated TextBox with UseNativeEditor=false"
@@ -48,5 +51,22 @@
   <TextBlock Text="Turn UseNativeEditor back on only when IME composition or the native accessibility peer is needed."
              Foreground="{StaticResource Muted}"
              Wrap="True" />
+
+  <TextBlock Text="Selection and caret are dependency properties"
+             Foreground="{StaticResource Text}"
+             FontSize="15"
+             Wrap="True" />
+
+  <TextBlock Text="Set SelectionBrush, SelectionForeground, CaretBrush, CaretThickness and CaretBlinkInterval (0 keeps the caret steady)."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
+  <TextBox UseNativeEditor="False"
+           Text="Select this line · the highlight and caret are yours"
+           SelectionBrush="{StaticResource DemoSelection}"
+           SelectionForeground="{StaticResource DemoSelectionText}"
+           CaretBrush="{StaticResource DemoCaret}"
+           CaretThickness="3"
+           CaretBlinkInterval="0" />
 
 </local:ThemedStackPanel>

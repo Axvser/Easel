@@ -58,7 +58,6 @@ public sealed class RichTextStyle
 /// </remarks>
 public class RichTextBox : TemplatedControl
 {
-    private const float CaretWidth = 1.5f;
     private const int UndoLimit = 100;
 
     /// <summary>The base font; runs without a size use it.</summary>
@@ -86,6 +85,44 @@ public class RichTextBox : TemplatedControl
     public static readonly DependencyProperty WrapProperty = DependencyProperty.Register(
         nameof(Wrap), typeof(bool), typeof(RichTextBox),
         new PropertyMetadata(true) { AffectsMeasure = true, AffectsRender = true });
+
+    /// <summary>The selection highlight brush; an unset value uses the active theme's selection colour.</summary>
+    public static readonly DependencyProperty SelectionBrushProperty = DependencyProperty.Register(
+        nameof(SelectionBrush), typeof(Brush), typeof(RichTextBox),
+        new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+        {
+            AffectsRender = true,
+        });
+
+    /// <summary>The colour of text inside the selection; an unset value keeps each run's own colour.</summary>
+    public static readonly DependencyProperty SelectionForegroundProperty = DependencyProperty.Register(
+        nameof(SelectionForeground), typeof(Brush), typeof(RichTextBox),
+        new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+        {
+            AffectsRender = true,
+        });
+
+    /// <summary>The caret brush; an unset value uses the active theme's focus ring.</summary>
+    /// <remarks>The caret is a single stroke, so a gradient brush paints its representative colour.</remarks>
+    public static readonly DependencyProperty CaretBrushProperty = DependencyProperty.Register(
+        nameof(CaretBrush), typeof(Brush), typeof(RichTextBox),
+        new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+        {
+            AffectsRender = true,
+        });
+
+    /// <summary>The caret stroke width in device-independent pixels.</summary>
+    public static readonly DependencyProperty CaretThicknessProperty = DependencyProperty.Register(
+        nameof(CaretThickness), typeof(double), typeof(RichTextBox),
+        new PropertyMetadata(1.5d, null, static (_, value) => Math.Max(0.5d, (double)value))
+        {
+            AffectsRender = true,
+        });
+
+    /// <summary>The caret blink period in milliseconds; <c>0</c> keeps the caret steady.</summary>
+    public static readonly DependencyProperty CaretBlinkIntervalProperty = DependencyProperty.Register(
+        nameof(CaretBlinkInterval), typeof(int), typeof(RichTextBox),
+        new PropertyMetadata(530));
 
     private readonly List<RichChar> _chars = [];
     private readonly List<VisualLine> _lines = [];
@@ -165,6 +202,41 @@ public class RichTextBox : TemplatedControl
     {
         get => (bool)GetValue(WrapProperty)!;
         set => SetValue(WrapProperty, value);
+    }
+
+    /// <summary>The selection highlight brush; <see langword="null"/> uses the active theme.</summary>
+    public Brush? SelectionBrush
+    {
+        get => GetValue(SelectionBrushProperty) as Brush;
+        set => SetValue(SelectionBrushProperty, value);
+    }
+
+    /// <summary>The colour of text inside the selection; <see langword="null"/> keeps each run's own colour.</summary>
+    public Brush? SelectionForeground
+    {
+        get => GetValue(SelectionForegroundProperty) as Brush;
+        set => SetValue(SelectionForegroundProperty, value);
+    }
+
+    /// <summary>The caret brush; <see langword="null"/> uses the active theme's focus ring.</summary>
+    public Brush? CaretBrush
+    {
+        get => GetValue(CaretBrushProperty) as Brush;
+        set => SetValue(CaretBrushProperty, value);
+    }
+
+    /// <summary>The caret stroke width in device-independent pixels.</summary>
+    public double CaretThickness
+    {
+        get => (double)GetValue(CaretThicknessProperty)!;
+        set => SetValue(CaretThicknessProperty, value);
+    }
+
+    /// <summary>The caret blink period in milliseconds; <c>0</c> keeps the caret steady.</summary>
+    public int CaretBlinkInterval
+    {
+        get => (int)GetValue(CaretBlinkIntervalProperty)!;
+        set => SetValue(CaretBlinkIntervalProperty, value);
     }
 
     /// <summary>Why the applied control template cannot host the document, or <see langword="null"/> when the template is usable.</summary>
@@ -329,27 +401,28 @@ public class RichTextBox : TemplatedControl
 
         var selectionStart = SelectionStart;
         var selectionEnd = selectionStart + SelectionLength;
-        using (var selection = new SolidBrush(theme.Selection))
+        var selectionBrush = SelectionBrush ?? new SolidColorBrush(theme.Selection);
+        foreach (var line in _lines)
         {
-            foreach (var line in _lines)
+            foreach (var cell in line.Cells)
             {
-                foreach (var cell in line.Cells)
+                if (cell.Index >= selectionStart && cell.Index < selectionEnd)
                 {
-                    if (cell.Index >= selectionStart && cell.Index < selectionEnd)
-                    {
-                        graphics.FillRectangle(
-                            selection,
+                    selectionBrush.Paint(
+                        graphics,
+                        new RectangleF(
                             content.Left + cell.X,
                             content.Top + line.Top,
                             Math.Max(1f, cell.Width),
-                            line.Height);
-                    }
+                            line.Height));
                 }
+            }
 
-                if (line.EndIndex >= selectionStart && line.EndIndex < selectionEnd)
-                {
-                    graphics.FillRectangle(selection, content.Left + line.Width, content.Top + line.Top, 5f, line.Height);
-                }
+            if (line.EndIndex >= selectionStart && line.EndIndex < selectionEnd)
+            {
+                selectionBrush.Paint(
+                    graphics,
+                    new RectangleF(content.Left + line.Width, content.Top + line.Top, 5f, line.Height));
             }
         }
 
@@ -358,30 +431,38 @@ public class RichTextBox : TemplatedControl
             foreach (var cell in line.Cells)
             {
                 var font = FontFor(cell.Style);
+                var selected = cell.Index >= selectionStart && cell.Index < selectionEnd;
+                var bounds = new RectangleF(
+                    content.Left + cell.X,
+                    content.Top + line.Top,
+                    Math.Max(1f, cell.Width + 2f),
+                    line.Height);
+                if (selected && SelectionForeground is { } selectionForeground)
+                {
+                    VisualText.Draw(this, graphics, cell.Value.ToString(), font, selectionForeground, bounds,
+                        wrap: false, StringAlignment.Near, StringAlignment.Center);
+                    continue;
+                }
+
                 var color = cell.Style.Foreground.IsEmpty
                     ? Foreground.IsEmpty ? theme.Foreground : Foreground
                     : cell.Style.Foreground;
-                VisualText.Draw(this,
-                    graphics,
-                    cell.Value.ToString(),
-                    font,
-                    color,
-                    new RectangleF(
-                        content.Left + cell.X,
-                        content.Top + line.Top,
-                        Math.Max(1f, cell.Width + 2f),
-                        line.Height),
-                    wrap: false,
-                    StringAlignment.Near,
-                    StringAlignment.Center);
+                VisualText.Draw(this, graphics, cell.Value.ToString(), font, color, bounds,
+                    wrap: false, StringAlignment.Near, StringAlignment.Center);
             }
         }
 
         if (IsFocused && _caretVisible)
         {
-            var (caretX, caretY, caretHeight) = CaretPoint(content);
-            using var caret = new Pen(theme.FocusRing, CaretWidth);
-            graphics.DrawLine(caret, caretX, caretY, caretX, caretY + caretHeight);
+            var caretBrush = CaretBrush ?? new SolidColorBrush(theme.FocusRing);
+            var caretColor = caretBrush.ApproximateColor;
+            if (caretColor.A > 0)
+            {
+                var (caretX, caretY, caretHeight) = CaretPoint(content);
+                using var caret = new Pen(caretColor, (float)CaretThickness);
+                var x = caretX + ((float)CaretThickness / 2f);
+                graphics.DrawLine(caret, x, caretY, x, caretY + caretHeight);
+            }
         }
     }
 
@@ -539,6 +620,11 @@ public class RichTextBox : TemplatedControl
     {
         _caretVisible = true;
         SetValue(IsFocusedProperty, true);
+        if (CaretBlinkInterval > 0 && !_caretTimer.Enabled)
+        {
+            _caretTimer.Start();
+        }
+
         InvalidateVisual();
     }
 
@@ -553,7 +639,11 @@ public class RichTextBox : TemplatedControl
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (ReferenceEquals(e.Property, FontProperty)
+        if (ReferenceEquals(e.Property, CaretBlinkIntervalProperty))
+        {
+            ApplyCaretBlinkInterval();
+        }
+        else if (ReferenceEquals(e.Property, FontProperty)
             || ReferenceEquals(e.Property, WrapProperty)
             || ReferenceEquals(e.Property, PaddingProperty))
         {
@@ -567,6 +657,25 @@ public class RichTextBox : TemplatedControl
             // 继承来的排版属性会换掉基础字体；按尺寸缓存的 run 字体必须一起失效。
             ClearFontCache();
             InvalidateLayout();
+        }
+    }
+
+    private void ApplyCaretBlinkInterval()
+    {
+        if (CaretBlinkInterval <= 0)
+        {
+            _caretTimer.Stop();
+            _caretVisible = true;
+            InvalidateVisual();
+            return;
+        }
+
+        _caretTimer.Interval = CaretBlinkInterval;
+        if (IsFocused)
+        {
+            _caretVisible = true;
+            _caretTimer.Stop();
+            _caretTimer.Start();
         }
     }
 

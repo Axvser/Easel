@@ -381,6 +381,50 @@ public class TextBox : TemplatedControl
             nameof(Wrap), typeof(bool), typeof(TextBox),
             new PropertyMetadata(false) { AffectsMeasure = true, AffectsRender = true });
 
+    /// <summary>The selection highlight brush; an unset value uses the active theme's selection colour.</summary>
+    /// <remarks>Only the visual editing path paints it; the native editor island draws the operating system selection.</remarks>
+    public static readonly DependencyProperty SelectionBrushProperty =
+        DependencyProperty.Register(
+            nameof(SelectionBrush), typeof(XamlBrush), typeof(TextBox),
+            new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+            {
+                AffectsRender = true,
+            });
+
+    /// <summary>The colour of text inside the selection; an unset value keeps the field's foreground.</summary>
+    public static readonly DependencyProperty SelectionForegroundProperty =
+        DependencyProperty.Register(
+            nameof(SelectionForeground), typeof(XamlBrush), typeof(TextBox),
+            new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+            {
+                AffectsRender = true,
+            });
+
+    /// <summary>The caret brush; an unset value uses the field's foreground.</summary>
+    /// <remarks>The caret is a single stroke, so a gradient brush paints its representative colour.</remarks>
+    public static readonly DependencyProperty CaretBrushProperty =
+        DependencyProperty.Register(
+            nameof(CaretBrush), typeof(XamlBrush), typeof(TextBox),
+            new PropertyMetadata(null, null, static (_, value) => ColorBrushCoercion.Coerce(value))
+            {
+                AffectsRender = true,
+            });
+
+    /// <summary>The caret stroke width in device-independent pixels.</summary>
+    public static readonly DependencyProperty CaretThicknessProperty =
+        DependencyProperty.Register(
+            nameof(CaretThickness), typeof(double), typeof(TextBox),
+            new PropertyMetadata(1d, null, static (_, value) => Math.Max(0.5d, (double)value))
+            {
+                AffectsRender = true,
+            });
+
+    /// <summary>The caret blink period in milliseconds; <c>0</c> keeps the caret steady.</summary>
+    public static readonly DependencyProperty CaretBlinkIntervalProperty =
+        DependencyProperty.Register(
+            nameof(CaretBlinkInterval), typeof(int), typeof(TextBox),
+            new PropertyMetadata(530));
+
     private readonly System.Windows.Forms.Timer _caretTimer;
     private readonly System.Windows.Forms.TextBox _editor;
     private readonly NativeControlHost _nativeHost;
@@ -553,6 +597,41 @@ public class TextBox : TemplatedControl
         set => SetValue(WrapProperty, value);
     }
 
+    /// <summary>The selection highlight brush; <see langword="null"/> uses the active theme.</summary>
+    public XamlBrush? SelectionBrush
+    {
+        get => GetValue(SelectionBrushProperty) as XamlBrush;
+        set => SetValue(SelectionBrushProperty, value);
+    }
+
+    /// <summary>The colour of text inside the selection; <see langword="null"/> keeps the field's foreground.</summary>
+    public XamlBrush? SelectionForeground
+    {
+        get => GetValue(SelectionForegroundProperty) as XamlBrush;
+        set => SetValue(SelectionForegroundProperty, value);
+    }
+
+    /// <summary>The caret brush; <see langword="null"/> uses the field's foreground.</summary>
+    public XamlBrush? CaretBrush
+    {
+        get => GetValue(CaretBrushProperty) as XamlBrush;
+        set => SetValue(CaretBrushProperty, value);
+    }
+
+    /// <summary>The caret stroke width in device-independent pixels.</summary>
+    public double CaretThickness
+    {
+        get => (double)GetValue(CaretThicknessProperty)!;
+        set => SetValue(CaretThicknessProperty, value);
+    }
+
+    /// <summary>The caret blink period in milliseconds; <c>0</c> keeps the caret steady.</summary>
+    public int CaretBlinkInterval
+    {
+        get => (int)GetValue(CaretBlinkIntervalProperty)!;
+        set => SetValue(CaretBlinkIntervalProperty, value);
+    }
+
     /// <summary>The first selected character.</summary>
     public int SelectionStart => XamlMath.Clamp(Math.Min(_selectionAnchor, _caretIndex), 0, Text.Length);
 
@@ -691,9 +770,11 @@ public class TextBox : TemplatedControl
         {
             graphics.SetClip(content, CombineMode.Intersect);
 
-            if (IsFocused && SelectionLength > 0)
+            var selectionStart = IsFocused ? SelectionStart : 0;
+            var selectionLength = IsFocused ? SelectionLength : 0;
+            if (selectionLength > 0)
             {
-                DrawSelection(graphics, content, offset);
+                DrawSelection(graphics, content, offset, SelectionBrush ?? new SolidColorBrush(theme.Selection));
             }
 
             if (string.IsNullOrEmpty(Text))
@@ -713,12 +794,12 @@ public class TextBox : TemplatedControl
             }
             else
             {
-                DrawLines(graphics, content, offset, textBrush);
+                DrawLines(graphics, content, offset, textBrush, selectionStart, selectionLength, SelectionForeground);
             }
 
             if (IsFocused && _caretVisible && !IsReadOnly)
             {
-                DrawCaret(graphics, content, offset, foreground);
+                DrawCaret(graphics, content, offset, textBrush);
             }
         }
         finally
@@ -731,7 +812,11 @@ public class TextBox : TemplatedControl
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (ReferenceEquals(e.Property, UseNativeEditorProperty))
+        if (ReferenceEquals(e.Property, CaretBlinkIntervalProperty))
+        {
+            ApplyCaretBlinkInterval();
+        }
+        else if (ReferenceEquals(e.Property, UseNativeEditorProperty))
         {
             if (UseNativeEditor)
             {
@@ -802,7 +887,11 @@ public class TextBox : TemplatedControl
     protected override void OnGotFocus()
     {
         _caretVisible = true;
-        _caretTimer.Start();
+        if (CaretBlinkInterval > 0)
+        {
+            _caretTimer.Start();
+        }
+
         ShowNativeEditor();
         UpdateFocusState();
         InvalidateVisual();
@@ -1249,9 +1338,17 @@ public class TextBox : TemplatedControl
         return VisualText.MeasureWidth(DisplayText.Substring(line.Start, clamped), Font, RenderDpi);
     }
 
-    private void DrawLines(Graphics graphics, Rectangle content, float offset, XamlBrush foreground)
+    private void DrawLines(
+        Graphics graphics,
+        Rectangle content,
+        float offset,
+        XamlBrush foreground,
+        int selectionStart,
+        int selectionLength,
+        XamlBrush? selectionForeground)
     {
         var display = DisplayText;
+        var selectionEnd = selectionStart + selectionLength;
         for (var index = 0; index < _lines.Count; index++)
         {
             var line = _lines[index];
@@ -1260,30 +1357,59 @@ public class TextBox : TemplatedControl
                 continue;
             }
 
-            var text = display.Substring(line.Start, line.Length);
-            var width = (float)Math.Ceiling(VisualText.MeasureWidth(text, Font, RenderDpi));
-            var destination = new RectangleF(
-                content.Left - offset,
-                content.Top + (index * _lineHeight),
-                Math.Max(content.Width, width + 2f),
-                _lineHeight);
-            VisualText.Draw(this,
-                graphics,
-                text,
-                Font,
-                foreground,
-                destination,
-                wrap: false,
-                StringAlignment.Near,
-                StringAlignment.Near);
+            var lineEnd = line.Start + line.Length;
+            if (selectionForeground is null || selectionLength <= 0 || selectionEnd <= line.Start || selectionStart >= lineEnd)
+            {
+                DrawLineSegment(graphics, content, offset, index, line, display, foreground, 0, line.Length);
+                continue;
+            }
+
+            var from = XamlMath.Clamp(selectionStart - line.Start, 0, line.Length);
+            var to = XamlMath.Clamp(selectionEnd - line.Start, 0, line.Length);
+            DrawLineSegment(graphics, content, offset, index, line, display, foreground, 0, from);
+            DrawLineSegment(graphics, content, offset, index, line, display, selectionForeground, from, to - from);
+            DrawLineSegment(graphics, content, offset, index, line, display, foreground, to, line.Length - to);
         }
     }
 
-    private void DrawSelection(Graphics graphics, Rectangle content, float offset)
+    private void DrawLineSegment(
+        Graphics graphics,
+        Rectangle content,
+        float offset,
+        int lineIndex,
+        TextLine line,
+        string display,
+        XamlBrush brush,
+        int start,
+        int length)
+    {
+        if (length <= 0)
+        {
+            return;
+        }
+
+        var text = display.Substring(line.Start + start, length);
+        var width = (float)Math.Ceiling(VisualText.MeasureWidth(text, Font, RenderDpi));
+        var destination = new RectangleF(
+            content.Left - offset + MeasurePrefix(line, start),
+            content.Top + (lineIndex * _lineHeight),
+            Math.Max(1f, width + 2f),
+            _lineHeight);
+        VisualText.Draw(this,
+            graphics,
+            text,
+            Font,
+            brush,
+            destination,
+            wrap: false,
+            StringAlignment.Near,
+            StringAlignment.Near);
+    }
+
+    private void DrawSelection(Graphics graphics, Rectangle content, float offset, XamlBrush selection)
     {
         var selectionStart = SelectionStart;
         var selectionEnd = selectionStart + SelectionLength;
-        using var selection = new SolidBrush(Theme.Current.Selection);
         for (var index = 0; index < _lines.Count; index++)
         {
             var line = _lines[index];
@@ -1296,23 +1422,32 @@ public class TextBox : TemplatedControl
 
             var left = content.Left - offset + MeasurePrefix(line, from - line.Start);
             var right = content.Left - offset + MeasurePrefix(line, to - line.Start);
-            graphics.FillRectangle(
-                selection,
-                left,
-                content.Top + (index * _lineHeight),
-                Math.Max(1f, right - left),
-                _lineHeight);
+            selection.Paint(
+                graphics,
+                new RectangleF(
+                    left,
+                    content.Top + (index * _lineHeight),
+                    Math.Max(1f, right - left),
+                    _lineHeight));
         }
     }
 
-    private void DrawCaret(Graphics graphics, Rectangle content, float offset, Color foreground)
+    private void DrawCaret(Graphics graphics, Rectangle content, float offset, XamlBrush foreground)
     {
+        var brush = CaretBrush ?? foreground;
+        var color = brush.ApproximateColor;
+        if (color.A == 0)
+        {
+            return;
+        }
+
+        var thickness = (float)CaretThickness;
         var lineIndex = FindLineIndex(CaretIndex);
         var line = _lines[lineIndex];
-        var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start);
+        var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start) + (thickness / 2f);
         var top = content.Top + (lineIndex * _lineHeight) + 2f;
-        using var pen = new Pen(foreground, 1f);
-        graphics.DrawLine(pen, caretX + 0.5f, top, caretX + 0.5f, top + Math.Max(1f, _lineHeight - 4f));
+        using var pen = new Pen(color, thickness);
+        graphics.DrawLine(pen, caretX, top, caretX, top + Math.Max(1f, _lineHeight - 4f));
     }
 
     private int HitTestIndex(PointF local, Rectangle content)
@@ -1579,6 +1714,30 @@ public class TextBox : TemplatedControl
 
     private void ResetCaretBlink()
     {
+        if (!IsFocused)
+        {
+            return;
+        }
+
+        _caretVisible = true;
+        _caretTimer.Stop();
+        if (CaretBlinkInterval > 0)
+        {
+            _caretTimer.Start();
+        }
+    }
+
+    private void ApplyCaretBlinkInterval()
+    {
+        if (CaretBlinkInterval <= 0)
+        {
+            _caretTimer.Stop();
+            _caretVisible = true;
+            InvalidateVisual();
+            return;
+        }
+
+        _caretTimer.Interval = CaretBlinkInterval;
         if (!IsFocused)
         {
             return;
