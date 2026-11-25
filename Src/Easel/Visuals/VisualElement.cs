@@ -765,6 +765,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         child._surface = null;
         base.Add(child);
         child.RefreshImplicitStyles();
+        if (Surface is not null)
+        {
+            child.NotifySurfaceRootChanged();
+        }
+
         InvalidateMeasure();
         return child;
     }
@@ -802,6 +807,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
 
         child._surface = null;
         child.RefreshImplicitStyles();
+        child.NotifySurfaceRootChanged();
         InvalidateMeasure();
         return true;
     }
@@ -1424,9 +1430,25 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         _surface = surface;
         // 表面资源是资源链的最后一站；根挂到 VisualHost（或从它摘下）时延迟解析要重试一次。
         SurfaceChanged?.Invoke(this, EventArgs.Empty);
+        NotifySurfaceRootChanged();
     }
 
     internal event EventHandler? SurfaceChanged;
+
+    // 根换表面时整棵子树都要知道；标题栏靠它在挂上宿主后才解析出 Form。
+    internal event EventHandler? SurfaceRootChanged;
+
+    private void NotifySurfaceRootChanged()
+    {
+        SurfaceRootChanged?.Invoke(this, EventArgs.Empty);
+        foreach (var child in Children)
+        {
+            if (child is VisualElement element)
+            {
+                element.NotifySurfaceRootChanged();
+            }
+        }
+    }
 
     // 模板里的每个后代都记着施模板的控件；TemplateBinding 靠它找源，模板触发器也写回它。
     internal void SetTemplatedParentRecursive(VisualElement? parent)
