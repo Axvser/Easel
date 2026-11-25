@@ -38,6 +38,10 @@ The built-in Dark+ and Light+ palettes are **XAML `ResourceDictionary` files in 
 
 `Caret` is the default text-field caret colour; a dictionary that omits it falls back to `Focus`.
 
+The host merges the active theme dictionary into its `Resources`, so a control template can use `{DynamicResource Accent}`
+and other theme keys directly. Built-in fallback control styles live in `Src/Easel/Themes/DefaultStyles.xaml`; an
+implicit style keyed by control type applies when the control has no explicit style.
+
 They are the source of truth for the current role names and values. They carry palette brushes, metrics
 (`CornerRadius`, `ControlHeight`, typography tokens where present) and keyed typography styles
 (`Heading`, `Subheading`, `Body`, `Caption`). `Theme.CreateDark()` / `CreateLight()` read the files into a

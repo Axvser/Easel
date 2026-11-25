@@ -48,6 +48,12 @@ This page lists each control's own properties and behaviour.
 | `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged`, `SelectionBrush`, `SelectionForeground`, `CaretBrush`, `CaretThickness`, `CaretBlinkInterval` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
 | `Image` | `Source` (`System.Drawing.Image?`), `Stretch` | Draws a bitmap in the tree. `BitmapImage`/`DrawingImage` also implement `ImageSource` for brushes/hosts. |
 
+## Control templates
+
+`TemplatedControl` applies `Template` first, then the style's template, then `DefaultTemplate` (a built-in fallback a control sets in code). A theme style can replace the whole appearance; self-drawn chrome stays inactive while a template is applied. Template triggers can read `ButtonBase.IsPointerOver`/`IsPressed`, `ToggleButtonBase.IsChecked` and `TemplatedControl.IsFocusVisible`.
+
+Decorative template parts must set `IsHitTestVisible="False"`; hit testing returns the deepest part, so an interactive part must opt back in. The built-in default styles live in `Src/Easel/Themes/DefaultStyles.xaml` and are applied when no explicit style exists.
+
 ## Selection and range
 
 | Control | Key members | Notes |

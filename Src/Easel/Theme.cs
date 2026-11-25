@@ -537,6 +537,24 @@ public static class Theme
         return resources;
     }
 
+    internal static ResourceDictionary DefaultStyles { get; } = new Themes.DefaultStyles();
+
+    internal static VisualStyle? FindDefaultStyle(VisualElement element)
+    {
+        var resources = DefaultStyles;
+        for (var type = element.GetType(); type is not null && type != typeof(object); type = type.BaseType)
+        {
+            if (resources.TryGetValue(type, out var value)
+                && value is VisualStyle style
+                && style.Matches(element))
+            {
+                return style;
+            }
+        }
+
+        return null;
+    }
+
     private static ResourceDictionary SourceFor(ThemeMode mode) => mode switch
     {
         ThemeMode.Light => LightSource,
@@ -544,8 +562,10 @@ public static class Theme
     };
 
     private static ResourceDictionary CreateHighContrastResourceDictionary()
+        => CreatePaletteResourceDictionary(CreateHighContrast());
+
+    internal static ResourceDictionary CreatePaletteResourceDictionary(ThemePalette palette)
     {
-        var palette = CreateHighContrast();
         var resources = new ResourceDictionary();
 
         void Brush(string key, Color color) => resources[key] = new SolidColorBrush(color);

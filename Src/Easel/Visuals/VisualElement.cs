@@ -1576,7 +1576,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             }
         }
 
-        return Surface?.Styles.FindMatch(this);
+        return Surface?.Styles.FindMatch(this) ?? Easel.Theme.FindDefaultStyle(this);
     }
 
     internal void SetFocused(bool focused)
@@ -1615,6 +1615,12 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         LostFocus?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Called after <see cref="IsFocusVisible"/> changes; templated controls mirror it into a trigger-friendly property.</summary>
+    /// <param name="visible">The new focus-visible state.</param>
+    protected virtual void OnFocusVisibleChanged(bool visible)
+    {
+    }
+
     internal void SetFocusVisible(bool visible)
     {
         if (_focusVisible == visible)
@@ -1623,6 +1629,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         }
 
         _focusVisible = visible;
+        OnFocusVisibleChanged(visible);
         InvalidateVisual();
     }
 

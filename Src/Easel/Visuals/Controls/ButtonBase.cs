@@ -190,6 +190,17 @@ public abstract class TemplatedControl : Panel
         nameof(Template), typeof(VisualControlTemplate), typeof(TemplatedControl),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
 
+    /// <summary>A template used when neither <see cref="Template"/> nor a style supplies one.</summary>
+    /// <remarks>Gives a control a built-in fallback appearance; a theme style template overrides it.</remarks>
+    public static readonly DependencyProperty DefaultTemplateProperty = DependencyProperty.Register(
+        nameof(DefaultTemplate), typeof(VisualControlTemplate), typeof(TemplatedControl),
+        new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
+
+    /// <summary>Whether the control has focus with the keyboard focus ring shown; template triggers observe it.</summary>
+    public static readonly DependencyProperty IsFocusVisibleProperty = DependencyProperty.Register(
+        nameof(IsFocusVisible), typeof(bool), typeof(TemplatedControl),
+        new PropertyMetadata(false) { AffectsRender = true });
+
     private VisualControlTemplate? _styleTemplate;
     private VisualControlTemplate? _appliedTemplate;
     private VisualElement? _templateRoot;
@@ -209,6 +220,16 @@ public abstract class TemplatedControl : Panel
         set => SetValue(TemplateProperty, value);
     }
 
+    /// <summary>A template used when neither <see cref="Template"/> nor a style supplies one.</summary>
+    public VisualControlTemplate? DefaultTemplate
+    {
+        get => (VisualControlTemplate?)GetValue(DefaultTemplateProperty);
+        set => SetValue(DefaultTemplateProperty, value);
+    }
+
+    /// <summary>Whether the control has focus with the keyboard focus ring shown.</summary>
+    public new bool IsFocusVisible => (bool)GetValue(IsFocusVisibleProperty)!;
+
     /// <summary>The template root currently applied, or <see langword="null"/> while the control draws itself.</summary>
     public VisualElement? TemplateRoot => _templateRoot;
 
@@ -226,7 +247,8 @@ public abstract class TemplatedControl : Panel
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (ReferenceEquals(e.Property, TemplateProperty))
+        if (ReferenceEquals(e.Property, TemplateProperty)
+            || ReferenceEquals(e.Property, DefaultTemplateProperty))
         {
             UpdateTemplate();
         }
@@ -283,6 +305,27 @@ public abstract class TemplatedControl : Panel
         base.ArrangeOverride(finalSize);
     }
 
+    /// <inheritdoc />
+    protected override void OnGotFocus()
+    {
+        base.OnGotFocus();
+        SetValue(IsFocusVisibleProperty, base.IsFocusVisible);
+    }
+
+    /// <inheritdoc />
+    protected override void OnLostFocus()
+    {
+        base.OnLostFocus();
+        SetValue(IsFocusVisibleProperty, false);
+    }
+
+    /// <inheritdoc />
+    protected override void OnFocusVisibleChanged(bool visible)
+    {
+        base.OnFocusVisibleChanged(visible);
+        SetValue(IsFocusVisibleProperty, base.IsFocusVisible);
+    }
+
     /// <summary>Called before the current template root is removed, so a control can detach visuals it put inside it.</summary>
     protected virtual void OnTemplateChanging()
     {
@@ -300,7 +343,7 @@ public abstract class TemplatedControl : Panel
             return;
         }
 
-        var effective = Template ?? _styleTemplate;
+        var effective = Template ?? _styleTemplate ?? DefaultTemplate;
         if (ReferenceEquals(effective, _appliedTemplate))
         {
             return;

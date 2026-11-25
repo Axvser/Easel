@@ -45,6 +45,7 @@ public class VisualHost : System.Windows.Forms.Control
     private int _nativeSuppressionCount;
     private readonly VisualStyleCollection _styles = new();
     private readonly ResourceDictionary _resources = new();
+    private readonly ResourceDictionary _themeResources = new();
     private readonly OverlayLayer _overlay = new();
     private readonly List<VisualPopup> _openPopups = [];
     private readonly List<Dialogs.VisualDialog> _openDialogs = [];
@@ -106,6 +107,8 @@ public class VisualHost : System.Windows.Forms.Control
         Root = new ContainerVisual();
         _styles.Changed += (_, _) => RefreshStyles();
         _overlay.SetSurfaceRoot(this);
+        _resources.MergedDictionaries.Add(_themeResources);
+        RefreshThemeResources();
         Theme.Changed += OnThemeChanged;
     }
 
@@ -2097,7 +2100,18 @@ public class VisualHost : System.Windows.Forms.Control
             return;
         }
 
+        RefreshThemeResources();
         InvalidateSurface();
+    }
+
+    // 宿主自带当前主题字典，默认模板里的 DynamicResource 才能找到主题键；应用自己的字典后合并、优先级更高。
+    private void RefreshThemeResources()
+    {
+        _themeResources.Clear();
+        foreach (var pair in Theme.CreateResourceDictionary(Theme.EffectiveMode))
+        {
+            _themeResources[pair.Key] = pair.Value;
+        }
     }
 
     internal VisualElement OverlayHost => _overlay;

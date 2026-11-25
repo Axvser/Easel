@@ -625,6 +625,50 @@ public sealed class VisualTemplatingAndRenderAnimationTests
         Assert.AreEqual(Color.Orange.ToArgb(), host.Background!.ApproximateColor.ToArgb());
     }
 
+    [TestMethod]
+    public void DefaultTemplateAppliesWithoutAnExplicitTemplate()
+    {
+        using var surface = new VisualHost { Size = new Size(180, 100), DpiScaleOverride = 1f };
+        var button = new VC.Button
+        {
+            Width = 140,
+            Height = 48,
+            Text = "go",
+            DefaultTemplate = new VisualControlTemplate(_ => new VC.Border { Background = Color.Lime, Padding = default })
+            {
+                TargetType = typeof(VC.Button),
+            },
+        };
+        surface.Root = button;
+        Layout(surface, 180, 100);
+
+        Assert.IsNotNull(button.TemplateRoot, "the default template is the fallback");
+        Assert.AreEqual(Color.Lime.ToArgb(), RenderPixel(surface, 90, 50).ToArgb(),
+            "the default template paints the control");
+
+        button.DefaultTemplate = null;
+
+        Assert.IsNull(button.TemplateRoot, "clearing the default returns to the self-drawn path");
+    }
+
+    [TestMethod]
+    public void KeyboardFocusRaisesTheTemplateFocusProperty()
+    {
+        using var surface = new VisualHost { Size = new Size(180, 100), DpiScaleOverride = 1f };
+        var button = new VC.Button { Width = 140, Height = 48, Text = "go" };
+        surface.Root = button;
+        Layout(surface, 180, 100);
+
+        var point = new PointF(button.AbsoluteBounds.X + 20f, button.AbsoluteBounds.Y + 20f);
+        surface.ProcessPointerDown(point, System.Windows.Forms.MouseButtons.Left);
+        surface.ProcessPointerUp(point, System.Windows.Forms.MouseButtons.Left);
+        Assert.IsFalse(button.IsFocusVisible, "pointer focus does not show the keyboard ring");
+
+        surface.ProcessKeyDown(System.Windows.Forms.Keys.Space);
+
+        Assert.IsTrue(button.IsFocusVisible, "keyboard input shows the focus ring through the trigger property");
+    }
+
     private static void Layout(VisualHost surface, int width, int height)
     {
         using var bitmap = new Bitmap(1, 1);
