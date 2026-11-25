@@ -1,32 +1,215 @@
 # Easel performance benchmarks
 
-The runner measures the costs that control templating can move: a slider drag, a splitter resize, and a palette
-switch on a page with a 200-row list, 20 buttons, 8 text fields, 5 sliders, 5 progress bars and a combo box.
-It uses a fixed 1× DPI surface and reports the median and p95 of N iterations after warmup.
+A standalone console runner that measures the costs template instantiation adds to a fixed page. It writes a
+machine-readable JSON result, reports medians and p95 per scenario, counts layout and paint passes, and can gate a
+run against a previous JSON baseline with per-scenario regression budgets.
+
+The project is not part of `Easel.slnx` and is never packed; it references the runtime project only to measure it.
+
+## Scenarios
+
+Every scenario runs against the same deterministic page: 1200×800 at 1× DPI, a 200-row `ListBox`, 20 buttons,
+8 text boxes, 5 sliders, 5 progress bars, a combo box and 30 property rows. The page is dark and the surface uses
+`RenderTo`, the software export path, so results do not depend on a window, monitor or GPU.
+
+| scenario | warmup | iterations | what it does |
+| --- | ---: | ---: | --- |
+| `slider-value` | 5 | 200 | Moves one slider value and repaints the damaged region. |
+| `splitter-resize` | 3 | 100 | Writes the first column width, invalidates measure, then repaints; one layout pass per sample. |
+| `full-frame` | 3 | 20 | Invalidates the surface, then re-measures, re-arranges and repaints the whole tree. |
+| `theme-toggle` | 3 | 20 | Switches dark/light with the page kept alive; shared brushes are mutated in place. |
+| `build-page` | 2 | 10 | Builds, lays out and renders a fresh page, then disposes it. |
+| `theme-rebuild` | 2 | 10 | Switches palette, then builds, lays out and renders a fresh page. |
+
+Each scenario reports `medianMs`, `p95Ms`, `minMs`, `maxMs`, `meanMs`, `stdDevMs` and the raw `samplesMs`. It also
+records the visual-tree shape (`nodes`, `templateNodes`, `arrangedNodes`) and the work done over the measured
+samples: `layoutPasses` (through `VisualHost.LayoutUpdated`), `paintPasses` (through `VisualHost.PaintCount`) and
+`treesBuilt`.
+
+## Run
+
+From the repository root:
 
 ```powershell
-dotnet run -c Release
+dotnet run -c Release --project Src/Test/Performance/Easel.Benchmarks -- --output current.json
 ```
+
+`--output` defaults to `benchmark-results.json` in the current directory. The console prints a compact summary; the
+JSON is written separately so console noise does not corrupt it.
+
+Offline, restore once from the local feed and then run without restoring:
+
+```powershell
+dotnet restore Src/Test/Performance/Easel.Benchmarks/Easel.Benchmarks.csproj --source C:\Users\Axvse\AppData\Local\Temp\easel-feed
+dotnet run -c Release --project Src/Test/Performance/Easel.Benchmarks --no-restore -- --output current.json
+```
+
+Options:
+
+| option | meaning |
+| --- | --- |
+| `-o`, `--output <path>` | JSON result path (default `benchmark-results.json`). |
+| `--no-json` | Do not write a JSON file. |
+| `--baseline <path>` | Compare against a JSON produced by this runner and attach a `comparison` section. |
+| `--scenario <list>` | Run only the named scenarios (comma separated). |
+| `--warmup <n>` | Override warmup iterations for every scenario. |
+| `--iterations <n>` | Override measured iterations for every scenario. |
+| `--budget <spec>` | Regression budget: `10%`, `0.10`, or `name=25%`; repeatable. |
+| `--budget-metric <m>` | Which statistic the budget checks: `median` (default) or `p95`. |
+| `--list` | List scenarios and their default iteration counts. |
+| `-h`, `--help` | Show usage. |
+
+Exit codes: `0` success (also an informational comparison with no budget), `1` at least one gated scenario exceeded
+its budget, `2` invalid arguments or baseline file.
 
 ## Compare against the pre-templating baseline
 
-Check out the Easel commit **before** the default styles were introduced (`886ab07`) into a separate clone and
-point the same runner at it:
+A baseline is a separate clone of the runtime at the commit before default control templates were introduced
+(`886ab07`). Restore and build this same runner against that project, which produces a baseline JSON:
 
 ```powershell
-dotnet run -c Release -p:EaselProject="C:\path\to\easel-baseline\Src\Easel\Easel.csproj"
+dotnet restore Src/Test/Performance/Easel.Benchmarks/Easel.Benchmarks.csproj `
+  -p:EaselProject=C:\path\to\easel-baseline\Src\Easel\Easel.csproj `
+  --source C:\Users\Axvse\AppData\Local\Temp\easel-feed
+dotnet run -c Release --project Src/Test/Performance/Easel.Benchmarks --no-restore `
+  -p:EaselProject=C:\path\to\easel-baseline\Src\Easel\Easel.csproj -- --output baseline.json
 ```
 
-Reference measurements from 2026-11-26 on this machine, 1200×800, 1× DPI, net8.0 Release:
+Restore the benchmark against the current runtime again, then compare and gate:
 
-| scenario | pre-templating (`886ab07`) | current |
-| --- | --- | --- |
-| slider, 200 value changes | 1.86 ms | 1.46 ms |
-| splitter, 100 width changes | 1.82 ms | 1.69 ms |
-| palette toggle (no rebuild) | 3.92 ms | 7.32 ms |
-| palette + full page rebuild | 13.96 ms | 145 ms |
+```powershell
+dotnet restore Src/Test/Performance/Easel.Benchmarks/Easel.Benchmarks.csproj --source C:\Users\Axvse\AppData\Local\Temp\easel-feed
+dotnet run -c Release --project Src/Test/Performance/Easel.Benchmarks --no-restore -- `
+  --output current.json --baseline baseline.json --budget 10%
+```
 
-Interaction is at or below the baseline. The palette toggle stays close after the shared-brush mutation
-(`VisualHost.RefreshThemeResources` updates `SolidColorBrush.Color` in place). The full page rebuild is still
-dominated by template and binding instantiation: 200 rows × the default row template. Virtualization or lazy
-template application is the remaining lever; changing markup or margins will not move that number.
+`--budget 10%` gates every scenario; `--budget build-page=25%` gates one. `--budget` can be repeated. Without any
+budget the comparison is informational and the exit code stays `0`. Each scenario's delta is
+`(current / baseline - 1) × 100`, checked against the budget on the chosen metric; a delta exactly at the budget
+passes and anything above it fails.
+
+The JSON records `run.easelInformationalVersion`, which includes the source commit the runner was compiled against,
+so a baseline file carries its own provenance.
+
+## Result shape
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-11-26T02:00:00.0000000Z",
+  "run": {
+    "configuration": "Release",
+    "framework": ".NET 8.0.31",
+    "os": "Microsoft Windows 10.0.26300",
+    "architecture": "X64",
+    "processorCount": 16,
+    "machineName": "AXVSER",
+    "stopwatchFrequency": 10000000,
+    "easelVersion": "1.4.0.0",
+    "easelInformationalVersion": "1.4.0+88e180d...",
+    "arguments": ["--output", "current.json"]
+  },
+  "tree": { "nodes": 1764, "templateNodes": 1282, "templateRoots": 248, "templatedControls": 247, "arrangedNodes": 1734, "visibleNodes": 1752 },
+  "scenarios": [
+    {
+      "name": "slider-value",
+      "title": "slider · value change",
+      "unit": "ms",
+      "warmup": 5,
+      "iterations": 200,
+      "medianMs": 1.678,
+      "p95Ms": 2.163,
+      "minMs": 1.4,
+      "maxMs": 4.0,
+      "meanMs": 1.8,
+      "stdDevMs": 0.3,
+      "samplesMs": [1.6, 1.7],
+      "counters": { "layoutPasses": 0, "paintPasses": 200, "treesBuilt": 0, "nodes": 1764, "templateNodes": 1282 }
+    }
+  ],
+  "comparison": {
+    "baselinePath": "baseline.json",
+    "metric": "median",
+    "hadBudget": true,
+    "verdict": "pass",
+    "scenarios": [
+      { "name": "slider-value", "currentMs": 1.678, "baselineMs": 1.769, "deltaPercent": -5.1, "budgetPercent": 10, "verdict": "pass" }
+    ]
+  }
+}
+```
+
+The sample array is truncated above; a real file contains every measured sample.
+
+## Measurements
+
+Environment: Windows 11 (10.0.26300), .NET 8.0.31, Release, 1200×800 at 1× DPI, 16 logical processors. Baseline is
+the clone at `C:\Users\Axvse\AppData\Local\Temp\easel-baseline` (`886ab07`, pre-templating, `1.4.0+886ab07…`);
+current is `88e180d` (`1.4.0+88e180d…`). Medians/p95 in milliseconds; one run per column on the same machine, so
+treat small deltas as noise.
+
+| scenario | pre-templating median | pre-templating p95 | current median | current p95 | delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `slider-value` | 1.769 | 2.300 | 1.678 | 2.163 | -5.1% |
+| `splitter-resize` | 4.184 | 5.170 | 5.877 | 7.810 | +40.5% |
+| `full-frame` | 3.391 | 4.268 | 4.249 | 4.615 | +25.3% |
+| `theme-toggle` | 3.360 | 3.766 | 4.518 | 4.811 | +34.4% |
+| `build-page` | 7.022 | 7.356 | 166.565 | 273.986 | +2272.0% |
+| `theme-rebuild` | 6.806 | 7.047 | 135.605 | 151.502 | +1892.3% |
+
+Visual-tree shape of the canonical page:
+
+| counter | pre-templating `886ab07` | current `88e180d` |
+| --- | ---: | ---: |
+| nodes | 286 | 1764 |
+| template-created nodes | 4 | 1282 |
+| template roots | 1 | 248 |
+| templated controls | 1 | 247 |
+| arranged nodes | 276 | 1734 |
+| visible nodes | 278 | 1752 |
+
+Work counters over the measured samples. Layout, paint and trees-built counts are identical on both sides because
+the scenario iteration counts match; the node columns describe the current tree (the baseline tree has 286 nodes
+and 4 template nodes):
+
+| scenario | layout passes | paint passes | trees built | nodes per tree | template nodes per tree |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `slider-value` | 0 | 200 | 0 | 1764 | 1282 |
+| `splitter-resize` | 100 | 100 | 0 | 1764 | 1282 |
+| `full-frame` | 20 | 20 | 0 | 1764 | 1282 |
+| `theme-toggle` | 20 | 20 | 0 | 1764 | 1282 |
+| `build-page` | 10 | 10 | 10 | 1764 | 1282 |
+| `theme-rebuild` | 10 | 10 | 10 | 1764 | 1282 |
+
+The slider scenario performs zero layout passes: its value change only damages a rectangle, so it measures the
+paint path. The splitter, full-frame, theme and build scenarios each run at least one measure/arrange pass per
+sample. The page-build cost tracks the 1282 template-created nodes; the interaction paths differ by roughly the
+extra nodes they must measure and paint, not by a change in the slider's own paint code.
+
+## Interpretation
+
+- A single slider drag remains at or below the pre-templating baseline: nothing in the default templates is on its
+  damaged repaint path.
+- Resize, full-frame repaint and palette switching are 25–40% slower in this run because the current tree is about
+  six times larger and every layout/paint walk crosses 1282 template-created nodes.
+- Building a page is roughly 20× slower. Almost all of the new cost is instantiating the default control templates
+  (1282 template nodes for 247 templated controls), not markup or margins. The counter to move is template
+  instantiation, for example lazy/virtualized item realization; changing brushes or margins will not move it.
+- The palette toggle stays in the same order of magnitude because shared brushes are mutated in place; the rebuild
+  scenario shows what a full re-instantiation costs.
+
+## Limitations
+
+- Results are wall-clock timings from one machine and one run per column. Background load moves the medians,
+  especially the 10-iteration build scenarios (p95 is visibly noisier than median); compare the same machine,
+  configuration and commit range, and prefer repeated runs when a delta is close to a budget.
+- `paintPasses` counts completed paint calls, not painted nodes. `RenderTo` reuses its frame cache, so even a
+  no-op render increments `PaintCount`; use layout passes and the tree counters to reason about the work behind a
+  timing.
+- `templateNodes` counts nodes whose `TemplatedParent` is set, i.e. control-template expansion. Item content
+  realized by an items control through a data template is not included unless that item control itself uses a
+  control template.
+- The page is synthetic, the surface is software-rendered, and the window paint path (DPI scaling, motion scale,
+  native islands) is not exercised.
+- Baseline comparison recompiles the same runner source against a different `Easel.csproj`; the two builds must
+  use a comparable runtime and the same benchmark source, otherwise the delta is not meaningful.
