@@ -43,6 +43,18 @@ internal static class VisualText
         return MeasureContext(dpi).MeasureString(text, font, PointF.Empty, format).Width;
     }
 
+    // 取字形的实际推进宽度：GDI+ 默认的 MeasureString 会在首尾各留约 1/6 em 的 padding，
+    // 用它定位插入符会让插入符停在最后一个字之后的一小段空白上。
+    internal static float MeasureWidthTight(string text, Font font, int dpi)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0f;
+        }
+
+        return MeasureContext(dpi).MeasureString(text, font, PointF.Empty, TightFormat()).Width;
+    }
+
     public static void Draw(
         Visual owner,
         Graphics graphics,
@@ -116,6 +128,35 @@ internal static class VisualText
         }
     }
 
+    internal static void DrawTight(
+        Visual owner,
+        Graphics graphics,
+        string text,
+        Font font,
+        Easel.Brush? brush,
+        RectangleF bounds)
+    {
+        if (string.IsNullOrEmpty(text) || bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            return;
+        }
+
+        var owns = false;
+        System.Drawing.Brush? native = brush?.AcquireNativeBrush(bounds, out owns);
+        native ??= NativeBrushPool.Get(brush?.ApproximateColor ?? Theme.Current.Foreground, out owns);
+        try
+        {
+            DrawCore(owner, graphics, text, font, native, bounds, TightFormat());
+        }
+        finally
+        {
+            if (owns)
+            {
+                native.Dispose();
+            }
+        }
+    }
+
     private static void DrawCore(
         Visual owner,
         Graphics graphics,
@@ -126,9 +167,19 @@ internal static class VisualText
         bool wrap,
         StringAlignment horizontal,
         StringAlignment vertical)
+        => DrawCore(owner, graphics, text, font, native, bounds, Format(wrap, horizontal, vertical));
+
+    private static void DrawCore(
+        Visual owner,
+        Graphics graphics,
+        string text,
+        Font font,
+        System.Drawing.Brush native,
+        RectangleF bounds,
+        StringFormat format)
     {
         graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-        graphics.DrawString(text, owner.ResolveDrawFont(font, graphics), native, bounds, Format(wrap, horizontal, vertical));
+        graphics.DrawString(text, owner.ResolveDrawFont(font, graphics), native, bounds, format);
     }
 
     // 格式对象按「换行 × 水平 × 垂直」缓存到当前线程：绘制期每帧都要，GDI+ 格式本身不必每帧新建。
@@ -152,6 +203,18 @@ internal static class VisualText
 
     [ThreadStatic]
     private static StringFormat? noTrimFormat;
+
+    [ThreadStatic]
+    private static StringFormat? tightFormat;
+
+    private static StringFormat TightFormat()
+        => tightFormat ??= new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormat.GenericTypographic.FormatFlags | StringFormatFlags.NoWrap,
+            Trimming = StringTrimming.None,
+            Alignment = StringAlignment.Near,
+            LineAlignment = StringAlignment.Near,
+        };
 
     private static StringFormat NoTrimFormat()
         => noTrimFormat ??= new StringFormat(StringFormatFlags.NoWrap)

@@ -432,6 +432,14 @@ public class TextBox : TemplatedControl
             nameof(CaretBlinkInterval), typeof(int), typeof(TextBox),
             new PropertyMetadata(530));
 
+    /// <summary>Whether typing replaces the character after the caret instead of inserting.</summary>
+    /// <remarks>The Insert key toggles it; the visual path draws a block caret in this mode. The native editor island
+    /// keeps the operating system's insert behaviour.</remarks>
+    public static readonly DependencyProperty IsOverwriteModeProperty =
+        DependencyProperty.Register(
+            nameof(IsOverwriteMode), typeof(bool), typeof(TextBox),
+            new PropertyMetadata(false) { AffectsRender = true });
+
     private readonly System.Windows.Forms.Timer _caretTimer;
     private readonly System.Windows.Forms.TextBox _editor;
     private readonly NativeControlHost _nativeHost;
@@ -639,6 +647,13 @@ public class TextBox : TemplatedControl
         set => SetValue(CaretBlinkIntervalProperty, value);
     }
 
+    /// <summary>Whether typing replaces the character after the caret instead of inserting.</summary>
+    public bool IsOverwriteMode
+    {
+        get => (bool)GetValue(IsOverwriteModeProperty)!;
+        set => SetValue(IsOverwriteModeProperty, value);
+    }
+
     /// <summary>The first selected character.</summary>
     public int SelectionStart => XamlMath.Clamp(Math.Min(_selectionAnchor, _caretIndex), 0, Text.Length);
 
@@ -666,7 +681,7 @@ public class TextBox : TemplatedControl
             }
 
             var content = ActiveContentRectangle();
-            var textWidth = (float)Math.Ceiling(VisualText.MeasureWidth(DisplayText, Font, RenderDpi));
+            var textWidth = (float)Math.Ceiling(VisualText.MeasureWidthTight(DisplayText, Font, RenderDpi));
             return Math.Max(0f, textWidth - content.Width);
         }
     }
@@ -1018,6 +1033,12 @@ public class TextBox : TemplatedControl
         var control = (args.Modifiers & Keys.Control) != 0;
         switch (args.KeyCode)
         {
+            case Keys.Insert when !shift && !control:
+                IsOverwriteMode = !IsOverwriteMode;
+                ResetCaretBlink();
+                InvalidateVisual();
+                args.Handled = true;
+                break;
             case Keys.Left when control:
                 MoveCaret(FindPreviousWord(Text, CaretIndex), shift);
                 args.Handled = true;
@@ -1287,7 +1308,7 @@ public class TextBox : TemplatedControl
                 }
                 while (wordEnd < hardEnd && char.IsWhiteSpace(display[wordEnd]) == wordSpace);
 
-                var width = VisualText.MeasureWidth(display.Substring(lineStart, wordEnd - lineStart), Font, RenderDpi);
+                var width = VisualText.MeasureWidthTight(display.Substring(lineStart, wordEnd - lineStart), Font, RenderDpi);
                 if (width <= wrapWidth)
                 {
                     lastFit = wordEnd;
@@ -1300,7 +1321,7 @@ public class TextBox : TemplatedControl
                     // 第一个词就比整行宽：按字符切到放得下的位置，至少留下一个字符。
                     var cut = lineStart + 1;
                     while (cut < wordEnd
-                        && VisualText.MeasureWidth(display.Substring(lineStart, cut + 1 - lineStart), Font, RenderDpi) <= wrapWidth)
+                        && VisualText.MeasureWidthTight(display.Substring(lineStart, cut + 1 - lineStart), Font, RenderDpi) <= wrapWidth)
                     {
                         cut++;
                     }
@@ -1343,7 +1364,7 @@ public class TextBox : TemplatedControl
             return 0f;
         }
 
-        return VisualText.MeasureWidth(DisplayText.Substring(line.Start, clamped), Font, RenderDpi);
+        return VisualText.MeasureWidthTight(DisplayText.Substring(line.Start, clamped), Font, RenderDpi);
     }
 
     private void DrawLines(
@@ -1397,21 +1418,13 @@ public class TextBox : TemplatedControl
         }
 
         var text = display.Substring(line.Start + start, length);
-        var width = (float)Math.Ceiling(VisualText.MeasureWidth(text, Font, RenderDpi));
+        var width = (float)Math.Ceiling(VisualText.MeasureWidthTight(text, Font, RenderDpi));
         var destination = new RectangleF(
             content.Left - offset + MeasurePrefix(line, start),
             content.Top + (lineIndex * _lineHeight),
             Math.Max(1f, width + 2f),
             _lineHeight);
-        VisualText.Draw(this,
-            graphics,
-            text,
-            Font,
-            brush,
-            destination,
-            wrap: false,
-            StringAlignment.Near,
-            StringAlignment.Near);
+        VisualText.DrawTight(this, graphics, text, Font, brush, destination);
     }
 
     private void DrawSelection(Graphics graphics, Rectangle content, float offset, XamlBrush selection)
@@ -1452,10 +1465,21 @@ public class TextBox : TemplatedControl
         var thickness = (float)CaretThickness;
         var lineIndex = FindLineIndex(CaretIndex);
         var line = _lines[lineIndex];
-        var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start) + (thickness / 2f);
+        var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start);
         var top = content.Top + (lineIndex * _lineHeight) + 2f;
+        var height = Math.Max(1f, _lineHeight - 4f);
+        if (IsOverwriteMode)
+        {
+            // 覆盖模式的方块占住下一个字符的推进宽度；到行尾没有下一个字符时给一个可见的默认宽度。
+            var width = CaretIndex < line.Start + line.Length
+                ? MeasurePrefix(line, CaretIndex - line.Start + 1) - MeasurePrefix(line, CaretIndex - line.Start)
+                : Math.Max(6f, thickness * 4f);
+            brush.Paint(graphics, new RectangleF(caretX, top, Math.Max(1f, width), height));
+            return;
+        }
+
         using var pen = new Pen(color, thickness);
-        graphics.DrawLine(pen, caretX, top, caretX, top + Math.Max(1f, _lineHeight - 4f));
+        graphics.DrawLine(pen, caretX + (thickness / 2f), top, caretX + (thickness / 2f), top + height);
     }
 
     private int HitTestIndex(PointF local, Rectangle content)
@@ -1609,6 +1633,16 @@ public class TextBox : TemplatedControl
         PushUndo();
         var start = SelectionStart;
         var length = SelectionLength;
+        // 覆盖模式只覆盖普通字符；换行（Enter）仍然插入，避免吃掉下一行。
+        if (length == 0
+            && IsOverwriteMode
+            && replacement.Length > 0
+            && replacement.IndexOf('\n') < 0
+            && replacement.IndexOf('\r') < 0)
+        {
+            length = Math.Min(replacement.Length, Text.Length - start);
+        }
+
         var before = Text.Substring(0, start);
         var after = Text.Substring(start + length);
         SetTextInternal(before + replacement + after);

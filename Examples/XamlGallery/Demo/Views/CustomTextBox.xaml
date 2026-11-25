@@ -69,4 +69,8 @@
            CaretThickness="3"
            CaretBlinkInterval="0" />
 
+  <TextBlock Text="Press Insert to toggle the overwrite block caret."
+             Foreground="{StaticResource Muted}"
+             Wrap="True" />
+
 </local:ThemedStackPanel>

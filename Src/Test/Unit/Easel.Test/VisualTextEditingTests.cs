@@ -547,6 +547,142 @@ public sealed class VisualTextEditingTests
         return false;
     }
 
+    [TestMethod]
+    public void TextBox_InsertKeyTogglesOverwriteMode()
+    {
+        using var surface = CreateSurface(320, 80);
+        var text = new VC.TextBox { Width = 280, Height = 34, Text = "abc", UseNativeEditor = false };
+        surface.Root = text;
+        Layout(surface, 320, 80);
+        surface.FocusElement(text);
+
+        Assert.IsFalse(text.IsOverwriteMode);
+        surface.ProcessKeyDown(Keys.Insert);
+        Assert.IsTrue(text.IsOverwriteMode, "Insert turns overwrite on");
+        surface.ProcessKeyDown(Keys.Insert);
+        Assert.IsFalse(text.IsOverwriteMode, "Insert turns it back off");
+    }
+
+    [TestMethod]
+    public void TextBox_OverwriteReplacesTheNextCharacter()
+    {
+        using var surface = CreateSurface(320, 80);
+        var text = new VC.TextBox { Width = 280, Height = 34, Text = "abc", UseNativeEditor = false };
+        surface.Root = text;
+        Layout(surface, 320, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.Home);
+        surface.ProcessKeyDown(Keys.Right);
+        surface.ProcessKeyDown(Keys.Insert);
+
+        surface.ProcessTextInput("X");
+        Assert.AreEqual("aXc", text.Text, "the next character is replaced");
+        Assert.AreEqual(2, text.CaretIndex);
+
+        surface.ProcessTextInput("Y");
+        Assert.AreEqual("aXY", text.Text, "the next character is replaced again");
+
+        surface.ProcessTextInput("Z");
+        Assert.AreEqual("aXYZ", text.Text, "at the end the field inserts");
+    }
+
+    [TestMethod]
+    public void TextBox_OverwriteModeDrawsABlockCaret()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 80) };
+        var text = new VC.TextBox
+        {
+            Width = 220,
+            Height = 36,
+            Text = "WWWW",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            CaretBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            CaretThickness = 1d,
+            CaretBlinkInterval = 0,
+        };
+        surface.Root = text;
+        Layout(surface, 260, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.Home);
+
+        using var insert = Render(surface, 260, 80);
+        var insertPixels = CountRedish(insert);
+        Assert.IsGreaterThan(0, insertPixels, "the insert caret is painted");
+
+        surface.ProcessKeyDown(Keys.Insert);
+        using var overwrite = Render(surface, 260, 80);
+        var overwritePixels = CountRedish(overwrite);
+
+        Assert.IsGreaterThan(insertPixels, overwritePixels, "the overwrite caret is a wider block");
+    }
+
+    [TestMethod]
+    public void TextBox_CaretSitsAtTheEndOfTheLastCharacter()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 80) };
+        var text = new VC.TextBox
+        {
+            Width = 220,
+            Height = 36,
+            Text = "WWWW",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            CaretBrush = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00)),
+            CaretThickness = 1d,
+            CaretBlinkInterval = 0,
+        };
+        surface.Root = text;
+        Layout(surface, 260, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.End);
+
+        using var bitmap = Render(surface, 260, 80);
+        var caretLeft = int.MaxValue;
+        var lastGlyph = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                if (IsRedish(pixel))
+                {
+                    caretLeft = Math.Min(caretLeft, x);
+                }
+                else if (pixel.R > 160 && pixel.G > 160 && pixel.B > 160)
+                {
+                    lastGlyph = Math.Max(lastGlyph, x);
+                }
+            }
+        }
+
+        Assert.IsTrue(caretLeft < int.MaxValue, "the caret is painted");
+        Assert.IsTrue(lastGlyph > 0, "the text is painted");
+        Assert.IsLessThan(4, caretLeft - lastGlyph,
+            $"the caret sits at the text advance (glyph={lastGlyph}, caret={caretLeft})");
+    }
+
+    private static int CountRedish(Bitmap bitmap)
+    {
+        var count = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (IsRedish(bitmap.GetPixel(x, y)))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsRedish(Color pixel) => pixel.R > 120 && pixel.G < 80 && pixel.B < 80;
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
 
