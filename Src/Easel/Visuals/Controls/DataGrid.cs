@@ -823,8 +823,19 @@ public class DataGrid : TemplatedControl
         }
 
         DrawHeader(graphics, inner, headerFont, theme, foreground);
+
+        // 行必须裁到表头下方：滚动偏移不是行高整数倍时，首行会越过 _bodyTop，画到表头上面。
+        var bodyState = graphics.Save();
+        graphics.SetClip(
+            new RectangleF(
+                _bodyLeft,
+                _bodyTop,
+                Math.Max(0f, _bodyRight - _bodyLeft),
+                Math.Max(0f, _bodyBottom - _bodyTop)),
+            CombineMode.Intersect);
         DrawRows(graphics, font, theme, foreground);
         DrawDropIndicator(graphics, theme);
+        graphics.Restore(bodyState);
 
         graphics.Restore(previous);
 

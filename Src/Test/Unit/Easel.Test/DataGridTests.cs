@@ -247,6 +247,42 @@ public sealed class DataGridTests
     }
 
     [TestMethod]
+    public void ScrollingAPartialRowKeepsItUnderTheHeader()
+    {
+        var original = Theme.Current;
+        try
+        {
+            var palette = Theme.CreateDark();
+            palette.SurfaceAlt = Color.FromArgb(0xFF, 0x20, 0x30, 0x40);
+            palette.Selection = Color.FromArgb(0xFF, 0x40, 0x50, 0x60);
+            palette.Foreground = Color.FromArgb(0xFF, 0xE0, 0xE0, 0xE0);
+            palette.CornerRadius = 0f;
+            Theme.Current = palette;
+
+            var rows = Enumerable.Range(0, 100).Select(index => new Row { Name = $"Row {index}", Value = index }).ToList();
+            var grid = CreateGrid(rows, 300, 160);
+            grid.SelectedIndex = 0;
+            using var host = BuildHost(grid, 300, 160);
+            grid.Children.OfType<Easel.Visuals.Controls.ScrollBar>().First().Value = 10d;
+
+            using var bitmap = new Bitmap(300, 160, PixelFormat.Format32bppPArgb);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                host.RenderTo(graphics, new Size(300, 160));
+            }
+
+            Assert.AreEqual(
+                palette.SurfaceAlt.ToArgb(),
+                bitmap.GetPixel(280, 25).ToArgb(),
+                "a partially scrolled row must not paint over the header");
+        }
+        finally
+        {
+            Theme.Current = original;
+        }
+    }
+
+    [TestMethod]
     public void DropZoneAcceptsTextAndReportsCopy()
     {
         var zone = new DropZone { Width = 320, Height = 120, Title = "Drop", Detail = "Anything" };
