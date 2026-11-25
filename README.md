@@ -72,6 +72,21 @@ public sealed partial class SettingsView : StackPanel
 }
 ```
 
+### Compiled bindings
+
+Bindings resolve through `TypeDescriptor` by default. Add `x:DataType` and opt in with `x:CompileBindings` to
+compile data-context paths into direct property access:
+
+```xml
+<StackPanel x:DataType="vm:SettingsViewModel" x:CompileBindings="True">
+  <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+</StackPanel>
+```
+
+The generator emits a typed reader per binding; `INotifyPropertyChanged`, converters, `StringFormat`, fallback
+values and validation still apply. `Source`, `ElementName`, `RelativeSource` and `TemplateBinding` stay runtime
+bindings, and a `DataTemplate` sets its own item type with `x:DataType`.
+
 ## What is in the box
 
 | Area | What you get |
@@ -82,7 +97,7 @@ public sealed partial class SettingsView : StackPanel
 | **Input** | `Button`/`RepeatButton`, toggles, `Slider`, `ProgressBar`, focus and keyboard navigation |
 | **Overlay** | `VisualPopup`, `VisualMenu`, `VisualContextMenu` in a surface overlay above the root tree |
 | **Styling** | Styles, triggers, `ControlTemplate` + `ContentPresenter`, keyed resources, `StaticResource` and `DynamicResource` |
-| **Binding** | One-way/two-way/one-time paths, converters, validation, inherited `DataContext`, commands |
+| **Binding** | One-way/two-way/one-time paths, converters, validation, inherited `DataContext`, commands, compiled `x:DataType` paths |
 | **Visuals** | Brushes, gradients, opacity/clip/effects, opacity masks, cached layers, exact-perspective 3D transforms |
 | **Theme** | Dark+/Light+ XAML dictionaries, high contrast, follow-system mode, custom `ResourceDictionary` themes |
 

@@ -103,6 +103,31 @@ internal static class Diagnostics
         "The unprefixed type '{0}' is not an Easel visual type; unprefixed names resolve to the visual backend, so write 'local:{0}' for a type in your own namespace",
         XamlCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor CompiledBindingNeedsDataType = new(
+        "EASEL_XAML020", "Compiled binding needs x:DataType",
+        "x:CompileBindings is enabled but no x:DataType is in scope for the binding path '{0}'",
+        XamlCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor UnknownCompiledBindingMember = new(
+        "EASEL_XAML021", "Unknown compiled binding member",
+        "'{0}' has no accessible property named '{1}' for the compiled binding path",
+        XamlCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor ReadOnlyCompiledBindingLeaf = new(
+        "EASEL_XAML022", "Compiled binding leaf is read-only",
+        "'{0}' cannot be written by a {1} compiled binding",
+        XamlCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor InvalidBindingDirective = new(
+        "EASEL_XAML023", "Invalid binding directive",
+        "The x:{0} value '{1}' is not valid",
+        XamlCategory, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor UnsupportedCompiledBindingPath = new(
+        "EASEL_XAML024", "Unsupported compiled binding path",
+        "The compiled binding path '{0}' is not supported ({1}); the binding falls back to reflection",
+        XamlCategory, DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor PropertyNotPartial = new(
         "EASEL_XAMLP001", "XamlProperty must be partial",
         "A [XamlProperty] property must be declared partial and have no accessor bodies",

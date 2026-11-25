@@ -15,7 +15,7 @@ public sealed partial class SettingsView : UserControl
 {
     public SettingsView(SettingsViewModel vm)
     {
-        DataContext = vm;          // before InitializeComponent: XAML bindings resolve immediately
+        DataContext = vm;          // before InitializeComponent: bindings see the context on their first read
         InitializeComponent();
     }
 }
@@ -23,11 +23,39 @@ public sealed partial class SettingsView : UserControl
 
 - Set `DataContext` **before** `InitializeComponent` when the XAML has bindings. A binding created before
   parenting still retries when the chain is complete, but setting it first avoids an empty first frame.
+  Setting it afterwards also reaches `OneWay`/`TwoWay` bindings through the inherited-context change;
+  `OneTime` bindings are the exception and never re-read a context that arrives later.
 - A local `DataContext` cuts inheritance for that subtree.
 - A binding's source is a property path into the data context; `Source` can override it with an object,
   `ElementName` with a named element, `RelativeSource` with `Self`/`TemplatedParent`/`FindAncestor`.
 - Use `RelativeSource={RelativeSource FindAncestor, AncestorType=local:MyView, AncestorLevel=1}` from an item
   template to reach the view model instead of copying it into every item.
+
+## Compiled bindings
+
+Bindings resolve through `TypeDescriptor` by default. Add `x:DataType` and `x:CompileBindings` to compile the
+data-context path into direct property access:
+
+```xml
+<UserControl
+    xmlns:vm="clr-namespace:MyApp.ViewModels"
+    x:DataType="vm:SettingsViewModel"
+    x:CompileBindings="True">
+  <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+  <Button Command="{Binding SaveCommand}" />
+</UserControl>
+```
+
+- Both directives are inherited by the subtree; `x:CompileBindings="False"` opts a subtree out.
+- A `DataTemplate` sets the item type for its body: `<DataTemplate x:DataType="local:Row">`.
+- Paths get checked at compile time; source-generated properties (`[VeloxProperty]`) are checked by the C#
+  compiler at the same point. Converters, `StringFormat`, fallback values, validation and
+  `INotifyPropertyChanged` behave exactly like runtime bindings.
+- `Source`, `ElementName`, `RelativeSource` and `TemplateBinding` remain runtime bindings.
+- `OneWay`/`OneTime` need only a getter. `TwoWay`/`OneWayToSource` need an accessible setter; a read-only leaf
+  is `EASEL_XAML022`.
+- Indexers compile for arrays, `IList<T>` and `IDictionary<TKey, TValue>`; a non-generic `IList`/`IDictionary`
+  yields `object`, so a later segment falls back to reflection with `EASEL_XAML024`.
 
 ## Bindable view models
 

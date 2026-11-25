@@ -227,6 +227,34 @@ A failed binding raises the static `VisualBindingOperations.BindingFailed` event
 a validation error raises `Validation.Error` (`ValidationErrorEventArgs`) when the binding sets
 `NotifyOnValidationError`. Neither is silently swallowed.
 
+### Compiled bindings
+
+Data-context paths can be compiled into direct property access. Enable it at the view root (or any subtree):
+
+```xml
+<UserControl
+    xmlns:vm="clr-namespace:MyApp.ViewModels"
+    x:DataType="vm:SettingsViewModel"
+    x:CompileBindings="True">
+  <TextBox Text="{Binding DisplayName, Mode=TwoWay}" />
+</UserControl>
+```
+
+- `x:CompileBindings` is inherited; `x:CompileBindings="False"` opts a subtree out. Setting it without an
+  `x:DataType` in scope is `EASEL_XAML020` for each data-context binding with a path.
+- `x:DataType` is also inherited. A `DataTemplate` sets its own item type (`x:DataType="local:Row"`), which
+  covers every binding in the template body.
+- Compiled bindings still use `INotifyPropertyChanged`, converters, `StringFormat`, fallback values and
+  validation. The generated reader walks the path through typed accessors, not `TypeDescriptor`.
+- The generator checks a path when the member is visible in its input compilation. Members added by another
+  source generator (for example `[VeloxProperty]`) defer to the C# compiler, which still fails the build on a typo.
+- `Source`, `ElementName`, `RelativeSource` and `TemplateBinding` stay runtime bindings; they are not compiled
+  against `x:DataType`.
+- Simple indexers compile through runtime helpers: arrays, `IList<T>` and `IDictionary<TKey, TValue>`. A
+  non-generic `IList`/`IDictionary` reads as `object`; an intermediate one falls back to reflection with
+  `EASEL_XAML024`. Other indexers fall back the same way.
+- A two-way compiled binding needs an accessible setter and a non-boxed owner; otherwise `EASEL_XAML022`.
+
 ## Events
 
 Any CLR event on a visual type can be set as an attribute:
@@ -265,9 +293,14 @@ The handler must be unambiguous and match the event's delegate signature. Pointe
 | `EASEL_XAML017` | invalid handler signature |
 | `EASEL_XAML018` | ambiguous type |
 | `EASEL_XAML019` | unprefixed type is not an Easel type |
+| `EASEL_XAML020` | compiled binding has no `x:DataType` in scope |
+| `EASEL_XAML021` | compiled binding path member is unknown or inaccessible |
+| `EASEL_XAML022` | compiled binding leaf cannot be written |
+| `EASEL_XAML023` | invalid `x:DataType` / `x:CompileBindings` value |
+| `EASEL_XAML024` | compiled binding path is unsupported and falls back to reflection |
 | `EASEL_XAMLP001`–`005` | property generator: non-partial, wrong owner, invalid attached accessors, name conflict, missing default value |
 
-`EASEL_XAML003/004/007/008/010/011/013/016/017` are warnings: the element/attribute is skipped and the build
+`EASEL_XAML003/004/007/008/010/011/013/016/017/024` are warnings: the element/attribute is skipped and the build
 continues. Every other `EASEL_XAML*` ID and `EASEL_XAMLP*` is an error. Treat the warning IDs as errors in
 practice.
 

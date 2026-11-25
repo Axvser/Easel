@@ -335,7 +335,7 @@ internal sealed class VisualBindingExpression : IVisualBindingExpression
         _target = target;
         _property = property;
         _binding = binding;
-        _path = new BindingPath(binding.Path);
+        _path = new BindingPath(binding.Path, (binding as CompiledBinding)?.Read);
         _validationPropertyName = LastPropertyName(binding.Path);
         _pushesTarget = binding.Mode is BindingMode.OneWay or BindingMode.TwoWay or BindingMode.OneTime;
         _writesSource = binding.Mode is BindingMode.TwoWay or BindingMode.OneWayToSource;

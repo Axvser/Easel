@@ -24,6 +24,11 @@ EASEL_XAML016 | Easel.Xaml | Warning | Ambiguous event handler
 EASEL_XAML017 | Easel.Xaml | Warning | Invalid event handler signature
 EASEL_XAML018 | Easel.Xaml | Error | Ambiguous XAML type
 EASEL_XAML019 | Easel.Xaml | Error | Unprefixed type is not a Easel type
+EASEL_XAML020 | Easel.Xaml | Error | Compiled binding needs x:DataType
+EASEL_XAML021 | Easel.Xaml | Error | Unknown compiled binding member
+EASEL_XAML022 | Easel.Xaml | Error | Compiled binding leaf is read-only
+EASEL_XAML023 | Easel.Xaml | Error | Invalid binding directive
+EASEL_XAML024 | Easel.Xaml | Warning | Unsupported compiled binding path
 EASEL_XAMLP001 | Easel.Xaml | Error | XamlProperty must be partial
 EASEL_XAMLP002 | Easel.Xaml | Error | XamlProperty owner unsupported
 EASEL_XAMLP003 | Easel.Xaml | Error | Invalid attached property accessors

@@ -11,10 +11,12 @@ namespace Easel;
 internal sealed class BindingPath
 {
     private readonly string[] _segments;
+    private readonly CompiledBindingReader? _compiled;
 
-    public BindingPath(string? path)
+    public BindingPath(string? path, CompiledBindingReader? compiled = null)
     {
         Raw = path ?? string.Empty;
+        _compiled = compiled;
         _segments = string.IsNullOrEmpty(Raw) || Raw == "."
             ? []
             : Raw.Split('.');
@@ -49,6 +51,19 @@ internal sealed class BindingPath
         value = null;
         nodes = [];
         leaf = null;
+
+        if (_compiled is not null)
+        {
+            if (root is null
+                || !_compiled(root, nodes, out value, out var compiledType, out var write))
+            {
+                return false;
+            }
+
+            var compiledValue = value;
+            leaf = new BindingLeaf(compiledType, () => compiledValue, write);
+            return true;
+        }
 
         if (IsEmpty)
         {
