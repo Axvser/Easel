@@ -1468,7 +1468,13 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     // 模板里的每个后代都记着施模板的控件；TemplateBinding 靠它找源，模板触发器也写回它。
     internal void SetTemplatedParentRecursive(VisualElement? parent)
     {
-        TemplatedParent = parent;
+        // 内层控件自己的模板部件已经指向内层控件，不能被外层模板改源；但它们的子树里可能有
+        // 属于外层模板的内容（例如 ScrollViewer 的 Content），所以保留部件本身、继续向下走。
+        if (TemplatedParent is null || ReferenceEquals(TemplatedParent, parent))
+        {
+            TemplatedParent = parent;
+        }
+
         foreach (var child in Children)
         {
             if (child is VisualElement element)

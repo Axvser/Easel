@@ -1013,20 +1013,10 @@ public class Calendar : TemplatedControl
         };
 
         item.Owner = this;
-        RestoreNestedTemplate(item);
         _calendarItem = item;
         item.InvalidateVisual();
     }
 
-    // 外层模板的 SetTemplatedParentRecursive 会一路盖到内嵌模板的后代，让内层部件的 TemplateBinding 源错位；
-    // 内层模板根要重新认回自己的控件。
-    private static void RestoreNestedTemplate(VisualElement nested)
-    {
-        if (nested is TemplatedControl { TemplateRoot: { } root } templated)
-        {
-            root.SetTemplatedParentRecursive(templated);
-        }
-    }
 }
 
 /// <summary>A date field whose calendar opens in a <see cref="VisualPopup"/>.</summary>
@@ -1394,7 +1384,6 @@ public class DatePicker : TemplatedControl
         _partTextBox.PropertyChanged += OnPartTextChanged;
         _partTextBox.PointerPressed -= OnPartTextPointerPressed;
         _partTextBox.PointerPressed += OnPartTextPointerPressed;
-        RestoreNestedTemplate(textBox);
         SyncPartText();
 
         var buttonPart = GetTemplateChild<VisualElement>("PART_Button");
