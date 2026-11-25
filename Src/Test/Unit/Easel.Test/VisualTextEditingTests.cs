@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Easel;
 using Easel.Visuals;
@@ -316,6 +317,57 @@ public sealed class VisualTextEditingTests
         Assert.IsGreaterThan(0, text.CaretIndex, "the click sets the visual caret");
         Assert.IsGreaterThan(0, text.NativeEditor.SelectionStart, "the first click positions the native caret");
     }
+
+    [TestMethod]
+    public void FirstClickFocusesTheNativeEditor()
+    {
+        using var form = new Form
+        {
+            Size = new Size(320, 200),
+            StartPosition = FormStartPosition.Manual,
+            Location = new Point(80, 80),
+        };
+        using var surface = new VisualHost { Dock = DockStyle.Fill };
+        form.Controls.Add(surface);
+        using var text = new VC.TextBox { Width = 200, Height = 32, Text = "hello" };
+        var root = new VC.Canvas { Width = 320, Height = 200 };
+        VC.Canvas.SetLeft(text, 40);
+        VC.Canvas.SetTop(text, 40);
+        root.Add(text);
+        surface.Root = root;
+        Layout(surface, 320, 200);
+        form.TopMost = true;
+        form.Show();
+        form.Activate();
+        for (var attempt = 0; attempt < 20 && !ReferenceEquals(Form.ActiveForm, form); attempt++)
+        {
+            SetForegroundWindow(form.Handle);
+            Application.DoEvents();
+            Thread.Sleep(25);
+        }
+
+        if (!ReferenceEquals(Form.ActiveForm, form))
+        {
+            Assert.Inconclusive("the test host did not become the active form");
+        }
+
+        var point = new PointF(text.AbsoluteBounds.X + 100f, text.AbsoluteBounds.Y + 16f);
+        surface.ProcessPointerDown(point, MouseButtons.Left);
+        surface.ProcessPointerUp(point, MouseButtons.Left);
+
+        for (var attempt = 0; attempt < 20 && !text.NativeEditor.Focused; attempt++)
+        {
+            Application.DoEvents();
+            Thread.Sleep(25);
+        }
+
+        Assert.IsTrue(text.IsUsingNativeEditor, "the click opens the native editor");
+        Assert.IsTrue(text.NativeEditor.Focused, "the first click leaves the caret in the native editor");
+        form.Close();
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
 
     private static VisualHost CreateSurface(int width, int height)
         => new() { Size = new Size(width, height) };

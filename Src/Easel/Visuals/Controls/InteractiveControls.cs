@@ -395,6 +395,8 @@ public class TextBox : TemplatedControl
     private bool _syncingNative;
     private bool _suppressHistoryReset;
     private bool _focusHandoff;
+    private bool _focusOnNextLayout;
+    private readonly System.Windows.Forms.Timer _editorFocusTimer;
     private float _horizontalOffset;
     private float _lineHeight = 16f;
     private float _laidOutWidth = -1f;
@@ -410,6 +412,13 @@ public class TextBox : TemplatedControl
         {
             _caretVisible = !_caretVisible;
             InvalidateVisual();
+        };
+
+        _editorFocusTimer = new System.Windows.Forms.Timer { Interval = 200 };
+        _editorFocusTimer.Tick += (_, _) =>
+        {
+            _editorFocusTimer.Stop();
+            FocusNativeEditorIfNeeded();
         };
 
         _editor = new System.Windows.Forms.TextBox
@@ -871,6 +880,12 @@ public class TextBox : TemplatedControl
     /// <inheritdoc />
     protected override void OnPointerReleased(VisualPointerEventArgs args)
     {
+        if (_nativeActive)
+        {
+            // 按下时补的焦点会被这次 WinForms 焦点处理收走；抬起时消息已经处理完，补一次就能留住。
+            FocusNativeEditorIfNeeded();
+        }
+
         if (_dragging)
         {
             _dragging = false;
@@ -1586,7 +1601,58 @@ public class TextBox : TemplatedControl
             _focusHandoff = false;
         }
 
+        // 第一次点击时焦点可能先落到编辑器、随后又被这次 WinForms 焦点处理收走；
+        // 所以不判断当前是否已聚焦，统一排到下一次布局之后（PlaceNative 已经跑完）再补一次。
+        _focusOnNextLayout = true;
+        if (Surface is { IsHandleCreated: true, IsDisposed: false } surface)
+        {
+            surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+            surface.LayoutUpdated += OnSurfaceLayoutUpdated;
+        }
+
+        _editorFocusTimer.Stop();
+        _editorFocusTimer.Start();
+
         InvalidateVisual();
+    }
+
+    private void OnSurfaceLayoutUpdated(object? sender, EventArgs e)
+    {
+        if (!_focusOnNextLayout)
+        {
+            return;
+        }
+
+        _focusOnNextLayout = false;
+        if (Surface is { } surface)
+        {
+            surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+            if (surface.IsHandleCreated && !surface.IsDisposed)
+            {
+                // 布局发生在绘制过程中；投回消息队列，等这一帧画完再抢焦点。
+                surface.BeginInvoke(new Action(FocusNativeEditorIfNeeded));
+            }
+        }
+
+        _editorFocusTimer.Stop();
+    }
+
+    private void FocusNativeEditorIfNeeded()
+    {
+        if (!_nativeActive || _editor.IsDisposed || !_editor.Visible || _editor.Focused || !_editor.CanFocus)
+        {
+            return;
+        }
+
+        _focusHandoff = true;
+        try
+        {
+            _editor.Focus();
+        }
+        finally
+        {
+            _focusHandoff = false;
+        }
     }
 
     private void HideNativeEditor()
@@ -1597,6 +1663,13 @@ public class TextBox : TemplatedControl
         }
 
         _nativeActive = false;
+        _focusOnNextLayout = false;
+        _editorFocusTimer.Stop();
+        if (Surface is { } surface)
+        {
+            surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+        }
+
         _nativeHost.Visibility = Easel.Controls.Visibility.Collapsed;
         Surface?.RemoveNative(_nativeHost);
         if (!_editor.IsDisposed)
@@ -1762,6 +1835,13 @@ public class TextBox : TemplatedControl
         {
             _caretTimer.Stop();
             _caretTimer.Dispose();
+            _editorFocusTimer.Stop();
+            _editorFocusTimer.Dispose();
+            if (Surface is { } surface)
+            {
+                surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+            }
+
             Surface?.RemoveNative(_nativeHost);
             _nativeHost.Child = null;
             _editor.Dispose();
