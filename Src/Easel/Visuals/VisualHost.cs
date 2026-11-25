@@ -2107,9 +2107,19 @@ public class VisualHost : System.Windows.Forms.Control
     // 宿主自带当前主题字典，默认模板里的 DynamicResource 才能找到主题键；应用自己的字典后合并、优先级更高。
     private void RefreshThemeResources()
     {
-        _themeResources.Clear();
-        foreach (var pair in Theme.CreateResourceDictionary(Theme.EffectiveMode))
+        // 主题切换时共享画笔原地改色，模板部件持有的同一个 brush 会一起变色；
+        // 清空/重建字典会让每个 DynamicResource 绑定收到每个 key 的 Changed，切主题变成事件风暴。
+        var fresh = Theme.CreateResourceDictionary(Theme.EffectiveMode);
+        foreach (var pair in fresh)
         {
+            if (_themeResources.TryGetValue(pair.Key, out var existing)
+                && existing is SolidColorBrush oldBrush
+                && pair.Value is SolidColorBrush newBrush)
+            {
+                oldBrush.Color = newBrush.Color;
+                continue;
+            }
+
             _themeResources[pair.Key] = pair.Value;
         }
     }

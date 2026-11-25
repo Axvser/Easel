@@ -280,33 +280,58 @@ internal sealed class ResourceBinding : IDisposable
     {
         Unsubscribe();
         VisualElement? root = null;
-        for (var current = _element; current is not null; current = current.ParentElement)
+        ResourceDictionary? source = null;
+        foreach (var current in EnumerateChain())
         {
             _chain.Add(current);
             root = current;
+            // 父级变化仍要逐个监听：模板部件先在工厂里创建，链在挂到 ListBox/弹层时才变长；
+            // 只监听元素本身和当时的链根会漏掉随后挂上的中间父级。
             current.ParentChanged += OnChainChanged;
-            var dictionary = current.Resources;
-            if (_dictionaries.Contains(dictionary))
+            if (current.Resources.TryFindSource(_key, out _, out var found))
             {
-                continue;
+                source = found;
             }
-
-            _dictionaries.Add(dictionary);
-            dictionary.Changed += OnDictionaryChanged;
         }
 
-        // 根挂到 VisualHost 之后才有表面字典；那时没有 ParentChanged，只能靠表面事件重试。
+        // 只为可能提供这个 key 的字典挂订阅：元素自己的、链根的、表面的，以及当前命中的来源字典。
+        // 给每个祖先的 Resources 都挂订阅会让模板部件创建时产生成倍的订阅开销。
+        AddDictionary(_element.Resources);
         if (root is not null)
         {
             _surfaceRoot = root;
             root.SurfaceChanged += OnChainChanged;
+            AddDictionary(root.Resources);
         }
 
-        if (_element.Surface is { } surface && !_dictionaries.Contains(surface.Resources))
+        if (source is not null)
         {
-            _dictionaries.Add(surface.Resources);
-            surface.Resources.Changed += OnDictionaryChanged;
+            AddDictionary(source);
         }
+
+        if (_element.Surface is { } surface)
+        {
+            AddDictionary(surface.Resources);
+        }
+    }
+
+    private IEnumerable<VisualElement> EnumerateChain()
+    {
+        for (var current = _element; current is not null; current = current.ParentElement)
+        {
+            yield return current;
+        }
+    }
+
+    private void AddDictionary(ResourceDictionary dictionary)
+    {
+        if (_dictionaries.Contains(dictionary))
+        {
+            return;
+        }
+
+        _dictionaries.Add(dictionary);
+        dictionary.Changed += OnDictionaryChanged;
     }
 
     private void Unsubscribe()

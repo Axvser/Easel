@@ -531,7 +531,10 @@ public static class Theme
         var resources = new ResourceDictionary();
         foreach (var pair in source)
         {
-            resources[pair.Key] = pair.Value;
+            // 拷贝字典拥有自己的画笔：宿主切主题时会原地改色，不能让所有副本共享静态主题里的 Draw 刷。
+            resources[pair.Key] = pair.Value is SolidColorBrush brush
+                ? new SolidColorBrush(brush.Color)
+                : pair.Value;
         }
 
         return resources;
