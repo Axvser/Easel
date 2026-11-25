@@ -18,7 +18,7 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     private readonly GalleryShellViewModel _vm;
     private readonly GalleryCardCatalog _catalog;
     private readonly Dictionary<VC.TreeViewItem, string> _entryItems = [];
-    private GalleryVisualInspector _inspector = new();
+    private GalleryVisualInspector _inspector;
     private bool _syncingSelection;
 
     /// <summary>Builds the shell for an existing view model and selection.</summary>
@@ -35,6 +35,7 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         DataContext = vm;
         InitializeComponent();
 
+        _inspector = new GalleryVisualInspector(Resources);
         InspectorHost.Content = _inspector.Root;
         LeftSplitter.Target = CatalogPane;
         RightSplitter.Target = InspectorPane;
@@ -188,22 +189,16 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     /// <summary>Updates theme-driven code-built parts without rebuilding the shell.</summary>
     public void RefreshTheme()
     {
-        var previousInspector = _inspector;
-        _inspector = new GalleryVisualInspector();
-        InspectorHost.Content = _inspector.Root;
-        previousInspector.Root.Dispose();
-
-        if (_vm.SelectedCard is { } card)
+        // Inspector labels hold the shell's theme brushes, which mutate in place; only a preview that
+        // captured Theme.Current colours at construction needs a new instance.
+        if (_vm.SelectedCard is not null
+            && PreviewHost.Content is VisualElement current
+            && current is Demo.Views.DynamicResourceCard or Demo.Views.Cards.CompositionLabView)
         {
-            var previous = PreviewHost.Content as VisualElement;
-            var next = _catalog.Find(card.Id)?.Create(_model);
+            var next = _catalog.Find(_vm.SelectedCard.Id)?.Create(_model);
             PreviewHost.Content = next;
-            previous?.Dispose();
+            current.Dispose();
             _inspector.SetTarget(next);
-        }
-        else
-        {
-            _inspector.SetTarget(null);
         }
     }
 

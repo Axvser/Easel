@@ -1,3 +1,4 @@
+using XamlBrush = Easel.Brush;
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
@@ -16,6 +17,17 @@ internal sealed class GalleryVisualInspector
     };
 
     private readonly VC.StackPanel _stack = new() { Spacing = 6 };
+    private readonly ResourceDictionary _resources;
+
+    internal GalleryVisualInspector(ResourceDictionary resources)
+    {
+        _resources = resources;
+    }
+
+    private XamlBrush Brush(string key)
+        => _resources.TryGetValue(key, out var value) && value is XamlBrush brush
+            ? brush
+            : new SolidColorBrush(Theme.Current.MutedForeground);
 
     /// <summary>The visual root of the inspector.</summary>
     public VisualElement Root => _stack;
@@ -105,12 +117,12 @@ internal sealed class GalleryVisualInspector
         return false;
     }
 
-    private static VisualElement CreateRow(VisualElement target, DependencyProperty property, object? value)
+    private VisualElement CreateRow(VisualElement target, DependencyProperty property, object? value)
     {
         var label = new VC.TextBlock
         {
             Text = property.Name,
-            Foreground = Theme.Current.MutedForeground,
+            Foreground = Brush("Muted"),
             Width = 150,
             VerticalAlignment = Easel.Controls.VerticalAlignment.Center,
         };
@@ -236,11 +248,11 @@ internal sealed class GalleryVisualInspector
         return null;
     }
 
-    private static VC.TextBlock Caption(string text)
+    private VC.TextBlock Caption(string text)
         => new()
         {
             Text = text,
-            Foreground = Theme.Current.MutedForeground,
+            Foreground = Brush("Muted"),
             Wrap = true,
         };
 }
