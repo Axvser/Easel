@@ -9,6 +9,15 @@
   <!-- The shell is authored in visual XAML; only the catalog rows, preview disposal and splitter targets
        stay in code-behind because they are view behaviour, not markup. -->
 
+  <VisualTitleBar x:Name="CaptionBar"
+                  DockPanel.Dock="Top"
+                  Title="Easel Demos"
+                  Height="32">
+    <VisualTitleBar.Icon>
+      <Border Width="16" Height="16" CornerRadius="4" Background="{StaticResource Accent}" />
+    </VisualTitleBar.Icon>
+  </VisualTitleBar>
+
   <Border x:Name="TitleBar"
           DockPanel.Dock="Top"
           Height="80"

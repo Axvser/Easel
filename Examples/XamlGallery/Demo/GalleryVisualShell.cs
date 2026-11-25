@@ -99,6 +99,7 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     {
         var visibility = visible ? XamlVisibility.Visible : XamlVisibility.Collapsed;
         TitleBar.Visibility = visibility;
+        CaptionBar.Visibility = visibility;
         StatusBar.Visibility = visibility;
         CatalogPane.Visibility = visibility;
         InspectorPane.Visibility = visibility;
