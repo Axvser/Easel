@@ -845,7 +845,7 @@ public class TextBox : TemplatedControl
 
             if (IsFocused && _caretVisible && !IsReadOnly)
             {
-                DrawCaret(graphics, content, offset, textTop, textBrush);
+                DrawCaret(graphics, content, offset, textTop);
             }
         }
         finally
@@ -1478,9 +1478,9 @@ public class TextBox : TemplatedControl
         }
     }
 
-    private void DrawCaret(Graphics graphics, Rectangle content, float offset, float textTop, XamlBrush foreground)
+    private void DrawCaret(Graphics graphics, Rectangle content, float offset, float textTop)
     {
-        var brush = CaretBrush ?? foreground;
+        var brush = CaretBrush ?? new SolidColorBrush(Theme.Current.Caret);
         var color = brush.ApproximateColor;
         if (color.A == 0)
         {
@@ -1499,13 +1499,16 @@ public class TextBox : TemplatedControl
             var width = CaretIndex < line.Start + line.Length
                 ? MeasurePrefix(line, CaretIndex - line.Start + 1) - MeasurePrefix(line, CaretIndex - line.Start)
                 : Math.Max(6f, thickness * 4f);
+            var rect = new RectangleF(caretX, top, Math.Max(1f, width), height);
             var alpha = (int)Math.Round(color.A * CaretBlockOpacity);
             if (alpha > 0)
             {
                 using var block = new SolidBrush(Color.FromArgb(alpha, color));
-                graphics.FillRectangle(block, caretX, top, Math.Max(1f, width), height);
+                graphics.FillRectangle(block, rect);
             }
 
+            using var outline = new Pen(color, 1f);
+            graphics.DrawRectangle(outline, rect.X, rect.Y, rect.Width, rect.Height);
             return;
         }
 
@@ -1704,8 +1707,10 @@ public class TextBox : TemplatedControl
         }
 
         PushUndo();
-        SetTextInternal(Text.Remove(_caretIndex - 1, 1));
-        _caretIndex--;
+        // Text 的变更回调会把选择夹回新长度；先算好落点，别在夹取之后再自减，否则行尾删除会多退一格。
+        var removeAt = _caretIndex - 1;
+        SetTextInternal(Text.Remove(removeAt, 1));
+        _caretIndex = XamlMath.Clamp(removeAt, 0, Text.Length);
         _selectionAnchor = _caretIndex;
         ResetCaretBlink();
         EnsureCaretVisible();
@@ -1733,6 +1738,7 @@ public class TextBox : TemplatedControl
 
         PushUndo();
         SetTextInternal(Text.Remove(_caretIndex, 1));
+        _caretIndex = XamlMath.Clamp(_caretIndex, 0, Text.Length);
         _selectionAnchor = _caretIndex;
         ResetCaretBlink();
         EnsureCaretVisible();

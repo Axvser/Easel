@@ -454,7 +454,7 @@ public class RichTextBox : TemplatedControl
 
         if (IsFocused && _caretVisible)
         {
-            var caretBrush = CaretBrush ?? new SolidColorBrush(theme.FocusRing);
+            var caretBrush = CaretBrush ?? new SolidColorBrush(theme.Caret);
             var caretColor = caretBrush.ApproximateColor;
             if (caretColor.A > 0)
             {

@@ -36,6 +36,8 @@ The built-in Dark+ and Light+ palettes are **XAML `ResourceDictionary` files in 
 - [`Src/Easel/Themes/DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml)
 - [`Src/Easel/Themes/LightTheme.xaml`](../../../Src/Easel/Themes/LightTheme.xaml)
 
+`Caret` is the default text-field caret colour; a dictionary that omits it falls back to `Focus`.
+
 They are the source of truth for the current role names and values. They carry palette brushes, metrics
 (`CornerRadius`, `ControlHeight`, typography tokens where present) and keyed typography styles
 (`Heading`, `Subheading`, `Body`, `Caption`). `Theme.CreateDark()` / `CreateLight()` read the files into a
@@ -103,6 +105,7 @@ A standalone dictionary with `x:Class`:
   <SolidColorBrush x:Key="Accent" Color="#FF29B6F6" />
   <SolidColorBrush x:Key="AccentText" Color="#FF06121A" />
   <SolidColorBrush x:Key="Focus" Color="#FF29B6F6" />
+  <SolidColorBrush x:Key="Caret" Color="#FF29B6F6" />
   <SolidColorBrush x:Key="Selection" Color="#FF0D3A50" />
   <SolidColorBrush x:Key="SelectedText" Color="#FFFFFFFF" />
   <SolidColorBrush x:Key="Disabled" Color="#FF141A1F" />

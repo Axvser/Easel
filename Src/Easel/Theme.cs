@@ -68,6 +68,9 @@ public sealed class ThemePalette
     /// <summary>The focus ring colour.</summary>
     public Color FocusRing { get; set; }
 
+    /// <summary>The default caret colour of text fields; falls back to <see cref="FocusRing"/>.</summary>
+    public Color Caret { get; set; }
+
     /// <summary>The text colour of a disabled control.</summary>
     public Color DisabledForeground { get; set; }
 
@@ -243,6 +246,7 @@ public sealed class ThemePalette
             Accent = Read("Accent"),
             AccentForeground = Read("AccentText"),
             FocusRing = Read("Focus"),
+            Caret = Optional("Caret", Read("Focus")),
             DisabledForeground = Read("DisabledText"),
             DisabledBackground = Read("Disabled"),
             Selection = Read("Selection"),
@@ -495,6 +499,7 @@ public static class Theme
         Accent = Color.FromArgb(0xFF, 0xFF, 0xB0, 0x00),
         AccentForeground = Color.Black,
         FocusRing = Color.FromArgb(0xFF, 0xFF, 0xD7, 0x00),
+        Caret = Color.FromArgb(0xFF, 0xFF, 0xD7, 0x00),
         DisabledForeground = Color.FromArgb(0xFF, 0x8A, 0x8A, 0x8A),
         DisabledBackground = Color.FromArgb(0xFF, 0x05, 0x05, 0x05),
         Selection = Color.FromArgb(0xFF, 0x6B, 0x46, 0x00),
@@ -557,6 +562,7 @@ public static class Theme
         Brush("Accent", palette.Accent);
         Brush("AccentText", palette.AccentForeground);
         Brush("Focus", palette.FocusRing);
+        Brush("Caret", palette.Caret);
         Brush("Selection", palette.Selection);
         Brush("SelectedText", palette.Foreground);
         Brush("Disabled", palette.DisabledBackground);

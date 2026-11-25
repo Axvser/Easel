@@ -64,7 +64,7 @@
            Text="Select this line · the highlight and caret are yours"
            SelectionBrush="{StaticResource DemoSelection}"
            SelectionForeground="{StaticResource DemoSelectionText}"
-           CaretBrush="{StaticResource Focus}"
+           CaretBrush="{StaticResource Caret}"
            CaretThickness="3"
            CaretBlinkInterval="0" />
 

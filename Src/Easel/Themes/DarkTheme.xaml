@@ -17,6 +17,7 @@
     <SolidColorBrush x:Key="Accent" Color="#FF0078D4" />
     <SolidColorBrush x:Key="AccentText" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="Focus" Color="#FF0078D4" />
+    <SolidColorBrush x:Key="Caret" Color="#FF0078D4" />
     <SolidColorBrush x:Key="Selection" Color="#FF094771" />
     <SolidColorBrush x:Key="SelectedText" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="Disabled" Color="#FF1F1F1F" />

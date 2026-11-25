@@ -725,6 +725,141 @@ public sealed class VisualTextEditingTests
             $"the single line sits in the middle (text={textCenter}, field={fieldCenter})");
     }
 
+    [TestMethod]
+    public void TextBox_DeleteAndBackspaceKeepTheCaretAcrossModes()
+    {
+        using var surface = CreateSurface(320, 80);
+        var text = new VC.TextBox { Width = 280, Height = 34, Text = "abcd", UseNativeEditor = false };
+        surface.Root = text;
+        Layout(surface, 320, 80);
+        surface.FocusElement(text);
+
+        surface.ProcessKeyDown(Keys.Home);
+        surface.ProcessKeyDown(Keys.Delete);
+        Assert.AreEqual("bcd", text.Text);
+        Assert.AreEqual(0, text.CaretIndex, "Delete leaves the caret where the removed character was");
+        Assert.AreEqual(0, text.SelectionLength);
+
+        surface.ProcessKeyDown(Keys.Back);
+        Assert.AreEqual("bcd", text.Text, "Backspace at the start is a no-op");
+        Assert.AreEqual(0, text.CaretIndex);
+
+        surface.ProcessKeyDown(Keys.End);
+        Assert.AreEqual(3, text.CaretIndex, "End reaches the text end");
+        Assert.AreEqual("bcd", text.Text);
+        surface.ProcessKeyDown(Keys.Back);
+        Assert.AreEqual("bc", text.Text);
+        Assert.AreEqual(2, text.CaretIndex);
+
+        surface.ProcessKeyDown(Keys.Insert);
+        surface.ProcessKeyDown(Keys.Home);
+        surface.ProcessKeyDown(Keys.Delete);
+        Assert.AreEqual("c", text.Text);
+        Assert.AreEqual(0, text.CaretIndex, "Delete in overwrite mode leaves the caret");
+        surface.ProcessKeyDown(Keys.Back);
+        Assert.AreEqual("c", text.Text, "Backspace at the start is a no-op in overwrite mode");
+        surface.ProcessKeyDown(Keys.End);
+        surface.ProcessKeyDown(Keys.Back);
+        Assert.AreEqual("", text.Text);
+        Assert.AreEqual(0, text.CaretIndex);
+
+        surface.ProcessKeyDown(Keys.Insert);
+        surface.ProcessTextInput("xy");
+        Assert.AreEqual("xy", text.Text);
+        Assert.AreEqual(2, text.CaretIndex);
+
+        surface.ProcessKeyDown(Keys.Home);
+        surface.ProcessKeyDown(Keys.Insert);
+        surface.ProcessTextInput("z");
+        Assert.AreEqual("zy", text.Text);
+        Assert.AreEqual(1, text.CaretIndex);
+        surface.ProcessKeyDown(Keys.Delete);
+        Assert.AreEqual("z", text.Text);
+        Assert.AreEqual(1, text.CaretIndex, "Delete at the end of overwrite text is a no-op");
+        surface.ProcessKeyDown(Keys.Back);
+        Assert.AreEqual("", text.Text);
+        Assert.AreEqual(0, text.CaretIndex);
+    }
+
+    [TestMethod]
+    public void TextBox_DeletingASelectionLeavesTheCaretAtItsStartInBothModes()
+    {
+        using var surface = CreateSurface(320, 80);
+        var text = new VC.TextBox { Width = 280, Height = 34, Text = "abcde", UseNativeEditor = false };
+        surface.Root = text;
+        Layout(surface, 320, 80);
+        surface.FocusElement(text);
+
+        surface.ProcessKeyDown(Keys.Home);
+        surface.ProcessKeyDown(Keys.Right);
+        surface.ProcessKeyDown(Keys.Right, Keys.Shift);
+        surface.ProcessKeyDown(Keys.Right, Keys.Shift);
+        Assert.AreEqual(1, text.SelectionStart);
+        Assert.AreEqual(2, text.SelectionLength);
+
+        surface.ProcessKeyDown(Keys.Insert);
+        Assert.IsTrue(text.IsOverwriteMode);
+        Assert.AreEqual(1, text.SelectionStart, "toggling modes does not move the selection");
+        Assert.AreEqual(2, text.SelectionLength);
+
+        surface.ProcessKeyDown(Keys.Delete);
+        Assert.AreEqual("ade", text.Text);
+        Assert.AreEqual(1, text.CaretIndex);
+        Assert.AreEqual(0, text.SelectionLength);
+
+        surface.ProcessKeyDown(Keys.Insert);
+        surface.ProcessKeyDown(Keys.A, Keys.Control);
+        surface.ProcessKeyDown(Keys.Delete);
+        Assert.AreEqual("", text.Text);
+        Assert.AreEqual(0, text.CaretIndex);
+    }
+
+    [TestMethod]
+    public void TextBox_TogglingOverwriteDoesNotMoveTheCaret()
+    {
+        using var surface = CreateSurface(320, 80);
+        var text = new VC.TextBox { Width = 280, Height = 34, Text = "abc", UseNativeEditor = false };
+        surface.Root = text;
+        Layout(surface, 320, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.End);
+        surface.ProcessKeyDown(Keys.Left);
+        Assert.AreEqual(2, text.CaretIndex);
+
+        for (var index = 0; index < 4; index++)
+        {
+            surface.ProcessKeyDown(Keys.Insert);
+            Assert.AreEqual(2, text.CaretIndex, "toggling insert/overwrite never moves the caret");
+            Assert.AreEqual(0, text.SelectionLength);
+        }
+    }
+
+    [TestMethod]
+    public void TextBox_UsesTheThemeCaretByDefault()
+    {
+        using var surface = new VisualHost { Size = new Size(260, 80) };
+        var text = new VC.TextBox
+        {
+            Width = 220,
+            Height = 36,
+            Text = "WW",
+            UseNativeEditor = false,
+            Font = new Font("Segoe UI", 18f, FontStyle.Bold),
+            Foreground = Color.FromArgb(0xFF, 0xE7, 0xE7, 0xE7),
+            CaretThickness = 3d,
+            CaretBlinkInterval = 0,
+            BorderThickness = new Easel.Controls.Thickness(0f),
+        };
+        surface.Root = text;
+        Layout(surface, 260, 80);
+        surface.FocusElement(text);
+        surface.ProcessKeyDown(Keys.End);
+
+        using var bitmap = Render(surface, 260, 80);
+        Assert.IsTrue(ContainsColor(bitmap, Theme.Current.Caret),
+            "an unset CaretBrush uses the theme caret colour");
+    }
+
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hwnd);
 
