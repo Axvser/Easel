@@ -824,6 +824,20 @@ internal sealed class VisualBindingExpression : IVisualBindingExpression
                 return;
             }
 
+            // A TemplateBinding to an unset property must leave the part's own default (theme brush/font), not a null.
+            if (value is null && _binding is TemplateBinding)
+            {
+                _target.ClearValue(_property);
+                return;
+            }
+
+            // Color-typed CLR properties report Color.Empty for an unset DP; do not turn that sentinel into a transparent brush.
+            if (value is System.Drawing.Color templateColor && templateColor.IsEmpty && _binding is TemplateBinding)
+            {
+                _target.ClearValue(_property);
+                return;
+            }
+
             if (value is null && _property.PropertyType.IsValueType && Nullable.GetUnderlyingType(_property.PropertyType) is null)
             {
                 _target.ClearValue(_property);

@@ -63,6 +63,7 @@ public sealed class VisualControlTemplate
         var scope = new VisualNameScope();
         var root = _factory(scope);
         root.SetTemplatedParentRecursive(templatedParent);
+        root.MarkTemplateContent();
         return new VisualTemplateInstance(root, scope);
     }
 }

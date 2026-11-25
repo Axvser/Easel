@@ -791,6 +791,8 @@ public class VisualTitleBar : TemplatedControl
             Padding = default;
             MinHeight = 0;
             CornerRadius = 0;
+            // 标题栏按钮自绘字形与红色 hover，显式空样式让主题默认 Button 模板不接管。
+            Style = new VisualStyle { TargetType = typeof(CaptionButton) };
         }
 
         protected override Size MeasureOverride(Size availableSize)

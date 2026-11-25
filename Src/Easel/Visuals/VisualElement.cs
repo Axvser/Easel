@@ -384,6 +384,21 @@ public abstract class VisualElement : ContainerVisual, IDisposable
 
     /// <summary>Whether a pointer hit lands on this element's own rectangle.</summary>
     /// <remarks>Panels set this to <see langword="false"/> when they have no background so content clicks pass through.</remarks>
+    // 模板内容里的装饰部件用 IsHitTestVisible=false 关掉自身命中；子元素仍可命中（内容区要能接收输入）。
+    internal bool IsTemplateContent { get; private set; }
+
+    internal void MarkTemplateContent()
+    {
+        IsTemplateContent = true;
+        foreach (var child in Children)
+        {
+            if (child is VisualElement element)
+            {
+                element.MarkTemplateContent();
+            }
+        }
+    }
+
     public bool IsHitTestVisible
     {
         get => (bool)GetValue(IsHitTestVisibleProperty)!;

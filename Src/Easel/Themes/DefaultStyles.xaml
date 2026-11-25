@@ -4,7 +4,62 @@
     x:Class="Easel.Themes.DefaultStyles">
 
   <!-- Built-in fallback styles for controls without an explicit style or template.
-       Add one implicit Style per control type; keep the template's theme keys on DynamicResource
-       so a host dictionary can override them. -->
+       Theme keys use DynamicResource so a host dictionary can override them. Decorative parts opt out of hit testing;
+       the control itself stays the hit target. -->
+  <Style TargetType="Button">
+    <Style.Template>
+      <ControlTemplate TargetType="Button">
+        <Grid x:Name="Root" IsHitTestVisible="False">
+          <Border x:Name="Chrome"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="Hover"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Hover}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Opacity="0" />
+          <Border x:Name="Pressed"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Pressed}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Opacity="0" />
+          <Border IsHitTestVisible="False"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Opacity="0" />
+          <Border IsHitTestVisible="False" Padding="{TemplateBinding Padding}">
+            <TextBlock IsHitTestVisible="False"
+                       Text="{TemplateBinding Text}"
+                       Font="{TemplateBinding Font}"
+                       Foreground="{TemplateBinding Foreground}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Setter TargetName="Hover" Property="Opacity" Value="1" />
+          </Trigger>
+          <Trigger Property="IsPressed" Value="True">
+            <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>

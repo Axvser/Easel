@@ -80,6 +80,8 @@ internal sealed class DialogButton : XamlButton
         Padding = new Thickness(16f, 6f);
         CornerRadius = 8f;
         IsHitTestVisible = true;
+        // 对话框按钮按角色自绘填充与状态色，显式空样式让主题默认 Button 模板不接管。
+        Style = new VisualStyle { TargetType = typeof(DialogButton) };
     }
 
     internal DialogButtonRole Role { get; }

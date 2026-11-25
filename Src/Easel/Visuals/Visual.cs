@@ -467,6 +467,11 @@ public abstract class Visual : WinformsObject
             return null;
         }
 
+        if (this is VisualElement templatePart && templatePart.IsTemplateContent && !templatePart.IsHitTestVisible)
+        {
+            return null;
+        }
+
         return HitTestContent(local.Value) ? this : null;
     }
 

@@ -541,18 +541,12 @@ public static class Theme
 
     internal static VisualStyle? FindDefaultStyle(VisualElement element)
     {
-        var resources = DefaultStyles;
-        for (var type = element.GetType(); type is not null && type != typeof(object); type = type.BaseType)
-        {
-            if (resources.TryGetValue(type, out var value)
-                && value is VisualStyle style
-                && style.Matches(element))
-            {
-                return style;
-            }
-        }
-
-        return null;
+        // 隐式默认样式按确切类型匹配（WPF 语义）；派生类型要自己的样式或 BasedOn。
+        return DefaultStyles.TryGetValue(element.GetType(), out var value)
+               && value is VisualStyle style
+               && style.Matches(element)
+            ? style
+            : null;
     }
 
     private static ResourceDictionary SourceFor(ThemeMode mode) => mode switch

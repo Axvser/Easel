@@ -52,7 +52,7 @@ This page lists each control's own properties and behaviour.
 
 `TemplatedControl` applies `Template` first, then the style's template, then `DefaultTemplate` (a built-in fallback a control sets in code). A theme style can replace the whole appearance; self-drawn chrome stays inactive while a template is applied. Template triggers can read `ButtonBase.IsPointerOver`/`IsPressed`, `ToggleButtonBase.IsChecked` and `TemplatedControl.IsFocusVisible`.
 
-Decorative template parts must set `IsHitTestVisible="False"`; hit testing returns the deepest part, so an interactive part must opt back in. The built-in default styles live in `Src/Easel/Themes/DefaultStyles.xaml` and are applied when no explicit style exists.
+Decorative template parts must set `IsHitTestVisible="False"`; that skips the part's own hit but keeps its children hittable, so an interactive child still receives input. The built-in default styles live in `Src/Easel/Themes/DefaultStyles.xaml`, match the exact control type (a derived type needs its own style or `BasedOn`), and apply when no explicit style exists. `TemplateBinding` clears the target for a null value or for `Color.Empty` reported by a Color-typed CLR property, so an unset brush does not paint transparent text.
 
 ## Selection and range
 

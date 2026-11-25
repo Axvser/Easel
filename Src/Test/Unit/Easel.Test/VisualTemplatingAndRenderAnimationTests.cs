@@ -22,7 +22,13 @@ public sealed class VisualTemplatingAndRenderAnimationTests
     public void ButtonTemplate_HasPartsExposesStateAndReplacesTheSelfDrawnChrome()
     {
         using var surface = new VisualHost { Size = new Size(180, 100), DpiScaleOverride = 1f };
-        var button = new VC.Button { Width = 140, Height = 48, Text = "go" };
+        var button = new VC.Button
+        {
+            Width = 140,
+            Height = 48,
+            Text = "go",
+            Style = new VisualStyle { TargetType = typeof(VC.Button) },
+        };
         VC.Border? indicator = null;
 
         var template = new VisualControlTemplate(scope =>
@@ -634,6 +640,7 @@ public sealed class VisualTemplatingAndRenderAnimationTests
             Width = 140,
             Height = 48,
             Text = "go",
+            Style = new VisualStyle { TargetType = typeof(VC.Button) },
             DefaultTemplate = new VisualControlTemplate(_ => new VC.Border { Background = Color.Lime, Padding = default })
             {
                 TargetType = typeof(VC.Button),
