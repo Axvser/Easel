@@ -319,7 +319,11 @@ internal sealed class VisualBindingExpression : IVisualBindingExpression
     private readonly string _validationPropertyName;
     private readonly bool _pushesTarget;
     private readonly bool _writesSource;
-    private readonly List<INotifyPropertyChanged> _nodes = [];
+    // 路径通常只有一个可通知节点；单节点内联，避免每条绑定都分配 List 与它的数组。
+    private INotifyPropertyChanged? _singleNode;
+    private List<INotifyPropertyChanged>? _extraNodes;
+    private int _nodeCount;
+    private PropertyChangedEventHandler? _sourceChangedHandler;
     private VisualElement? _dataContextParent;
     private BindingLeaf? _leaf;
     private object? _resolvedSource;
@@ -473,12 +477,7 @@ internal sealed class VisualBindingExpression : IVisualBindingExpression
 
     private void DetachNodes()
     {
-        foreach (var node in _nodes)
-        {
-            node.PropertyChanged -= OnSourcePropertyChanged;
-        }
-
-        _nodes.Clear();
+        DetachNodeSubscriptions();
         _leaf = null;
     }
 
@@ -796,20 +795,117 @@ internal sealed class VisualBindingExpression : IVisualBindingExpression
 
     private void TrackNodes(List<object?> nodes)
     {
-        foreach (var node in _nodes)
+        // 同一份源重新求值时路径节点通常没变（DataContext/TemplatedParent 的二次跳转）；
+        // 这时摘了再挂只会分配新的多播委托，并且让每个节点白收一次订阅变更。
+        if (MatchesSubscribed(nodes))
         {
-            node.PropertyChanged -= OnSourcePropertyChanged;
+            return;
         }
 
-        _nodes.Clear();
-        foreach (var node in nodes)
+        DetachNodeSubscriptions();
+
+        for (var index = 0; index < nodes.Count; index++)
         {
-            if (node is INotifyPropertyChanged observable && !_nodes.Contains(observable))
+            if (nodes[index] is not INotifyPropertyChanged observable
+                || ContainsSubscribed(observable))
             {
-                _nodes.Add(observable);
-                observable.PropertyChanged += OnSourcePropertyChanged;
+                continue;
+            }
+
+            if (_nodeCount == 0)
+            {
+                _singleNode = observable;
+            }
+            else
+            {
+                (_extraNodes ??= []).Add(observable);
+            }
+
+            _nodeCount++;
+            observable.PropertyChanged += SourceChangedHandler;
+        }
+    }
+
+    private PropertyChangedEventHandler SourceChangedHandler
+        => _sourceChangedHandler ??= OnSourcePropertyChanged;
+
+    private INotifyPropertyChanged NodeAt(int index)
+        => index == 0 ? _singleNode! : _extraNodes![index - 1];
+
+    private bool MatchesSubscribed(List<object?> nodes)
+    {
+        var count = _nodeCount;
+        var matched = 0;
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            if (nodes[index] is not INotifyPropertyChanged observable)
+            {
+                continue;
+            }
+
+            // 与 TrackNodes 一样按首次出现的对象去重，重复节点不额外订阅。
+            var duplicate = false;
+            for (var seen = 0; seen < matched; seen++)
+            {
+                if (ReferenceEquals(NodeAt(seen), observable))
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (duplicate)
+            {
+                continue;
+            }
+
+            if (matched >= count || !ReferenceEquals(NodeAt(matched), observable))
+            {
+                return false;
+            }
+
+            matched++;
+        }
+
+        return matched == count;
+    }
+
+    private bool ContainsSubscribed(INotifyPropertyChanged observable)
+    {
+        for (var index = 0; index < _nodeCount; index++)
+        {
+            if (ReferenceEquals(NodeAt(index), observable))
+            {
+                return true;
             }
         }
+
+        return false;
+    }
+
+    private void DetachNodeSubscriptions()
+    {
+        if (_nodeCount == 0)
+        {
+            return;
+        }
+
+        var handler = _sourceChangedHandler;
+        if (handler is not null)
+        {
+            _singleNode!.PropertyChanged -= handler;
+            if (_extraNodes is { } extra)
+            {
+                for (var index = 0; index < extra.Count; index++)
+                {
+                    extra[index].PropertyChanged -= handler;
+                }
+            }
+        }
+
+        _singleNode = null;
+        _extraNodes = null;
+        _nodeCount = 0;
     }
 
     private void ApplyTarget(object? value)

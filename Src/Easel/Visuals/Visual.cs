@@ -1316,9 +1316,10 @@ public class ContainerVisual : Visual
 
         protected override void ClearItems()
         {
-            foreach (var item in this)
+            // 按索引走：Collection<T> 的 foreach 会把 List 枚举器装箱，每释放一个容器就分配一次。
+            for (var index = Count - 1; index >= 0; index--)
             {
-                item.Parent = null;
+                this[index].Parent = null;
             }
 
             base.ClearItems();

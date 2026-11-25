@@ -62,8 +62,7 @@ public sealed class VisualControlTemplate
 
         var scope = new VisualNameScope();
         var root = _factory(scope);
-        root.SetTemplatedParentRecursive(templatedParent);
-        root.MarkTemplateContent();
+        root.InitializeTemplateContent(templatedParent);
         return new VisualTemplateInstance(root, scope);
     }
 }
@@ -74,8 +73,9 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
     private readonly IWinformsObject _owner;
     private readonly VisualNameScope _scope;
     private readonly IList<VisualTrigger> _triggers;
-    private readonly List<(IWinformsObject Target, DependencyProperty Property)> _written = [];
-    private readonly HashSet<VisualTrigger> _activeTriggers = [];
+    private List<(IWinformsObject Target, DependencyProperty Property)>? _written;
+    private HashSet<VisualTrigger>? _activeTriggers;
+    private HashSet<VisualTrigger>? _nowActive;
     private bool _evaluating;
     private bool _disposed;
 
@@ -88,7 +88,8 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
         _scope = scope;
         _triggers = triggers;
 
-        if (owner is WinformsObject observable)
+        // 没有触发器就不订阅施模板控件的属性变化，也不分配求值集合。
+        if (triggers.Count > 0 && owner is WinformsObject observable)
         {
             observable.PropertyChanged += OnOwnerPropertyChanged;
         }
@@ -104,7 +105,7 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
         }
 
         _disposed = true;
-        if (_owner is WinformsObject observable)
+        if (_triggers.Count > 0 && _owner is WinformsObject observable)
         {
             observable.PropertyChanged -= OnOwnerPropertyChanged;
         }
@@ -118,7 +119,7 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
     // 先算完整张表再落值：同一属性被两个激活触发器写时，后声明的赢；退出时只清本轮写过的。
     private void Evaluate()
     {
-        if (_evaluating || _disposed)
+        if (_evaluating || _disposed || _triggers.Count == 0)
         {
             return;
         }
@@ -129,9 +130,12 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
         try
         {
             Dictionary<(IWinformsObject Target, DependencyProperty Property), object?>? active = null;
-            var nowActive = new HashSet<VisualTrigger>();
-            foreach (var trigger in _triggers)
+            var nowActive = _nowActive ??= [];
+            nowActive.Clear();
+            // 触发器与 setter 都是 IList：按索引走，避免每轮求值把集合枚举器装箱。
+            for (var triggerIndex = 0; triggerIndex < _triggers.Count; triggerIndex++)
             {
+                var trigger = _triggers[triggerIndex];
                 if (trigger?.Property is null || !trigger.Matches(_owner))
                 {
                     continue;
@@ -139,8 +143,10 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
 
                 var target = ResolveTarget(trigger, null) ?? _owner;
                 nowActive.Add(trigger);
-                foreach (var setter in trigger.Setters)
+                var setters = trigger.Setters;
+                for (var setterIndex = 0; setterIndex < setters.Count; setterIndex++)
                 {
+                    var setter = setters[setterIndex];
                     if (setter?.Property is not null)
                     {
                         // Setter.TargetName 是 WPF 形状；Trigger.TargetName 仍作为整条触发器默认目标。
@@ -151,17 +157,22 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
                 }
             }
 
-            foreach (var pair in _written)
+            if (_written is not null)
             {
-                if (active is null || !active.ContainsKey(pair))
+                foreach (var pair in _written)
                 {
-                    pair.Property.ClearValue(pair.Target, BindingPriority.Template);
+                    if (active is null || !active.ContainsKey(pair))
+                    {
+                        pair.Property.ClearValue(pair.Target, BindingPriority.Template);
+                    }
                 }
+
+                _written.Clear();
             }
 
-            _written.Clear();
             if (active is not null)
             {
+                _written ??= [];
                 foreach (var pair in active)
                 {
                     pair.Key.Property.SetValue(pair.Key.Target, pair.Value, BindingPriority.Template);
@@ -169,24 +180,37 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
                 }
             }
 
+            var wasActive = _activeTriggers;
             foreach (var trigger in nowActive)
             {
-                if (!_activeTriggers.Contains(trigger))
+                if (wasActive is null || !wasActive.Contains(trigger))
                 {
                     (entered ??= []).Add((trigger, ResolveTarget(trigger, null) ?? _owner));
                 }
             }
 
-            foreach (var trigger in _activeTriggers)
+            if (wasActive is not null)
             {
-                if (!nowActive.Contains(trigger))
+                foreach (var trigger in wasActive)
                 {
-                    (exited ??= []).Add((trigger, ResolveTarget(trigger, null) ?? _owner));
+                    if (!nowActive.Contains(trigger))
+                    {
+                        (exited ??= []).Add((trigger, ResolveTarget(trigger, null) ?? _owner));
+                    }
                 }
             }
 
-            _activeTriggers.Clear();
-            _activeTriggers.UnionWith(nowActive);
+            if (nowActive.Count == 0)
+            {
+                _activeTriggers = null;
+            }
+            else
+            {
+                wasActive ??= [];
+                wasActive.Clear();
+                wasActive.UnionWith(nowActive);
+                _activeTriggers = wasActive;
+            }
         }
         finally
         {
@@ -222,14 +246,15 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
     // 模板卸载时补一次退出动作；动作拿到的是与 setter 相同的目标（命名部件或施模板的控件）。
     private void ExitActiveTriggers()
     {
-        if (_activeTriggers.Count == 0)
+        if (_activeTriggers is not { Count: > 0 } active)
         {
             return;
         }
 
-        var active = _activeTriggers.ToArray();
-        _activeTriggers.Clear();
-        foreach (var trigger in active)
+        // 先清集合再走动作：动作即使重入（此刻 _disposed 已置位，求值会被吞掉）也不会改到正在遍历的集合。
+        var snapshot = active.ToArray();
+        active.Clear();
+        foreach (var trigger in snapshot)
         {
             InvokeAction(trigger.ExitAction, ResolveTarget(trigger, null) ?? _owner);
         }
@@ -248,6 +273,11 @@ internal sealed class VisualTemplateTriggerApplication : IDisposable
 
     private void ClearWritten()
     {
+        if (_written is null)
+        {
+            return;
+        }
+
         foreach (var pair in _written)
         {
             pair.Property.ClearValue(pair.Target, BindingPriority.Template);

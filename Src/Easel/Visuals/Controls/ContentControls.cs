@@ -211,12 +211,12 @@ public class ContentControl : VisualElement
         SetTemplateScope(instance.Scope);
         Add(root);
 
-        foreach (var presenter in EnumeratePresenters(root))
-        {
-            _presenters.Add(presenter);
-        }
+        AddPresenters(root, _presenters);
 
-        _templateTriggers = new VisualTemplateTriggerApplication(this, instance.Scope, effective.Triggers);
+        // 没有触发器就不建求值器：否则每个模板化控件都要额外挂一次属性监听。
+        _templateTriggers = effective.Triggers.Count > 0
+            ? new VisualTemplateTriggerApplication(this, instance.Scope, effective.Triggers)
+            : null;
         UpdateContent();
         InvalidateMeasure();
     }
@@ -404,21 +404,20 @@ public class ContentControl : VisualElement
         _dataContent = null;
     }
 
-    private static IEnumerable<ContentPresenter> EnumeratePresenters(VisualElement root)
+    // 直接把部件收进调用方的列表：迭代器版本会在模板每个节点上分配一个状态机对象。
+    private static void AddPresenters(VisualElement root, List<ContentPresenter> presenters)
     {
         if (root is ContentPresenter presenter)
         {
-            yield return presenter;
+            presenters.Add(presenter);
         }
 
-        foreach (var child in root.Children)
+        var children = root.Children;
+        for (var index = 0; index < children.Count; index++)
         {
-            if (child is VisualElement element)
+            if (children[index] is VisualElement element)
             {
-                foreach (var inner in EnumeratePresenters(element))
-                {
-                    yield return inner;
-                }
+                AddPresenters(element, presenters);
             }
         }
     }

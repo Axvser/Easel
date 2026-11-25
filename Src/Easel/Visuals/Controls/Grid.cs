@@ -131,6 +131,17 @@ public class Grid : Panel
         element.SetValue(ColumnSpanProperty, Math.Max(1, value));
     }
 
+    // 轨道解析的临时数组挂在实例上复用：每趟布局每张网格都要重算，局部 new 会让整页布局反复分配。
+    // 数组只在轨道数变化时重建，其余时候原地覆盖（星号缓存每次清零）。
+    private XamlGridLength[] _columnLengths = [];
+    private XamlGridLength[] _rowLengths = [];
+    private double[] _widths = [];
+    private double[] _heights = [];
+    private double[] _starWidths = [];
+    private double[] _starHeights = [];
+    private Size _tracksContent;
+    private bool _tracksResolved;
+
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -151,12 +162,33 @@ public class Grid : Panel
         var content = new Size(
             Math.Max(0, finalSize.Width - (int)Math.Ceiling(padding.Horizontal)),
             Math.Max(0, finalSize.Height - (int)Math.Ceiling(padding.Vertical)));
-        var (widths, heights) = ResolveTracks(content);
+
+        // 布局管线在同一次布局里先 Measure 后 Arrange；尺寸没变时轨道结果仍然有效，
+        // 再走一遍 ResolveTracks 会把每个子项重新量一遍（那正是上一轮刚做过的事）。
+        double[] widths;
+        double[] heights;
+        if (_tracksResolved && IsMeasureValid && _tracksContent == content)
+        {
+            widths = _widths;
+            heights = _heights;
+        }
+        else
+        {
+            (widths, heights) = ResolveTracks(content);
+        }
+
         var columnOffsets = Offsets(widths, padding.Left);
         var rowOffsets = Offsets(heights, padding.Top);
 
-        foreach (var child in ArrangedChildren())
+        var children = Children;
+        for (var childIndex = 0; childIndex < children.Count; childIndex++)
         {
+            if (children[childIndex] is not VisualElement child
+                || child.Visibility == XamlVisibility.Collapsed)
+            {
+                continue;
+            }
+
             var placement = PlacementOf(child);
             var column = XamlMath.Clamp(placement.Column, 0, widths.Length - 1);
             var row = XamlMath.Clamp(placement.Row, 0, heights.Length - 1);
@@ -172,115 +204,150 @@ public class Grid : Panel
         }
     }
 
+    private void EnsureTrackStorage(int columns, int rows)
+    {
+        if (_columnLengths.Length != columns)
+        {
+            _columnLengths = new XamlGridLength[columns];
+            _widths = new double[columns];
+            _starWidths = new double[columns];
+        }
+
+        if (_rowLengths.Length != rows)
+        {
+            _rowLengths = new XamlGridLength[rows];
+            _heights = new double[rows];
+            _starHeights = new double[rows];
+        }
+    }
+
     // 测一次子项得到自然尺寸，再按定义分到像素/自动/星号三种轨道。
     private (double[] Widths, double[] Heights) ResolveTracks(Size content)
     {
-        var columnDefinitions = ColumnDefinitions.Count > 0
-            ? ColumnDefinitions.ToArray()
-            : [new XamlColumnDefinition()];
-        var rowDefinitions = RowDefinitions.Count > 0
-            ? RowDefinitions.ToArray()
-            : [new XamlRowDefinition()];
-
-        var widths = new double[columnDefinitions.Length];
-        var heights = new double[rowDefinitions.Length];
-        var starWidths = new double[columnDefinitions.Length];
-        var starHeights = new double[rowDefinitions.Length];
-
-        for (var index = 0; index < columnDefinitions.Length; index++)
+        // 没有定义的网格等价于一整行星号轨道；不再为这个默认轨道 new 定义对象。
+        var columnCount = ColumnDefinitions.Count;
+        var rowCount = RowDefinitions.Count;
+        var defaultColumns = columnCount == 0;
+        var defaultRows = rowCount == 0;
+        if (defaultColumns)
         {
-            var width = columnDefinitions[index].Width;
-            widths[index] = width.IsAbsolute ? Math.Ceiling(Math.Max(0d, width.Value)) : 0d;
+            columnCount = 1;
         }
 
-        for (var index = 0; index < rowDefinitions.Length; index++)
+        if (defaultRows)
         {
-            var height = rowDefinitions[index].Height;
-            heights[index] = height.IsAbsolute ? Math.Ceiling(Math.Max(0d, height.Value)) : 0d;
+            rowCount = 1;
         }
 
-        foreach (var child in ArrangedChildren())
+        EnsureTrackStorage(columnCount, rowCount);
+
+        // 定义只在解析开始时读一次，之后全部用数组，避免每趟布局把集合复制成数组。
+        for (var index = 0; index < columnCount; index++)
         {
+            var width = defaultColumns ? XamlGridLength.Star : ColumnDefinitions[index].Width;
+            _columnLengths[index] = width;
+            _widths[index] = width.IsAbsolute ? Math.Ceiling(Math.Max(0d, width.Value)) : 0d;
+        }
+
+        for (var index = 0; index < rowCount; index++)
+        {
+            var height = defaultRows ? XamlGridLength.Star : RowDefinitions[index].Height;
+            _rowLengths[index] = height;
+            _heights[index] = height.IsAbsolute ? Math.Ceiling(Math.Max(0d, height.Value)) : 0d;
+        }
+
+        Array.Clear(_starWidths, 0, columnCount);
+        Array.Clear(_starHeights, 0, rowCount);
+
+        var children = Children;
+        for (var childIndex = 0; childIndex < children.Count; childIndex++)
+        {
+            if (children[childIndex] is not VisualElement child
+                || child.Visibility == XamlVisibility.Collapsed)
+            {
+                continue;
+            }
+
             var placement = PlacementOf(child);
-            var column = XamlMath.Clamp(placement.Column, 0, widths.Length - 1);
-            var row = XamlMath.Clamp(placement.Row, 0, heights.Length - 1);
-            var columnSpan = XamlMath.Clamp(placement.ColumnSpan, 1, widths.Length - column);
-            var rowSpan = XamlMath.Clamp(placement.RowSpan, 1, heights.Length - row);
+            var column = XamlMath.Clamp(placement.Column, 0, columnCount - 1);
+            var row = XamlMath.Clamp(placement.Row, 0, rowCount - 1);
+            var columnSpan = XamlMath.Clamp(placement.ColumnSpan, 1, columnCount - column);
+            var rowSpan = XamlMath.Clamp(placement.RowSpan, 1, rowCount - row);
 
             // 自动轨道沿该轴不设限地量：Auto 的语义是「由内容决定」，若仍按整张网格的可用尺寸量，
             // 里面一个默认单星号行的 Grid 就会把整段高度要走（Auto 行拿到整段，星号行归零）。
             // 星号轨道则相反 —— 它需要剩余空间才能分配，先按整个可用尺寸量，第二遍再按格子收紧。
-            var measureWidth = MeasureAxis(columnDefinitions, column, columnSpan, content.Width);
-            var measureHeight = MeasureAxis(rowDefinitions, row, rowSpan, content.Height);
+            var measureWidth = MeasureAxis(_columnLengths, column, columnSpan, content.Width);
+            var measureHeight = MeasureAxis(_rowLengths, row, rowSpan, content.Height);
             var measured = child.Measure(new Size(measureWidth, measureHeight));
-            var autoColumn = FirstAutoColumn(columnDefinitions, column, columnSpan);
+            var autoColumn = FirstAutoTrack(_columnLengths, column, columnSpan);
             if (autoColumn >= 0)
             {
-                widths[autoColumn] = Math.Max(widths[autoColumn], measured.Width);
+                _widths[autoColumn] = Math.Max(_widths[autoColumn], measured.Width);
             }
 
-            var autoRow = FirstAutoRow(rowDefinitions, row, rowSpan);
+            var autoRow = FirstAutoTrack(_rowLengths, row, rowSpan);
             if (autoRow >= 0)
             {
-                heights[autoRow] = Math.Max(heights[autoRow], measured.Height);
+                _heights[autoRow] = Math.Max(_heights[autoRow], measured.Height);
             }
 
             for (var index = column; index < column + columnSpan; index++)
             {
-                if (columnDefinitions[index].Width.IsStar)
+                if (_columnLengths[index].IsStar)
                 {
-                    starWidths[index] = Math.Max(starWidths[index], measured.Width);
+                    _starWidths[index] = Math.Max(_starWidths[index], measured.Width);
                 }
             }
 
             for (var index = row; index < row + rowSpan; index++)
             {
-                if (rowDefinitions[index].Height.IsStar)
+                if (_rowLengths[index].IsStar)
                 {
-                    starHeights[index] = Math.Max(starHeights[index], measured.Height);
+                    _starHeights[index] = Math.Max(_starHeights[index], measured.Height);
                 }
             }
         }
 
-        DistributeStars(
-            columnDefinitions.Select(static definition => definition.Width).ToArray(),
-            widths,
-            content.Width,
-            starWidths);
-        DistributeStars(
-            rowDefinitions.Select(static definition => definition.Height).ToArray(),
-            heights,
-            content.Height,
-            starHeights);
+        DistributeStars(_columnLengths, _widths, content.Width, _starWidths);
+        DistributeStars(_rowLengths, _heights, content.Height, _starHeights);
 
         // 轨道尺寸定下来之后，再按每个子项实际分到的格子量一次。第一遍用的是整张网格的可用尺寸，
         // 这对按自己尺寸绘制的子项够用，但 ScrollViewer 的期望尺寸取决于父级给它的可用宽度：
         // 按整格宽量过之后，它会把内容算成整格宽，安排进窄轨道时右对齐的内容被推出裁剪区，
         // 槽位行为量到的锚点也跟着偏到裁剪区外。
-        foreach (var child in ArrangedChildren())
+        for (var childIndex = 0; childIndex < children.Count; childIndex++)
         {
-            var placement = PlacementOf(child);
-            var column = XamlMath.Clamp(placement.Column, 0, widths.Length - 1);
-            var row = XamlMath.Clamp(placement.Row, 0, heights.Length - 1);
-            var columnSpan = XamlMath.Clamp(placement.ColumnSpan, 1, widths.Length - column);
-            var rowSpan = XamlMath.Clamp(placement.RowSpan, 1, heights.Length - row);
+            if (children[childIndex] is not VisualElement child
+                || child.Visibility == XamlVisibility.Collapsed)
+            {
+                continue;
+            }
 
-            var slotWidth = (int)Math.Ceiling(Math.Max(0d, SpanSize(widths, column, columnSpan)));
-            var slotHeight = (int)Math.Ceiling(Math.Max(0d, SpanSize(heights, row, rowSpan)));
-            var measureWidth = MeasureAxis(columnDefinitions, column, columnSpan, content.Width);
-            var measureHeight = MeasureAxis(rowDefinitions, row, rowSpan, content.Height);
+            var placement = PlacementOf(child);
+            var column = XamlMath.Clamp(placement.Column, 0, columnCount - 1);
+            var row = XamlMath.Clamp(placement.Row, 0, rowCount - 1);
+            var columnSpan = XamlMath.Clamp(placement.ColumnSpan, 1, columnCount - column);
+            var rowSpan = XamlMath.Clamp(placement.RowSpan, 1, rowCount - row);
+
+            var slotWidth = (int)Math.Ceiling(Math.Max(0d, SpanSize(_widths, column, columnSpan)));
+            var slotHeight = (int)Math.Ceiling(Math.Max(0d, SpanSize(_heights, row, rowSpan)));
+            var measureWidth = MeasureAxis(_columnLengths, column, columnSpan, content.Width);
+            var measureHeight = MeasureAxis(_rowLengths, row, rowSpan, content.Height);
 
             // 只有跨星号轨道的子项需要第二遍：它们的格子由分配结果决定。像素/自动轨道的测量空间
             // 已经等于最终格子（像素轨道给像素和，自动轨道给不设限），再量一次只是重复整棵子树。
-            var needsReflow = HasStar(columnDefinitions, column, columnSpan)
-                              || HasStar(rowDefinitions, row, rowSpan);
+            var needsReflow = HasStar(_columnLengths, column, columnSpan)
+                              || HasStar(_rowLengths, row, rowSpan);
             if (needsReflow && (slotWidth != measureWidth || slotHeight != measureHeight))
             {
                 child.Measure(new Size(slotWidth, slotHeight));
             }
         }
 
-        return (widths, heights);
+        _tracksContent = content;
+        _tracksResolved = true;
+        return (_widths, _heights);
     }
 
     // 星号轨道平分扣除像素与自动轨道后的剩余；最后一格吃掉取整误差，保证总宽等于可用宽。
@@ -340,24 +407,11 @@ public class Grid : Panel
         }
     }
 
-    private static int FirstAutoColumn(XamlColumnDefinition[] definitions, int start, int span)
+    private static int FirstAutoTrack(XamlGridLength[] lengths, int start, int span)
     {
         for (var index = start; index < start + span; index++)
         {
-            if (definitions[index].Width.IsAuto)
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
-    private static int FirstAutoRow(XamlRowDefinition[] definitions, int start, int span)
-    {
-        for (var index = start; index < start + span; index++)
-        {
-            if (definitions[index].Height.IsAuto)
+            if (lengths[index].IsAuto)
             {
                 return index;
             }
@@ -368,65 +422,36 @@ public class Grid : Panel
 
     // 子项该按多大的空间测量：跨到星号轨道的按整张网格量（星号要用可用尺寸分配），
     // 只有自动轨道或像素轨道的按该轴不设限量（自动轨道的尺寸由内容给出）。
-    private static int MeasureAxis(
-        XamlColumnDefinition[] definitions, int start, int span, double contentAxis)
-        => MeasureAxis(
-            start, span, contentAxis,
-            index => definitions[index].Width.IsStar,
-            index => definitions[index].Width.IsAuto,
-            index => definitions[index].Width.Value);
-
-    private static int MeasureAxis(
-        XamlRowDefinition[] definitions, int start, int span, double contentAxis)
-        => MeasureAxis(
-            start, span, contentAxis,
-            index => definitions[index].Height.IsStar,
-            index => definitions[index].Height.IsAuto,
-            index => definitions[index].Height.Value);
-
-    private static int MeasureAxis(
-        int start, int span, double contentAxis, Func<int, bool> isStar, Func<int, bool> isAuto, Func<int, double> fixedSize)
+    private static int MeasureAxis(XamlGridLength[] lengths, int start, int span, double contentAxis)
     {
         var hasAuto = false;
         var size = 0d;
         for (var index = start; index < start + span; index++)
         {
-            if (isStar(index))
+            var length = lengths[index];
+            if (length.IsStar)
             {
                 return ToAxis(contentAxis);
             }
 
-            if (isAuto(index))
+            if (length.IsAuto)
             {
                 hasAuto = true;
             }
             else
             {
-                size += Math.Max(0d, fixedSize(index));
+                size += Math.Max(0d, length.Value);
             }
         }
 
         return hasAuto ? int.MaxValue : ToAxis(size);
     }
 
-    private static bool HasStar(XamlColumnDefinition[] definitions, int start, int span)
+    private static bool HasStar(XamlGridLength[] lengths, int start, int span)
     {
         for (var index = start; index < start + span; index++)
         {
-            if (definitions[index].Width.IsStar)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool HasStar(XamlRowDefinition[] definitions, int start, int span)
-    {
-        for (var index = start; index < start + span; index++)
-        {
-            if (definitions[index].Height.IsStar)
+            if (lengths[index].IsStar)
             {
                 return true;
             }
@@ -439,18 +464,6 @@ public class Grid : Panel
         => value <= 0d || double.IsNaN(value) || double.IsInfinity(value)
             ? 0
             : (int)Math.Min(int.MaxValue, Math.Ceiling(value));
-
-    // 折叠的子项既不测量也不占格；Hidden 仍然参与布局，只是不绘制。
-    private IEnumerable<VisualElement> ArrangedChildren()
-    {
-        foreach (var child in Children)
-        {
-            if (child is VisualElement element && element.Visibility != XamlVisibility.Collapsed)
-            {
-                yield return element;
-            }
-        }
-    }
 
     private static double SpanSize(double[] sizes, int start, int span)
     {

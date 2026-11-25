@@ -271,6 +271,9 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private bool _arrangeValid;
     private Size _measureAvailable;
     private Size _desiredSize;
+
+    // 布局缓存的复用前提：Measure 之后没有被 InvalidateMeasure 推翻。Grid 用它判断能否跳过重测。
+    internal bool IsMeasureValid => _measureValid;
     private VisualHost? _surface;
     private bool _focused;
     private bool _focusVisible;
@@ -393,8 +396,14 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     // 模板内容里的装饰部件用 IsHitTestVisible=false 关掉自身命中；子元素仍可命中（内容区要能接收输入）。
     internal bool IsTemplateContent { get; private set; }
 
-    internal void MarkTemplateContent()
+    // 模板实例一次走完两件事：认施模板的控件、标模板内容。以前是两次全树递归，模板节点每建一次走两遍。
+    internal void InitializeTemplateContent(VisualElement? parent)
     {
+        if (TemplatedParent is null || ReferenceEquals(TemplatedParent, parent))
+        {
+            TemplatedParent = parent;
+        }
+
         IsTemplateContent = true;
         // Children 是 IList<Visual>；按索引走，避免 foreach 装箱结构体枚举器。
         var children = Children;
@@ -402,7 +411,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         {
             if (children[index] is VisualElement element)
             {
-                element.MarkTemplateContent();
+                element.InitializeTemplateContent(parent);
             }
         }
     }
