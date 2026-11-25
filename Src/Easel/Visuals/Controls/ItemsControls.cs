@@ -682,10 +682,51 @@ public class ListBoxItem : ContentControl
         nameof(IsPointerOver), typeof(bool), typeof(ListBoxItem),
         new PropertyMetadata(false) { AffectsRender = true });
 
+    private bool _templateDeferred;
+    private VisualControlTemplate? _deferredTemplate;
+
     /// <summary>Creates a row container that leaves pointer hits to its list.</summary>
     public ListBoxItem()
     {
         IsHitTestVisible = false;
+    }
+
+    // 列表把行模板的创建推迟到行进入视口；这里只记下样式给的模板，不建模板根。
+    internal bool IsTemplateDeferred => _templateDeferred;
+
+    internal void DeferTemplateRealization() => _templateDeferred = true;
+
+    internal void RealizeTemplate()
+    {
+        if (!_templateDeferred)
+        {
+            return;
+        }
+
+        _templateDeferred = false;
+        base.ApplyStyleTemplate(_deferredTemplate);
+    }
+
+    internal void ReleaseTemplate()
+    {
+        if (_templateDeferred)
+        {
+            return;
+        }
+
+        _templateDeferred = true;
+        base.ApplyStyleTemplate(null);
+    }
+
+    internal override void ApplyStyleTemplate(VisualControlTemplate? template)
+    {
+        _deferredTemplate = template;
+        if (_templateDeferred)
+        {
+            return;
+        }
+
+        base.ApplyStyleTemplate(template);
     }
 
     /// <summary>Whether the owning list has this row selected.</summary>
@@ -756,7 +797,104 @@ public class ListBox : ItemsControl
 
     /// <inheritdoc />
     protected override VisualElement CreateItemVisual(object? item)
-        => CreateItemContainer(item, CreateItemContent(item));
+    {
+        var container = CreateItemContainer(item, CreateItemContent(item));
+        // 源先全部建行（Items 保持逐项对应），行模板等进入视口再建。
+        container.DeferTemplateRealization();
+        return container;
+    }
+
+    /// <inheritdoc />
+    protected override void ArrangeOverride(Size finalSize)
+    {
+        base.ArrangeOverride(finalSize);
+        RealizeVisibleRows();
+    }
+
+    // 行的文档位置由 ItemsPresenter 排好后才知道，因此在 Arrange 之后按视口实现模板。
+    private void RealizeVisibleRows()
+    {
+        var count = Items.Count;
+        if (count == 0)
+        {
+            return;
+        }
+
+        // 没有自己的滚动视口时不裁行，必须全部实现，否则行会不显示。
+        if (GetTemplateChild<ScrollViewer>("PART_ScrollViewer") is not { ContentPresenter: { } presenter })
+        {
+            for (var index = 0; index < count; index++)
+            {
+                if (Items[index] is ListBoxItem deferred)
+                {
+                    deferred.RealizeTemplate();
+                }
+            }
+
+            return;
+        }
+
+        // 行是 presenter 的直接子项，Bounds 已是 presenter 坐标；用偏移和视口比较，避免每行走一遍父链求绝对框。
+        var host = ResolveItemsHost();
+        var offset = presenter.VerticalOffset;
+        var viewportHeight = presenter.ViewportHeight;
+        if (viewportHeight <= 0f)
+        {
+            return;
+        }
+
+        var changed = false;
+        for (var index = 0; index < count; index++)
+        {
+            if (Items[index] is not ListBoxItem row)
+            {
+                continue;
+            }
+
+            var bounds = row.Bounds;
+            if (bounds.Height <= 0f)
+            {
+                continue;
+            }
+
+            // 不走模板 presenter 的行（自定义 ItemsPanel）无法用滚动偏移判断，直接实现，保持原有可见性。
+            if (!ReferenceEquals(row.ParentElement, host))
+            {
+                if (row.IsTemplateDeferred)
+                {
+                    row.RealizeTemplate();
+                    changed = true;
+                }
+
+                continue;
+            }
+
+            var top = bounds.Y;
+            var bottom = bounds.Y + bounds.Height;
+            if (row.IsTemplateDeferred)
+            {
+                if (bottom > offset && top < offset + viewportHeight)
+                {
+                    row.RealizeTemplate();
+                    changed = true;
+                }
+            }
+            else if (bottom <= offset - RealizationMargin || top >= offset + viewportHeight + RealizationMargin)
+            {
+                row.ReleaseTemplate();
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            SyncContainerStates();
+            InvalidateMeasure();
+        }
+    }
+
+    // 释放边界比实现边界宽出一小段，滚动到边界附近不会抖。
+    private const float RealizationMargin = 48f;
 
     /// <inheritdoc />
     protected override void OnPointerMoved(VisualPointerEventArgs args)
