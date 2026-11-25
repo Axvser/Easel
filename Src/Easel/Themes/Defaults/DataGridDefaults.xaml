@@ -1,11 +1,43 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="clr-namespace:Easel.Visuals.Controls"
     x:Class="Easel.Themes.Defaults.DataGridDefaults">
 
   <!-- Built-in fallback appearance for DataGrid; added to the implicit style table by Theme.DefaultStyles.
        The shell template only declares the layout regions: the grid still paints rows, cells and headers itself,
-       so every part stays transparent and out of hit testing. -->
+       so every part stays transparent and out of hit testing. Row, header and cell appearance comes from the
+       public style properties on DataGrid, never from a part. -->
+
+  <!-- Kind cell templates: the grid realizes one element per visible cell for these columns, and a column's own
+       CellTemplate/CellFactory still wins. Replace the key in a host dictionary to change a kind's appearance. -->
+  <DataTemplate x:Key="DataGrid.BadgeCell">
+    <controls:DataGridBadgeCell />
+  </DataTemplate>
+
+  <DataTemplate x:Key="DataGrid.CheckCell">
+    <controls:DataGridCheckCell />
+  </DataTemplate>
+
+  <DataTemplate x:Key="DataGrid.ProgressCell">
+    <controls:DataGridProgressCell />
+  </DataTemplate>
+
+  <!-- The built-in cell containers are decorative: the grid owns their geometry and colours. -->
+  <Style x:Key="DataGridCellChrome" TargetType="controls:DataGridCell">
+    <Style.Setters>
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="Focusable" Value="False" />
+    </Style.Setters>
+  </Style>
+
+  <Style TargetType="controls:DataGridBadgeCell" BasedOn="{StaticResource DataGridCellChrome}" />
+
+  <Style TargetType="controls:DataGridCheckCell" BasedOn="{StaticResource DataGridCellChrome}" />
+
+  <Style TargetType="controls:DataGridProgressCell" BasedOn="{StaticResource DataGridCellChrome}" />
+
 <Style TargetType="DataGrid">
     <Style.Setters>
       <Setter Property="CellPadding" Value="10" />

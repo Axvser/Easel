@@ -166,7 +166,11 @@ public sealed class DataGridColumn : INotifyPropertyChanged
         set => Set(ref _cellFactory, value);
     }
 
-    /// <summary>Whether this column realizes its cells as elements instead of painting them.</summary>
+    /// <summary>Whether this column itself supplies a cell element through <see cref="CellFactory"/> or <see cref="CellTemplate"/>.</summary>
+    /// <remarks>
+    /// The grid may also realize an element for a non-text <see cref="Kind"/> from its built-in cell template.
+    /// Per-column factory or template still wins over that built-in appearance.
+    /// </remarks>
     public bool HasCellElement => _cellFactory is not null || _cellTemplate is not null;
 
     /// <summary>Creates the element for one row's cell, or <see langword="null"/> when the column paints itself.</summary>
@@ -560,6 +564,11 @@ public class DataGrid : TemplatedControl
     public static readonly DependencyProperty ProgressCornerRadiusProperty = RegisterDouble(nameof(ProgressCornerRadius), 3d);
 
     /// <summary>The template part that bounds the column header strip.</summary>
+    /// <remarks>
+    /// Shell parts are a geometry contract: a part only supplies a rectangle, the grid paints headers, rows and cells
+    /// inside it, and a missing part falls back to the self-drawn layout. Parts therefore stay transparent and out of
+    /// hit testing; row, header and cell appearance comes from the public style properties, never from the part.
+    /// </remarks>
     public const string ColumnHeadersPartName = "PART_ColumnHeaders";
 
     /// <summary>The template part that bounds the data row area.</summary>
@@ -573,6 +582,34 @@ public class DataGrid : TemplatedControl
 
     /// <summary>The decorative template part above the scroll bar; the grid paints it but never arranges content there.</summary>
     public const string CornerPartName = "PART_Corner";
+
+    /// <summary>The resource key of the built-in text-cell template; no default template is registered, so text columns stay self-drawn.</summary>
+    public const string TextCellTemplateKey = "DataGrid.TextCell";
+
+    /// <summary>The resource key of the built-in badge-cell template.</summary>
+    public const string BadgeCellTemplateKey = "DataGrid.BadgeCell";
+
+    /// <summary>The resource key of the built-in check-cell template.</summary>
+    public const string CheckCellTemplateKey = "DataGrid.CheckCell";
+
+    /// <summary>The resource key of the built-in progress-cell template.</summary>
+    public const string ProgressCellTemplateKey = "DataGrid.ProgressCell";
+
+    // 种类到资源键、以及资源缺失时的兜底工厂都集中在这两张表里；绘制路径不再按 Kind 分支。
+    private static readonly Dictionary<DataGridColumnKind, string> CellTemplateKeys = new()
+    {
+        [DataGridColumnKind.Text] = TextCellTemplateKey,
+        [DataGridColumnKind.Badge] = BadgeCellTemplateKey,
+        [DataGridColumnKind.Check] = CheckCellTemplateKey,
+        [DataGridColumnKind.Progress] = ProgressCellTemplateKey,
+    };
+
+    private static readonly Dictionary<DataGridColumnKind, Func<DataGridCell>> FallbackCells = new()
+    {
+        [DataGridColumnKind.Badge] = static () => new DataGridBadgeCell(),
+        [DataGridColumnKind.Check] = static () => new DataGridCheckCell(),
+        [DataGridColumnKind.Progress] = static () => new DataGridProgressCell(),
+    };
 
     private const float ScrollBarWidth = 12f;
 
@@ -607,6 +644,8 @@ public class DataGrid : TemplatedControl
     private float _headerBottom;
     private float _contentWidth;
     private float[] _widths = [];
+    private readonly Dictionary<DataGridColumnKind, DataTemplate?> _cellTemplates = [];
+    private bool[] _cellVisual = [];
     private Font? _headerFont;
     private Font? _headerFontBase;
     private FontStyle _headerFontStyle;
@@ -1272,6 +1311,7 @@ public class DataGrid : TemplatedControl
 
     private void UpdateCellElements()
     {
+        RefreshCellVisuals();
         var rowHeight = (float)Math.Max(1d, RowHeight);
         if (_view.Count == 0 || _viewportHeight <= 0f)
         {
@@ -1299,7 +1339,90 @@ public class DataGrid : TemplatedControl
             _bodyLeft,
             gutter,
             _columns,
-            _widths);
+            _widths,
+            _cellVisual,
+            this);
+    }
+
+    // 每次布局重解一次：列模板优先，其次是按 Kind 取的资源模板，资源缺失时用内置兜底单元。
+    private void RefreshCellVisuals()
+    {
+        var count = _columns.Count;
+        if (_cellVisual.Length != count)
+        {
+            _cellVisual = new bool[count];
+        }
+
+        _cellTemplates.Clear();
+        for (var index = 0; index < count; index++)
+        {
+            var column = _columns[index];
+            var hasElement = column.HasCellElement;
+            if (!hasElement && CellTemplateKeys.TryGetValue(column.Kind, out var key))
+            {
+                if (!_cellTemplates.TryGetValue(column.Kind, out var template))
+                {
+                    template = ResolveCellTemplate(key);
+                    _cellTemplates[column.Kind] = template;
+                }
+
+                hasElement = template is not null || FallbackCells.ContainsKey(column.Kind);
+            }
+
+            _cellVisual[index] = hasElement;
+        }
+    }
+
+    // 元素链上的同名资源先赢，宿主因此可以替换某个种类的外观；没有才回退到默认字典。
+    private DataTemplate? ResolveCellTemplate(string key)
+    {
+        if (VisualResourceLookup.TryFindResource(this, key, out var local) && local is DataTemplate localTemplate)
+        {
+            return localTemplate;
+        }
+
+        return Theme.DefaultStyles.TryGetValue(key, out var fallback) && fallback is DataTemplate defaultTemplate
+            ? defaultTemplate
+            : null;
+    }
+
+    // 单元格宿主只认这一处创建逻辑：列的工厂/模板优先，之后才是 Kind 的内置模板与兜底单元。
+    internal VisualElement? CreateCellElement(DataGridColumn column, object? item)
+    {
+        if (column.HasCellElement)
+        {
+            return column.CreateCellElement(item);
+        }
+
+        VisualElement? visual = null;
+        var kind = column.Kind;
+        if (_cellTemplates.TryGetValue(kind, out var template) && template is not null)
+        {
+            visual = template.Create();
+        }
+
+        if (visual is null && FallbackCells.TryGetValue(kind, out var factory))
+        {
+            visual = factory();
+        }
+
+        if (visual is null)
+        {
+            return null;
+        }
+
+        if (visual is DataGridCell cell)
+        {
+            cell.Owner = this;
+            cell.Column = column;
+        }
+
+        if (item is not null && !visual.IsSet(VisualElement.DataContextProperty))
+        {
+            visual.DataContext = item;
+        }
+
+        return visual;
     }
 
     /// <inheritdoc />
@@ -2189,9 +2312,9 @@ public class DataGrid : TemplatedControl
                     row.Y,
                     Math.Max(0f, width - (cellPadding * 2f)),
                     row.Height);
-                if (!_columns[columnIndex].HasCellElement)
+                if (columnIndex >= _cellVisual.Length || !_cellVisual[columnIndex])
                 {
-                    DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, theme, rowForeground, selected);
+                    DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, rowForeground);
                 }
 
                 x += width;
@@ -2219,15 +2342,14 @@ public class DataGrid : TemplatedControl
         }
     }
 
+    // 自绘路径只剩文本；Badge/Check/Progress 由 Kind 模板创建的元素单元负责。
     private void DrawCell(
         Graphics graphics,
         DataGridColumn column,
         object? item,
         RectangleF cell,
         Font font,
-        ThemePalette theme,
-        Color foreground,
-        bool selected)
+        Color foreground)
     {
         var text = column.GetText(item);
         var color = column.Foreground.IsEmpty ? ResolveColor(CellForeground, foreground) : column.Foreground;
@@ -2235,204 +2357,20 @@ public class DataGrid : TemplatedControl
         graphics.SetClip(cell, CombineMode.Intersect);
         try
         {
-            switch (column.Kind)
-            {
-                case DataGridColumnKind.Check:
-                    DrawCheck(graphics, column, item, cell, theme);
-                    break;
-                case DataGridColumnKind.Badge:
-                    DrawBadge(graphics, column, item, text, cell, font, theme);
-                    break;
-                case DataGridColumnKind.Progress:
-                    DrawProgress(graphics, column, item, text, cell, font, theme, foreground);
-                    break;
-                default:
-                    VisualText.Draw(
-                        this,
-                        graphics,
-                        text,
-                        font,
-                        color,
-                        cell,
-                        wrap: false,
-                        ToStringAlignment(column.TextAlignment),
-                        StringAlignment.Center);
-                    break;
-            }
+            VisualText.Draw(
+                this,
+                graphics,
+                text,
+                font,
+                color,
+                cell,
+                wrap: false,
+                ToStringAlignment(column.TextAlignment),
+                StringAlignment.Center);
         }
         finally
         {
             graphics.Restore(previous);
-        }
-    }
-
-    private void DrawBadge(
-        Graphics graphics,
-        DataGridColumn column,
-        object? item,
-        string text,
-        RectangleF cell,
-        Font font,
-        ThemePalette theme)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        var color = column.GetColor(item);
-        if (color.IsEmpty)
-        {
-            color = ResolveColor(BadgeBackground, theme.Accent);
-        }
-
-        var padding = (float)Math.Max(0d, BadgePadding);
-        var measured = VisualText.Measure(text, font, 0f, wrap: false, RenderDpi);
-        var width = Math.Min(cell.Width, measured.Width + (padding * 2f));
-        var height = Math.Min((float)Math.Max(0d, BadgeHeight), cell.Height - 4f);
-        if (width <= 0f || height <= 0f)
-        {
-            return;
-        }
-
-        var corner = double.IsNaN(BadgeCornerRadius)
-            ? height / 2f
-            : (float)Math.Max(0d, BadgeCornerRadius);
-        var x = column.TextAlignment switch
-        {
-            XamlTextAlignment.Right => cell.Right - width,
-            XamlTextAlignment.Center => cell.X + ((cell.Width - width) / 2f),
-            _ => cell.X,
-        };
-        var y = cell.Y + ((cell.Height - height) / 2f);
-        using var path = XamlDrawing.RoundedRectangle(new RectangleF(x, y, width, height), corner);
-        using var fill = new SolidBrush(color);
-        graphics.FillPath(fill, path);
-        VisualText.Draw(
-            this,
-            graphics,
-            text,
-            font,
-            ResolveColor(BadgeForeground, ContrastText(color)),
-            new RectangleF(x + padding, y, Math.Max(0f, width - (padding * 2f)), height),
-            wrap: false,
-            StringAlignment.Center,
-            StringAlignment.Center);
-    }
-
-    private void DrawProgress(
-        Graphics graphics,
-        DataGridColumn column,
-        object? item,
-        string text,
-        RectangleF cell,
-        Font font,
-        ThemePalette theme,
-        Color foreground)
-    {
-        var value = column.GetProgress(item);
-        var color = column.GetColor(item);
-        if (color.IsEmpty)
-        {
-            color = ResolveColor(ProgressFillBrush, theme.Accent);
-        }
-
-        var trackHeight = (float)Math.Max(1d, ProgressTrackHeight);
-        var corner = (float)Math.Max(0d, ProgressCornerRadius);
-        var labelWidth = cell.Width >= 76f ? 36f : 0f;
-        var track = new RectangleF(
-            cell.X,
-            cell.Y + ((cell.Height - trackHeight) / 2f),
-            Math.Max(0f, cell.Width - labelWidth - (labelWidth > 0f ? 8f : 0f)),
-            trackHeight);
-        if (track.Width > 0f)
-        {
-            using (var path = XamlDrawing.RoundedRectangle(track, corner))
-            using (var fill = new SolidBrush(ResolveColor(ProgressTrackBrush, WithAlpha(foreground, 30))))
-            {
-                graphics.FillPath(fill, path);
-            }
-
-            var fillWidth = Math.Max(0f, track.Width * (float)(value / 100d));
-            if (fillWidth >= 2f)
-            {
-                using var path = XamlDrawing.RoundedRectangle(new RectangleF(track.X, track.Y, fillWidth, track.Height), corner);
-                using var fill = new SolidBrush(color);
-                graphics.FillPath(fill, path);
-            }
-        }
-
-        if (labelWidth > 0f)
-        {
-            var label = string.IsNullOrEmpty(text) ? $"{value:0}%" : text;
-            VisualText.Draw(
-                this,
-                graphics,
-                label,
-                font,
-                ResolveColor(ProgressLabelForeground, theme.MutedForeground),
-                new RectangleF(cell.Right - labelWidth, cell.Y, labelWidth, cell.Height),
-                wrap: false,
-                StringAlignment.Far,
-                StringAlignment.Center);
-        }
-    }
-
-    private void DrawCheck(Graphics graphics, DataGridColumn column, object? item, RectangleF cell, ThemePalette theme)
-    {
-        var value = column.GetValue(item);
-        bool isChecked;
-        try
-        {
-            isChecked = value switch
-            {
-                bool flag => flag,
-                null => false,
-                _ => Convert.ToBoolean(value, CultureInfo.CurrentCulture),
-            };
-        }
-        catch (FormatException)
-        {
-            isChecked = false;
-        }
-        catch (InvalidCastException)
-        {
-            isChecked = false;
-        }
-
-        var size = (float)Math.Max(1d, CheckSize);
-        var rect = new RectangleF(
-            column.TextAlignment switch
-            {
-                XamlTextAlignment.Right => cell.Right - size,
-                XamlTextAlignment.Center => cell.X + ((cell.Width - size) / 2f),
-                _ => cell.X,
-            },
-            cell.Y + ((cell.Height - size) / 2f),
-            size,
-            size);
-        using var path = XamlDrawing.RoundedRectangle(rect, (float)Math.Max(0d, CheckCornerRadius));
-        if (isChecked)
-        {
-            using var fill = new SolidBrush(ResolveColor(CheckFill, theme.Accent));
-            graphics.FillPath(fill, path);
-            using var check = new System.Drawing.Pen(ResolveColor(CheckMarkBrush, theme.AccentForeground), 1.8f)
-            {
-                StartCap = LineCap.Round,
-                EndCap = LineCap.Round,
-            };
-            var scale = size / 16f;
-            graphics.DrawLines(check, new[]
-            {
-                new PointF(rect.X + (4f * scale), rect.Y + (8f * scale)),
-                new PointF(rect.X + (7f * scale), rect.Y + (11f * scale)),
-                new PointF(rect.X + (12f * scale), rect.Y + (5f * scale)),
-            });
-        }
-        else
-        {
-            using var stroke = new System.Drawing.Pen(ResolveColor(CheckBorderBrush, theme.ControlBorder), 1.2f);
-            graphics.DrawPath(stroke, path);
         }
     }
 
@@ -2854,7 +2792,8 @@ public class DataGrid : TemplatedControl
             InvalidateVisual();
         }
         else if (e.PropertyName == nameof(DataGridColumn.CellTemplate)
-                 || e.PropertyName == nameof(DataGridColumn.CellFactory))
+                 || e.PropertyName == nameof(DataGridColumn.CellFactory)
+                 || e.PropertyName == nameof(DataGridColumn.Kind))
         {
             _cellHost.Reset();
             _cellHost.ClearPools();
@@ -2867,7 +2806,7 @@ public class DataGrid : TemplatedControl
         }
     }
 
-    private static StringAlignment ToStringAlignment(XamlTextAlignment alignment)
+    internal static StringAlignment ToStringAlignment(XamlTextAlignment alignment)
         => alignment switch
         {
             XamlTextAlignment.Right => StringAlignment.Far,
@@ -2875,7 +2814,7 @@ public class DataGrid : TemplatedControl
             _ => StringAlignment.Near,
         };
 
-    private static Color WithAlpha(Color color, int alpha)
+    internal static Color WithAlpha(Color color, int alpha)
         => color.A == alpha ? color : Color.FromArgb(XamlMath.Clamp(alpha, 0, 255), color.R, color.G, color.B);
 
     private static DependencyProperty RegisterBrush(string name)
@@ -2889,7 +2828,7 @@ public class DataGrid : TemplatedControl
             new PropertyMetadata(defaultValue) { AffectsRender = true });
 
     // 自绘路径只认单色；渐变笔刷取代表色，和 Foreground 的取值方式一致。
-    private static Color ResolveColor(XamlBrush? brush, Color fallback)
+    internal static Color ResolveColor(XamlBrush? brush, Color fallback)
     {
         if (brush is null)
         {
@@ -2900,7 +2839,7 @@ public class DataGrid : TemplatedControl
         return color.IsEmpty ? fallback : color;
     }
 
-    private static Color ContrastText(Color background)
+    internal static Color ContrastText(Color background)
     {
         var luminance = ((0.2126 * background.R) + (0.7152 * background.G) + (0.0722 * background.B)) / 255d;
         return luminance > 0.58d
@@ -2910,6 +2849,267 @@ public class DataGrid : TemplatedControl
 
     private static string Truncate(string text, int length)
         => text.Length <= length ? text : text.Substring(0, length - 1) + "…";
+}
+
+/// <summary>The base of the element-based cells realized by the DataGrid kind templates.</summary>
+/// <remarks>
+/// A built-in template such as <c>DataGrid.BadgeCell</c> creates one of these for each visible cell. The grid
+/// attaches the owning grid and the column before arranging it, and the row item arrives as the
+/// <see cref="VisualElement.DataContext"/>. A cell paints inside its own bounds and reads every colour and metric
+/// from the owning grid's public style properties.
+/// </remarks>
+public abstract class DataGridCell : VisualElement
+{
+    /// <summary>Creates a decorative cell; the grid supplies its geometry, column and item.</summary>
+    protected DataGridCell()
+    {
+        IsHitTestVisible = false;
+        IsTabStop = false;
+        Focusable = false;
+    }
+
+    /// <summary>The grid that realized this cell, or <see langword="null"/> outside a grid.</summary>
+    public DataGrid? Owner { get; internal set; }
+
+    /// <summary>The column this cell presents, or <see langword="null"/> outside a grid.</summary>
+    public DataGridColumn? Column { get; internal set; }
+
+    /// <summary>The row item this cell presents.</summary>
+    protected object? Item => DataContext;
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
+        if (Owner is not { } owner || Column is not { } column)
+        {
+            return;
+        }
+
+        var padding = (float)Math.Max(0d, owner.CellPadding);
+        var cell = new RectangleF(
+            padding,
+            0f,
+            Math.Max(0f, Bounds.Width - (padding * 2f)),
+            Bounds.Height);
+        if (cell.Width <= 0f || cell.Height <= 0f)
+        {
+            return;
+        }
+
+        var previous = graphics.Save();
+        graphics.SetClip(cell, CombineMode.Intersect);
+        try
+        {
+            Paint(graphics, owner, column, cell);
+        }
+        finally
+        {
+            graphics.Restore(previous);
+        }
+    }
+
+    /// <summary>Paints the cell inside <paramref name="cell"/>, which already excludes <see cref="DataGrid.CellPadding"/>.</summary>
+    /// <param name="graphics">The target surface in the cell's local coordinates.</param>
+    /// <param name="owner">The grid that supplies colours and metrics.</param>
+    /// <param name="column">The column that supplies the value, text and optional per-row colour.</param>
+    /// <param name="cell">The local rectangle available to the appearance.</param>
+    protected abstract void Paint(Graphics graphics, DataGrid owner, DataGridColumn column, RectangleF cell);
+}
+
+/// <summary>A status pill painted from <see cref="DataGridColumnKind.Badge"/>.</summary>
+public sealed class DataGridBadgeCell : DataGridCell
+{
+    /// <summary>Creates an empty badge cell; the grid attaches its column and item.</summary>
+    public DataGridBadgeCell()
+    {
+    }
+
+    /// <inheritdoc />
+    protected override void Paint(Graphics graphics, DataGrid owner, DataGridColumn column, RectangleF cell)
+    {
+        var text = column.GetText(Item);
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var theme = Theme.Current;
+        var color = column.GetColor(Item);
+        if (color.IsEmpty)
+        {
+            color = DataGrid.ResolveColor(owner.BadgeBackground, theme.Accent);
+        }
+
+        var padding = (float)Math.Max(0d, owner.BadgePadding);
+        var font = owner.ResolveFont(DefaultFont);
+        var measured = VisualText.Measure(text, font, 0f, wrap: false, RenderDpi);
+        var width = Math.Min(cell.Width, measured.Width + (padding * 2f));
+        var height = Math.Min((float)Math.Max(0d, owner.BadgeHeight), cell.Height - 4f);
+        if (width <= 0f || height <= 0f)
+        {
+            return;
+        }
+
+        var corner = double.IsNaN(owner.BadgeCornerRadius)
+            ? height / 2f
+            : (float)Math.Max(0d, owner.BadgeCornerRadius);
+        var x = column.TextAlignment switch
+        {
+            XamlTextAlignment.Right => cell.Right - width,
+            XamlTextAlignment.Center => cell.X + ((cell.Width - width) / 2f),
+            _ => cell.X,
+        };
+        var y = cell.Y + ((cell.Height - height) / 2f);
+        using var path = XamlDrawing.RoundedRectangle(new RectangleF(x, y, width, height), corner);
+        using var fill = new SolidBrush(color);
+        graphics.FillPath(fill, path);
+        VisualText.Draw(
+            owner,
+            graphics,
+            text,
+            font,
+            DataGrid.ResolveColor(owner.BadgeForeground, DataGrid.ContrastText(color)),
+            new RectangleF(x + padding, y, Math.Max(0f, width - (padding * 2f)), height),
+            wrap: false,
+            StringAlignment.Center,
+            StringAlignment.Center);
+    }
+}
+
+/// <summary>A boolean box painted from <see cref="DataGridColumnKind.Check"/>.</summary>
+public sealed class DataGridCheckCell : DataGridCell
+{
+    /// <summary>Creates an empty check cell; the grid attaches its column and item.</summary>
+    public DataGridCheckCell()
+    {
+    }
+
+    /// <inheritdoc />
+    protected override void Paint(Graphics graphics, DataGrid owner, DataGridColumn column, RectangleF cell)
+    {
+        var value = column.GetValue(Item);
+        bool isChecked;
+        try
+        {
+            isChecked = value switch
+            {
+                bool flag => flag,
+                null => false,
+                _ => Convert.ToBoolean(value, CultureInfo.CurrentCulture),
+            };
+        }
+        catch (FormatException)
+        {
+            isChecked = false;
+        }
+        catch (InvalidCastException)
+        {
+            isChecked = false;
+        }
+
+        var theme = Theme.Current;
+        var size = (float)Math.Max(1d, owner.CheckSize);
+        var rect = new RectangleF(
+            column.TextAlignment switch
+            {
+                XamlTextAlignment.Right => cell.Right - size,
+                XamlTextAlignment.Center => cell.X + ((cell.Width - size) / 2f),
+                _ => cell.X,
+            },
+            cell.Y + ((cell.Height - size) / 2f),
+            size,
+            size);
+        using var path = XamlDrawing.RoundedRectangle(rect, (float)Math.Max(0d, owner.CheckCornerRadius));
+        if (isChecked)
+        {
+            using var fill = new SolidBrush(DataGrid.ResolveColor(owner.CheckFill, theme.Accent));
+            graphics.FillPath(fill, path);
+            using var check = new System.Drawing.Pen(
+                DataGrid.ResolveColor(owner.CheckMarkBrush, theme.AccentForeground),
+                1.8f)
+            {
+                StartCap = LineCap.Round,
+                EndCap = LineCap.Round,
+            };
+            var scale = size / 16f;
+            graphics.DrawLines(check, new[]
+            {
+                new PointF(rect.X + (4f * scale), rect.Y + (8f * scale)),
+                new PointF(rect.X + (7f * scale), rect.Y + (11f * scale)),
+                new PointF(rect.X + (12f * scale), rect.Y + (5f * scale)),
+            });
+        }
+        else
+        {
+            using var stroke = new System.Drawing.Pen(
+                DataGrid.ResolveColor(owner.CheckBorderBrush, theme.ControlBorder),
+                1.2f);
+            graphics.DrawPath(stroke, path);
+        }
+    }
+}
+
+/// <summary>A 0–100 progress track painted from <see cref="DataGridColumnKind.Progress"/>.</summary>
+public sealed class DataGridProgressCell : DataGridCell
+{
+    /// <summary>Creates an empty progress cell; the grid attaches its column and item.</summary>
+    public DataGridProgressCell()
+    {
+    }
+
+    /// <inheritdoc />
+    protected override void Paint(Graphics graphics, DataGrid owner, DataGridColumn column, RectangleF cell)
+    {
+        var theme = Theme.Current;
+        var foreground = owner.Foreground.IsEmpty ? theme.Foreground : owner.Foreground;
+        var value = column.GetProgress(Item);
+        var color = column.GetColor(Item);
+        if (color.IsEmpty)
+        {
+            color = DataGrid.ResolveColor(owner.ProgressFillBrush, theme.Accent);
+        }
+
+        var trackHeight = (float)Math.Max(1d, owner.ProgressTrackHeight);
+        var corner = (float)Math.Max(0d, owner.ProgressCornerRadius);
+        var labelWidth = cell.Width >= 76f ? 36f : 0f;
+        var track = new RectangleF(
+            cell.X,
+            cell.Y + ((cell.Height - trackHeight) / 2f),
+            Math.Max(0f, cell.Width - labelWidth - (labelWidth > 0f ? 8f : 0f)),
+            trackHeight);
+        if (track.Width > 0f)
+        {
+            using (var path = XamlDrawing.RoundedRectangle(track, corner))
+            using (var fill = new SolidBrush(DataGrid.ResolveColor(owner.ProgressTrackBrush, DataGrid.WithAlpha(foreground, 30))))
+            {
+                graphics.FillPath(fill, path);
+            }
+
+            var fillWidth = Math.Max(0f, track.Width * (float)(value / 100d));
+            if (fillWidth >= 2f)
+            {
+                using var path = XamlDrawing.RoundedRectangle(new RectangleF(track.X, track.Y, fillWidth, track.Height), corner);
+                using var fill = new SolidBrush(color);
+                graphics.FillPath(fill, path);
+            }
+        }
+
+        if (labelWidth > 0f)
+        {
+            var text = column.GetText(Item);
+            var label = string.IsNullOrEmpty(text) ? $"{value:0}%" : text;
+            VisualText.Draw(
+                owner,
+                graphics,
+                label,
+                owner.ResolveFont(DefaultFont),
+                DataGrid.ResolveColor(owner.ProgressLabelForeground, theme.MutedForeground),
+                new RectangleF(cell.Right - labelWidth, cell.Y, labelWidth, cell.Height),
+                wrap: false,
+                StringAlignment.Far,
+                StringAlignment.Center);
+        }
+    }
 }
 
 // 只实现可见单元格窗口的元素宿主：键是（可见行, 列），移出窗口的元素按列回池。
@@ -2941,7 +3141,9 @@ internal sealed class DataGridCellHost : Panel
         float bodyLeft,
         float gutter,
         IReadOnlyList<DataGridColumn> columns,
-        float[] widths)
+        float[] widths,
+        bool[] cellVisual,
+        DataGrid owner)
     {
         _desired.Clear();
         var y = bodyTop + (firstRow * rowHeight) - verticalOffset;
@@ -2952,7 +3154,7 @@ internal sealed class DataGridCellHost : Panel
             for (var column = 0; column < columns.Count && column < widths.Length; column++)
             {
                 var width = widths[column];
-                if (width <= 0f || !columns[column].HasCellElement)
+                if (width <= 0f || column >= cellVisual.Length || !cellVisual[column])
                 {
                     x += width;
                     continue;
@@ -2962,7 +3164,7 @@ internal sealed class DataGridCellHost : Panel
                 _desired.Add(key);
                 if (!_realized.TryGetValue(key, out var element))
                 {
-                    element = Take(column) ?? columns[column].CreateCellElement(item);
+                    element = Take(column) ?? owner.CreateCellElement(columns[column], item);
                     if (element is null)
                     {
                         x += width;
