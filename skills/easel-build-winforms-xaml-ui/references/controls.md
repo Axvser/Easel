@@ -88,6 +88,23 @@ This page lists each control's own properties and behaviour.
 | `VisualContextMenu` | inherits `VisualPopup`; `OpenAt(target, surfacePoint)`, `Items` | Detached menu opened at a surface point. |
 | `VisualPopup` | `IsOpen`, `Child`, `PlacementTarget`, `Placement` (`VisualPlacement`), `HorizontalOffset`, `VerticalOffset`, `StaysOpen`, `MatchTargetWidth`, `Opened`, `Closed` | Hosted in the overlay above the root tree; not clipped by ancestor scroll viewers. `PlacementTarget` is set in code (no `ElementName` requirement). |
 
+## Dialogs
+
+| Control | Key members | Notes |
+| --- | --- | --- |
+| `VisualDialog` | `Options`, `ShowAsync(host)`, `Close(DialogResult)`, `IsOpen`, `Result`, `PromptText`, `Opened`/`Closed`, template parts | In-surface modal: 40% scrim, centered card (Surface, 1px ControlBorder, radius 12, shadow), 180 ms fade/slide, focus trap, native islands hidden while open. Template parts `PART_Icon`, `PART_Title`, `PART_Content`, `PART_Primary`, `PART_Secondary`, `PART_Cancel`, `PART_Close`. |
+| `DialogService` | `ShowAsync(host, options)`, `MessageAsync`, `ConfirmAsync`, `PromptAsync` | Async results: `DialogResult.Primary/Secondary/Cancel`; prompt returns the text or `null`. `DialogResult` collides with `System.Windows.Forms.DialogResult` when both namespaces are imported. |
+
+```csharp
+var result = await DialogService.ConfirmAsync(
+    surface, "Delete row?", "This cannot be undone.", "Delete", "Keep", DialogKind.Warning);
+var name = await DialogService.PromptAsync(surface, "Rename", "Name", current);
+```
+
+`DialogOptions.Content` may be a `VisualElement` (default card path) or a string; with a template, string content fills
+`PART_Content`. Dialogs stack; Enter activates the primary, Esc cancels when `DismissOnEscape`, outside clicks close
+only when `DismissOnOutsideClick`.
+
 ## Shapes
 
 `Rectangle`, `Ellipse`, `Line`, `Polygon`, `Polyline`, `Path` (`ShapeElement`):
