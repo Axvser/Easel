@@ -396,6 +396,7 @@ public class TextBox : TemplatedControl
     private bool _suppressHistoryReset;
     private bool _focusHandoff;
     private bool _focusOnNextLayout;
+    private int _focusAttempts;
     private readonly System.Windows.Forms.Timer _editorFocusTimer;
     private float _horizontalOffset;
     private float _lineHeight = 16f;
@@ -414,11 +415,26 @@ public class TextBox : TemplatedControl
             InvalidateVisual();
         };
 
-        _editorFocusTimer = new System.Windows.Forms.Timer { Interval = 200 };
+        _editorFocusTimer = new System.Windows.Forms.Timer { Interval = 40 };
         _editorFocusTimer.Tick += (_, _) =>
         {
             _editorFocusTimer.Stop();
+            if (!_nativeActive || _editor.IsDisposed || _editor.Focused || !IsFocused)
+            {
+                _focusAttempts = 0;
+                return;
+            }
+
             FocusNativeEditorIfNeeded();
+            if (!_editor.Focused && ++_focusAttempts < 25)
+            {
+                Surface?.InvalidateSurface();
+                _editorFocusTimer.Start();
+            }
+            else
+            {
+                _focusAttempts = 0;
+            }
         };
 
         _editor = new System.Windows.Forms.TextBox
@@ -1604,10 +1620,13 @@ public class TextBox : TemplatedControl
         // 第一次点击时焦点可能先落到编辑器、随后又被这次 WinForms 焦点处理收走；
         // 所以不判断当前是否已聚焦，统一排到下一次布局之后（PlaceNative 已经跑完）再补一次。
         _focusOnNextLayout = true;
+        _focusAttempts = 0;
         if (Surface is { IsHandleCreated: true, IsDisposed: false } surface)
         {
             surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
             surface.LayoutUpdated += OnSurfaceLayoutUpdated;
+            surface.GotFocus -= OnSurfaceGotFocus;
+            surface.GotFocus += OnSurfaceGotFocus;
         }
 
         _editorFocusTimer.Stop();
@@ -1637,6 +1656,8 @@ public class TextBox : TemplatedControl
         _editorFocusTimer.Stop();
     }
 
+    private void OnSurfaceGotFocus(object? sender, EventArgs e) => FocusNativeEditorIfNeeded();
+
     private void FocusNativeEditorIfNeeded()
     {
         if (!_nativeActive || _editor.IsDisposed || !_editor.Visible || _editor.Focused || !_editor.CanFocus)
@@ -1664,10 +1685,12 @@ public class TextBox : TemplatedControl
 
         _nativeActive = false;
         _focusOnNextLayout = false;
+        _focusAttempts = 0;
         _editorFocusTimer.Stop();
         if (Surface is { } surface)
         {
             surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+            surface.GotFocus -= OnSurfaceGotFocus;
         }
 
         _nativeHost.Visibility = Easel.Controls.Visibility.Collapsed;
@@ -1840,6 +1863,7 @@ public class TextBox : TemplatedControl
             if (Surface is { } surface)
             {
                 surface.LayoutUpdated -= OnSurfaceLayoutUpdated;
+                surface.GotFocus -= OnSurfaceGotFocus;
             }
 
             Surface?.RemoveNative(_nativeHost);
