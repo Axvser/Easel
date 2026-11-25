@@ -28,9 +28,10 @@ namespace Easel.Visuals.Controls;
 /// <para>
 /// With a template the self-drawn chrome is suppressed. The template must declare <c>PART_Popup</c> (a
 /// <see cref="VisualPopup"/>) and an items host named <c>PART_ItemsPresenter</c> or marked with
-/// <see cref="ItemsControl.SetIsItemsHost"/>; the realized list is parented into that host. An editable template may
-/// declare <c>PART_EditableTextBox</c> (a <see cref="Easel.Visuals.Controls.TextBox"/>) and a toggle
-/// named <c>PART_ToggleButton</c> or
+/// <see cref="ItemsControl.SetIsItemsHost"/>; the realized list is parented into that host. A template may also
+/// declare <c>PART_Display</c> (a <see cref="Easel.Visuals.Controls.TextBlock"/>); the selected item's display text
+/// or the placeholder is written to it. An editable template may declare <c>PART_EditableTextBox</c> (a
+/// <see cref="Easel.Visuals.Controls.TextBox"/>) and a toggle named <c>PART_ToggleButton</c> or
 /// <c>PART_Arrow</c>. A missing required part throws <see cref="InvalidOperationException"/> instead of leaving the
 /// chrome unchanged.
 /// </para>
@@ -109,6 +110,7 @@ public class ComboBox : TemplatedControl
     private VisualTextBox? _editablePart;
     private VisualButton? _toggleButton;
     private ToggleButton? _toggleSwitch;
+    private TextBlock? _displayPart;
     private bool _syncingSelection;
     private bool _syncingOpen;
     private bool _syncingText;
@@ -490,7 +492,14 @@ public class ComboBox : TemplatedControl
         if (ReferenceEquals(e.Property, DisplayMemberPathProperty))
         {
             _list.RefreshItems();
+            SyncDisplayText();
             InvalidateMeasure();
+            return;
+        }
+
+        if (ReferenceEquals(e.Property, PlaceholderProperty))
+        {
+            SyncDisplayText();
             return;
         }
 
@@ -516,6 +525,7 @@ public class ComboBox : TemplatedControl
             SyncSelectedFromIndex();
             SyncListSelection();
             SyncEditableText();
+            SyncDisplayText();
             InvalidateMeasure();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             return;
@@ -526,6 +536,7 @@ public class ComboBox : TemplatedControl
             SyncSelectedIndexFromItem();
             SyncListSelection();
             SyncEditableText();
+            SyncDisplayText();
             InvalidateMeasure();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             return;
@@ -704,6 +715,7 @@ public class ComboBox : TemplatedControl
 
         AttachEditable();
         AttachToggle();
+        AttachDisplay();
     }
 
     private Panel? ResolveItemsHost(VisualPopup popup)
@@ -783,10 +795,18 @@ public class ComboBox : TemplatedControl
         }
     }
 
+    // 显示部件是可选的：自定义模板没有它时，显示文本仍由控件自己或编辑器承担。
+    private void AttachDisplay()
+    {
+        _displayPart = GetTemplateChild<TextBlock>("PART_Display");
+        SyncDisplayText();
+    }
+
     private void DetachTemplateParts()
     {
         DetachEditable();
         DetachToggle();
+        DetachDisplay();
         RestoreUntemplatedList();
 
         if (_templatePopup is { } popup)
@@ -813,6 +833,8 @@ public class ComboBox : TemplatedControl
             _editablePart = null;
         }
     }
+
+    private void DetachDisplay() => _displayPart = null;
 
     private void DetachToggle()
     {
@@ -861,6 +883,16 @@ public class ComboBox : TemplatedControl
         {
             _syncingText = false;
         }
+    }
+
+    private void SyncDisplayText()
+    {
+        if (_displayPart is null)
+        {
+            return;
+        }
+
+        _displayPart.Text = DisplayText;
     }
 
     private void SyncToggleChecked()

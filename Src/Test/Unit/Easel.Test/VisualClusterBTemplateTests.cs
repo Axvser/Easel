@@ -89,10 +89,10 @@ public sealed class VisualClusterBTemplateTests
         combo.Template = null;
         Layout(surface, 320, 240);
 
-        Assert.IsNull(combo.TemplateRoot, "clearing the template removes the root");
-        Assert.IsNull(combo.GetTemplateChild<VC.Border>("PART_Chrome"), "the part scope is cleared");
+        Assert.IsNotNull(combo.TemplateRoot, "clearing the direct template falls back to the default style template");
+        Assert.IsNull(combo.GetTemplateChild<VC.Border>("PART_Chrome"), "the direct template's part scope is cleared");
         Assert.AreNotEqual(Color.Lime.ToArgb(), RenderPixel(surface, 80, 20).ToArgb(),
-            "without a template the self-drawn selector is visible again");
+            "clearing the direct template removes its lime chrome");
     }
 
     [TestMethod]
@@ -172,7 +172,13 @@ public sealed class VisualClusterBTemplateTests
     public void ComboBoxWithoutTemplate_StillDrawsAndSelects()
     {
         using var surface = new VisualHost { Size = new Size(320, 240) };
-        using var combo = new VC.ComboBox { Width = 160, SelectedIndex = 0 };
+        // An explicit empty style suppresses the built-in default template, so this exercises the self-drawn path.
+        using var combo = new VC.ComboBox
+        {
+            Width = 160,
+            SelectedIndex = 0,
+            Style = new VisualStyle { TargetType = typeof(VC.ComboBox) },
+        };
         combo.Items.Add("One");
         combo.Items.Add("Two");
         surface.Root = combo;

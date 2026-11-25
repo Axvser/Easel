@@ -4,6 +4,121 @@
     x:Class="Easel.Themes.Defaults.ComboBoxDefaults">
 
   <!-- Built-in fallback appearance for ComboBox; added to the implicit style table by Theme.DefaultStyles. -->
-  
+<Style TargetType="ComboBox">
+    <Style.Template>
+      <ControlTemplate TargetType="ComboBox">
+        <Grid x:Name="Root" IsHitTestVisible="False">
+          <Border x:Name="Chrome"
+                  IsHitTestVisible="False"
+                  Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="HoverRing"
+                  IsHitTestVisible="False"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border IsHitTestVisible="False"
+                  Padding="{TemplateBinding Padding}"
+                  Margin="0,0,22,0">
+            <TextBlock x:Name="PART_Display"
+                       IsHitTestVisible="False"
+                       Foreground="{TemplateBinding Foreground}"
+                       VerticalAlignment="Center" />
+          </Border>
+          <TextBox x:Name="PART_EditableTextBox"
+                   Padding="{TemplateBinding Padding}"
+                   Margin="0,0,22,0"
+                   Foreground="{TemplateBinding Foreground}" />
+          <Polygon x:Name="ChevronDown"
+                   IsHitTestVisible="False"
+                   Width="8"
+                   Height="5"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"
+                   Points="0,0 8,0 4,5"
+                   Fill="{DynamicResource Text}" />
+          <Polygon x:Name="ChevronUp"
+                   IsHitTestVisible="False"
+                   Width="8"
+                   Height="5"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Margin="0,0,8,0"
+                   Points="0,5 8,5 4,0"
+                   Fill="{DynamicResource Text}" />
+          <VisualPopup x:Name="PART_Popup">
+            <VisualPopup.Child>
+              <ScrollViewer>
+                <ItemsPresenter x:Name="PART_ItemsPresenter" />
+              </ScrollViewer>
+            </VisualPopup.Child>
+          </VisualPopup>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <!-- Trigger-controlled parts carry no baseline attributes: template setters rank below local values,
+               and among active triggers the later one wins. -->
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsDropDownOpen" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
+              <Setter TargetName="ChevronDown" Property="Visibility" Value="Collapsed" />
+              <Setter TargetName="ChevronUp" Property="Visibility" Value="Visible" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsDropDownOpen" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
+              <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible" />
+              <Setter TargetName="ChevronUp" Property="Visibility" Value="Collapsed" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEditable" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="PART_Display" Property="Visibility" Value="Collapsed" />
+              <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEditable" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="PART_Display" Property="Visibility" Value="Visible" />
+              <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Collapsed" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>
