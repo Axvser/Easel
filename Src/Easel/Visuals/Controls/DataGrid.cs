@@ -54,6 +54,8 @@ public sealed class DataGridColumn : INotifyPropertyChanged
     private Func<object?, string?>? _textSelector;
     private Func<object?, Color>? _colorSelector;
     private Func<object?, double>? _progressSelector;
+    private DataTemplate? _cellTemplate;
+    private Func<object?, VisualElement>? _cellFactory;
     private BindingPath? _path;
 
     /// <summary>Raised when a property that affects layout or painting changed.</summary>
@@ -148,6 +150,43 @@ public sealed class DataGridColumn : INotifyPropertyChanged
     {
         get => _progressSelector;
         set => Set(ref _progressSelector, value);
+    }
+
+    /// <summary>Creates a cell element from a template; <see cref="CellFactory"/> wins when both are set.</summary>
+    public DataTemplate? CellTemplate
+    {
+        get => _cellTemplate;
+        set => Set(ref _cellTemplate, value);
+    }
+
+    /// <summary>Creates a cell element for a row; takes precedence over <see cref="CellTemplate"/>.</summary>
+    public Func<object?, VisualElement>? CellFactory
+    {
+        get => _cellFactory;
+        set => Set(ref _cellFactory, value);
+    }
+
+    /// <summary>Whether this column realizes its cells as elements instead of painting them.</summary>
+    public bool HasCellElement => _cellFactory is not null || _cellTemplate is not null;
+
+    /// <summary>Creates the element for one row's cell, or <see langword="null"/> when the column paints itself.</summary>
+    /// <param name="item">The row object; the element receives it as its <see cref="VisualElement.DataContext"/>.</param>
+    public VisualElement? CreateCellElement(object? item)
+    {
+        var visual = _cellFactory is { } factory
+            ? factory(item)
+            : _cellTemplate?.Create();
+        if (visual is null)
+        {
+            return null;
+        }
+
+        if (item is not null && !visual.IsSet(VisualElement.DataContextProperty))
+        {
+            visual.DataContext = item;
+        }
+
+        return visual;
     }
 
     /// <summary>The text shown for <paramref name="item"/>.</summary>
@@ -423,6 +462,7 @@ public class DataGrid : TemplatedControl
     private readonly ObservableCollection<DataGridColumn> _columns = [];
     private readonly List<object?> _rows = [];
     private readonly List<int> _view = [];
+    private readonly DataGridCellHost _cellHost;
     private readonly ScrollBar _scrollBar;
     private readonly HashSet<DataGridColumn> _observedColumns = [];
     private INotifyCollectionChanged? _observedSource;
@@ -461,6 +501,9 @@ public class DataGrid : TemplatedControl
         CornerRadius = Theme.Current.CornerRadius;
 
         _columns.CollectionChanged += OnColumnsChanged;
+        // 单元格元素在自绘内容之上、滚动条之下；先加宿主再把滚动条加在它后面。
+        _cellHost = new DataGridCellHost();
+        Add(_cellHost);
         _scrollBar = new ScrollBar
         {
             Orientation = Orientation.Vertical,
@@ -590,6 +633,12 @@ public class DataGrid : TemplatedControl
 
     /// <summary>The number of rows in the current view.</summary>
     public int RowCount => _view.Count;
+
+    /// <summary>The number of cell elements currently realized for the visible window.</summary>
+    public int RealizedCellCount => _cellHost.RealizedCount;
+
+    /// <summary>The realized cell elements, in realization order.</summary>
+    public IReadOnlyList<VisualElement> RealizedCells => _cellHost.RealizedCells;
 
     /// <summary>Returns the row object at a view index, or <see langword="null"/> when out of range.</summary>
     /// <param name="viewIndex">The zero-based index in the current sort order.</param>
@@ -741,6 +790,8 @@ public class DataGrid : TemplatedControl
         {
             ArrangeTemplate(finalSize);
             _scrollBar.Visibility = XamlVisibility.Collapsed;
+            _cellHost.Reset();
+            _cellHost.Visibility = XamlVisibility.Collapsed;
             return;
         }
 
@@ -782,6 +833,54 @@ public class DataGrid : TemplatedControl
                 ScrollBarWidth,
                 viewport));
         }
+
+        ArrangeCellHost(finalSize);
+    }
+
+    // 单元格宿主铺满控件，靠 Clip 裁到表头下方；元素坐标因此与自绘行是同一套。
+    private void ArrangeCellHost(Size finalSize)
+    {
+        _cellHost.Visibility = XamlVisibility.Visible;
+        _cellHost.Clip = new RectangleF(
+            _bodyLeft,
+            _bodyTop,
+            Math.Max(0f, _bodyRight - _bodyLeft),
+            Math.Max(0f, _bodyBottom - _bodyTop));
+        _cellHost.Measure(finalSize);
+        _cellHost.Arrange(new RectangleF(0f, 0f, finalSize.Width, finalSize.Height));
+        UpdateCellElements();
+    }
+
+    private void UpdateCellElements()
+    {
+        var rowHeight = (float)Math.Max(1d, RowHeight);
+        if (_view.Count == 0 || _viewportHeight <= 0f)
+        {
+            _cellHost.Reset();
+            return;
+        }
+
+        var first = Math.Max(0, (int)Math.Floor(_verticalOffset / rowHeight));
+        var last = Math.Min(_view.Count - 1, (int)Math.Ceiling((_verticalOffset + _viewportHeight) / rowHeight));
+        if (last < first)
+        {
+            _cellHost.Reset();
+            return;
+        }
+
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
+        _cellHost.Update(
+            _view,
+            _rows,
+            first,
+            last,
+            rowHeight,
+            _verticalOffset,
+            _bodyTop,
+            _bodyLeft,
+            gutter,
+            _columns,
+            _widths);
     }
 
     /// <inheritdoc />
@@ -1028,6 +1127,7 @@ public class DataGrid : TemplatedControl
             0f,
             max);
         SyncScrollBar();
+        InvalidateArrange();
         InvalidateVisual();
         args.Handled = true;
     }
@@ -1248,6 +1348,8 @@ public class DataGrid : TemplatedControl
             SetSelectionSilently(-1, null);
         }
 
+        // 排序或换源后同一格对应的行对象已经不同，元素一律回池重绑。
+        _cellHost.Reset();
         SyncScrollBar();
     }
 
@@ -1365,6 +1467,7 @@ public class DataGrid : TemplatedControl
 
         _verticalOffset = XamlMath.Clamp(_verticalOffset, 0f, max);
         SyncScrollBar();
+        InvalidateArrange();
     }
 
     private void SyncScrollBar()
@@ -1400,6 +1503,7 @@ public class DataGrid : TemplatedControl
         var rowHeight = (float)Math.Max(1d, RowHeight);
         var max = Math.Max(0f, (_view.Count * rowHeight) - _viewportHeight);
         _verticalOffset = XamlMath.Clamp((float)_scrollBar.Value, 0f, max);
+        InvalidateArrange();
         InvalidateVisual();
     }
 
@@ -1620,7 +1724,11 @@ public class DataGrid : TemplatedControl
                     row.Y,
                     Math.Max(0f, width - (CellPadding * 2f)),
                     row.Height);
-                DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, theme, rowForeground, selected);
+                if (!_columns[columnIndex].HasCellElement)
+                {
+                    DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, theme, rowForeground, selected);
+                }
+
                 x += width;
             }
 
@@ -2226,6 +2334,8 @@ public class DataGrid : TemplatedControl
             _sortColumn = _columns.Count - 1;
         }
 
+        _cellHost.Reset();
+        _cellHost.ClearPools();
         InvalidateMeasure();
         InvalidateVisual();
     }
@@ -2259,6 +2369,15 @@ public class DataGrid : TemplatedControl
                  || e.PropertyName == nameof(DataGridColumn.MinWidth)
                  || e.PropertyName == nameof(DataGridColumn.MaxWidth))
         {
+            InvalidateArrange();
+            InvalidateVisual();
+        }
+        else if (e.PropertyName == nameof(DataGridColumn.CellTemplate)
+                 || e.PropertyName == nameof(DataGridColumn.CellFactory))
+        {
+            _cellHost.Reset();
+            _cellHost.ClearPools();
+            InvalidateMeasure();
             InvalidateVisual();
         }
         else
@@ -2288,4 +2407,174 @@ public class DataGrid : TemplatedControl
 
     private static string Truncate(string text, int length)
         => text.Length <= length ? text : text.Substring(0, length - 1) + "…";
+}
+
+// 只实现可见单元格窗口的元素宿主：键是（可见行, 列），移出窗口的元素按列回池。
+internal sealed class DataGridCellHost : Panel
+{
+    private readonly Dictionary<long, VisualElement> _realized = new();
+    private readonly List<VisualElement> _order = new();
+    private readonly Dictionary<int, Stack<VisualElement>> _pools = new();
+    private readonly HashSet<long> _desired = new();
+    private readonly List<long> _stale = new();
+
+    internal DataGridCellHost()
+    {
+        IsHitTestVisible = false;
+    }
+
+    internal int RealizedCount => _realized.Count;
+
+    internal IReadOnlyList<VisualElement> RealizedCells => _order;
+
+    internal void Update(
+        IReadOnlyList<int> view,
+        IReadOnlyList<object?> rows,
+        int firstRow,
+        int lastRow,
+        float rowHeight,
+        float verticalOffset,
+        float bodyTop,
+        float bodyLeft,
+        float gutter,
+        IReadOnlyList<DataGridColumn> columns,
+        float[] widths)
+    {
+        _desired.Clear();
+        var y = bodyTop + (firstRow * rowHeight) - verticalOffset;
+        for (var row = firstRow; row <= lastRow; row++)
+        {
+            var item = rows[view[row]];
+            var x = bodyLeft + gutter;
+            for (var column = 0; column < columns.Count && column < widths.Length; column++)
+            {
+                var width = widths[column];
+                if (width <= 0f || !columns[column].HasCellElement)
+                {
+                    x += width;
+                    continue;
+                }
+
+                var key = Key(row, column);
+                _desired.Add(key);
+                if (!_realized.TryGetValue(key, out var element))
+                {
+                    element = Take(column) ?? columns[column].CreateCellElement(item);
+                    if (element is null)
+                    {
+                        x += width;
+                        continue;
+                    }
+
+                    Bind(element, item);
+                    _realized[key] = element;
+                    _order.Add(element);
+                    Add(element);
+                }
+                else if (!ReferenceEquals(element.DataContext, item))
+                {
+                    Bind(element, item);
+                }
+
+                element.Measure(new Size((int)Math.Ceiling(width), (int)Math.Ceiling(rowHeight)));
+                element.Arrange(new RectangleF(x, y, width, rowHeight));
+                x += width;
+            }
+
+            y += rowHeight;
+        }
+
+        _stale.Clear();
+        foreach (var key in _realized.Keys)
+        {
+            if (!_desired.Contains(key))
+            {
+                _stale.Add(key);
+            }
+        }
+
+        foreach (var key in _stale)
+        {
+            Recycle(key);
+        }
+    }
+
+    internal void Reset()
+    {
+        if (_realized.Count == 0)
+        {
+            return;
+        }
+
+        _stale.Clear();
+        _stale.AddRange(_realized.Keys);
+        foreach (var key in _stale)
+        {
+            Recycle(key);
+        }
+
+        _stale.Clear();
+    }
+
+    internal void ClearPools()
+    {
+        foreach (var pool in _pools.Values)
+        {
+            foreach (var element in pool)
+            {
+                element.Dispose();
+            }
+        }
+
+        _pools.Clear();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Reset();
+            ClearPools();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private static void Bind(VisualElement element, object? item)
+    {
+        if (item is not null)
+        {
+            element.DataContext = item;
+        }
+        else
+        {
+            element.ClearValue(VisualElement.DataContextProperty);
+        }
+    }
+
+    private void Recycle(long key)
+    {
+        var element = _realized[key];
+        _realized.Remove(key);
+        _order.Remove(element);
+        if (element.ParentElement is { } parent)
+        {
+            parent.RemoveChild(element);
+        }
+
+        var column = (int)(key & 0xFFFFFFFF);
+        if (!_pools.TryGetValue(column, out var pool))
+        {
+            pool = new Stack<VisualElement>();
+            _pools[column] = pool;
+        }
+
+        pool.Push(element);
+    }
+
+    private VisualElement? Take(int column)
+        => _pools.TryGetValue(column, out var pool) && pool.Count > 0 ? pool.Pop() : null;
+
+    private static long Key(int row, int column) => ((long)row << 32) | (uint)column;
 }
