@@ -1555,8 +1555,9 @@ public abstract class VisualElement : ContainerVisual, IDisposable
                 continue;
             }
 
+            // RaisePropertyChanged → element.OnPropertyChanged 会继续通知它的子级；
+            // 这里再显式递归会让同一棵子树被走两遍，深度一大就变成指数级。
             element.RaisePropertyChanged(DataContextProperty, oldValue, newValue, BindingPriority.Inherited);
-            NotifyDataContextDescendants(element, oldValue, newValue);
         }
     }
 
