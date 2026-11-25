@@ -286,7 +286,10 @@ public class ComboBox : TemplatedControl
                 : IsPointerOver || IsDropDownOpen
                     ? theme.ControlHover
                     : theme.ControlBackground);
-        var border = BorderBrush?.ApproximateColor ?? theme.ControlBorder;
+        var border = BorderBrush?.ApproximateColor
+            ?? (IsEnabled && (IsPointerOver || IsDropDownOpen)
+                ? theme.FocusRing
+                : theme.ControlBorder);
         var bounds = new Rectangle(0, 0, Math.Max(1, (int)Math.Ceiling(Bounds.Width)), Math.Max(1, (int)Math.Ceiling(Bounds.Height)));
         var thickness = BorderThickness.IsEmpty ? theme.ControlBorderThickness : BorderThickness;
         var radius = CornerRadius > 0 ? CornerRadius : theme.CornerRadius;
@@ -308,12 +311,20 @@ public class ComboBox : TemplatedControl
             : Foreground.IsEmpty ? theme.Foreground : Foreground;
         using (var chevron = new SolidBrush(foreground))
         {
-            graphics.FillPolygon(chevron, new[]
-            {
-                new PointF(chevronRight - 4f, chevronCenter - 2f),
-                new PointF(chevronRight + 4f, chevronCenter - 2f),
-                new PointF(chevronRight, chevronCenter + 3f),
-            });
+            // 展开时箭头朝上，收起时朝下。
+            graphics.FillPolygon(chevron, IsDropDownOpen
+                ? new[]
+                {
+                    new PointF(chevronRight - 4f, chevronCenter + 3f),
+                    new PointF(chevronRight + 4f, chevronCenter + 3f),
+                    new PointF(chevronRight, chevronCenter - 2f),
+                }
+                : new[]
+                {
+                    new PointF(chevronRight - 4f, chevronCenter - 2f),
+                    new PointF(chevronRight + 4f, chevronCenter - 2f),
+                    new PointF(chevronRight, chevronCenter + 3f),
+                });
         }
 
         var text = DisplayText;

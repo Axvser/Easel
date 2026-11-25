@@ -534,6 +534,7 @@ public class ListBox : ItemsControl
             new PropertyMetadata(null) { AffectsRender = true });
 
     private bool _syncingSelection;
+    private int _hoverIndex = -1;
 
     /// <summary>Creates a focusable list with theme metrics.</summary>
     public ListBox()
@@ -568,24 +569,66 @@ public class ListBox : ItemsControl
     {
         if (IsTemplated)
         {
-            // 选中带属于自绘外观；模板用 SelectedIndex/SelectedItem 触发器表达选中态。
+            // 选中带与悬停带属于自绘外观；模板用 SelectedIndex/SelectedItem 触发器表达选中态。
             return;
         }
 
-        if (SelectedIndex < 0 || SelectedIndex >= Items.Count)
+        var theme = Theme.Current;
+        if (IsEnabled && _hoverIndex >= 0 && _hoverIndex != SelectedIndex)
+        {
+            PaintRow(graphics, _hoverIndex, Color.FromArgb(18, theme.Foreground), theme.CornerRadius);
+        }
+
+        PaintRow(graphics, SelectedIndex, theme.Selection, theme.CornerRadius);
+    }
+
+    // 悬停带与选中带都按行元素的局部矩形绘制；滚动只是移动列表本身，行坐标不变。
+    private void PaintRow(Graphics graphics, int index, Color color, float radius)
+    {
+        if (index < 0 || index >= Items.Count)
         {
             return;
         }
 
-        var bounds = Items[SelectedIndex].Bounds;
+        var bounds = Items[index].Bounds;
         if (bounds.Width <= 0f || bounds.Height <= 0f)
         {
             return;
         }
 
-        using var path = XamlDrawing.RoundedRectangle(bounds, Theme.Current.CornerRadius);
-        using var brush = new SolidBrush(Theme.Current.Selection);
+        using var path = XamlDrawing.RoundedRectangle(bounds, radius);
+        using var brush = new SolidBrush(color);
         graphics.FillPath(brush, path);
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerMoved(VisualPointerEventArgs args)
+    {
+        base.OnPointerMoved(args);
+        SetHover(IsTemplated ? -1 : IndexAt(args.GetPosition(this)));
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(VisualPointerEventArgs args)
+    {
+        base.OnPointerExited(args);
+        SetHover(-1);
+    }
+
+    private void SetHover(int index)
+    {
+        if (!IsEnabled)
+        {
+            index = -1;
+        }
+
+        if (_hoverIndex == index)
+        {
+            return;
+        }
+
+        _hoverIndex = index;
+        InvalidateVisual();
     }
 
     /// <inheritdoc />

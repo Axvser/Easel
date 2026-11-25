@@ -214,6 +214,82 @@ public sealed class VisualPopupComboBoxTests
     }
 
     [TestMethod]
+    public void ComboBox_ChevronFlipsWhileOpen()
+    {
+        using var surface = new VisualHost();
+        using var combo = CreateComboBox();
+        var root = new VC.StackPanel();
+        root.Add(combo);
+        surface.Root = root;
+        Layout(surface, 320, 240);
+
+        using var closed = Render(surface, 320, 240);
+        var chevronX = (int)(combo.AbsoluteBounds.X + combo.Bounds.Width - 14f);
+        var centerY = combo.AbsoluteBounds.Y + (combo.Bounds.Height / 2f);
+        var topRow = (int)(centerY - 1.5f);
+        var bottomRow = (int)(centerY + 1.5f);
+
+        combo.IsDropDownOpen = true;
+        Layout(surface, 320, 240);
+        using var open = Render(surface, 320, 240);
+
+        Assert.IsTrue(closed.GetPixel(chevronX, topRow).R > 120, "the closed chevron is widest at the top");
+        Assert.IsTrue(closed.GetPixel(chevronX, bottomRow).R < 100, "the closed chevron narrows at the bottom");
+        Assert.IsTrue(open.GetPixel(chevronX, topRow).R < 100, "the open chevron narrows at the top");
+        Assert.IsTrue(open.GetPixel(chevronX, bottomRow).R > 120, "the open chevron is widest at the bottom");
+    }
+
+    [TestMethod]
+    public void ComboBox_ClosedChromeHighlightsOnHover()
+    {
+        using var surface = new VisualHost();
+        using var combo = CreateComboBox();
+        var root = new VC.StackPanel();
+        root.Add(combo);
+        surface.Root = root;
+        Layout(surface, 320, 240);
+
+        var x = (int)combo.AbsoluteBounds.X;
+        var y = (int)(combo.AbsoluteBounds.Y + (combo.Bounds.Height / 2f));
+        using var before = Render(surface, 320, 240);
+        surface.ProcessPointerMove(Center(combo.AbsoluteBounds));
+        using var after = Render(surface, 320, 240);
+
+        Assert.IsTrue(
+            after.GetPixel(x, y).B > after.GetPixel(x, y).R + 30,
+            $"hover draws the accent border (pixel={after.GetPixel(x, y)})");
+        Assert.IsTrue(
+            before.GetPixel(x, y).B <= before.GetPixel(x, y).R + 30,
+            $"at rest the border stays neutral (pixel={before.GetPixel(x, y)})");
+    }
+
+    [TestMethod]
+    public void ComboBox_DropDownRowsHighlightOnHover()
+    {
+        using var surface = new VisualHost { BackColor = Color.Black };
+        using var combo = CreateComboBox();
+        var root = new VC.StackPanel();
+        root.Add(combo);
+        surface.Root = root;
+        Layout(surface, 320, 240);
+
+        combo.IsDropDownOpen = true;
+        Layout(surface, 320, 240);
+        var row = combo.DropDownList.Items[1].AbsoluteBounds;
+        var point = new PointF(row.X + 6f, row.Y + (row.Height / 2f));
+        var x = (int)point.X;
+        var y = (int)point.Y;
+
+        using var before = Render(surface, 320, 240);
+        surface.ProcessPointerMove(point);
+        using var after = Render(surface, 320, 240);
+
+        Assert.IsTrue(
+            after.GetPixel(x, y).R > before.GetPixel(x, y).R + 4,
+            $"hovering a row lightens it (before={before.GetPixel(x, y)}, after={after.GetPixel(x, y)})");
+    }
+
+    [TestMethod]
     public void ComboBox_CreatesNoAdditionalWindows()
     {
         using var surface = new VisualHost();
@@ -289,5 +365,13 @@ public sealed class VisualPopupComboBoxTests
         using var bitmap = new Bitmap(1, 1);
         using var graphics = Graphics.FromImage(bitmap);
         surface.RenderTo(graphics, new Size(width, height));
+    }
+
+    private static Bitmap Render(VisualHost surface, int width, int height)
+    {
+        var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        surface.RenderTo(graphics, new Size(width, height));
+        return bitmap;
     }
 }
