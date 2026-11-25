@@ -383,6 +383,25 @@ public abstract class Visual : WinformsObject
 
         var previousGraphics = _renderGraphics;
         _renderGraphics = graphics;
+
+        // 恒等变换且不裁剪时不必 Save/Restore 整套 GDI+ 状态：平移进去再平移回来即可。
+        // 模板化控件每行会多出若干层纯布局容器，这个状态栈开销是真实热路径。
+        if (Transform.IsIdentity && !ClipToBounds && Clip is null)
+        {
+            graphics.TranslateTransform(Bounds.X, Bounds.Y);
+            try
+            {
+                Paint(graphics, zeroSized);
+            }
+            finally
+            {
+                graphics.TranslateTransform(-Bounds.X, -Bounds.Y);
+                _renderGraphics = previousGraphics;
+            }
+
+            return;
+        }
+
         var state = graphics.Save();
         try
         {
@@ -405,35 +424,40 @@ public abstract class Visual : WinformsObject
                 graphics.SetClip(clip, CombineMode.Intersect);
             }
 
-            // 零尺寸装不下一张合成位图，缓存也没有意义；直接画子项。
-            if (zeroSized)
-            {
-                RenderChildren(graphics);
-                return;
-            }
-
-            var has3D = Transform3D is { IsIdentity: false };
-
-            if (CacheAsBitmap && Effect is null && OpacityMask is null && !has3D)
-            {
-                RenderCached(graphics);
-                return;
-            }
-
-            if (Opacity < 0.999d || Effect is not null || OpacityMask is not null || has3D)
-            {
-                RenderComposited(graphics);
-                return;
-            }
-
-            RenderContent(graphics);
-            RenderChildren(graphics);
+            Paint(graphics, zeroSized);
         }
         finally
         {
             graphics.Restore(state);
             _renderGraphics = previousGraphics;
         }
+    }
+
+    private void Paint(Graphics graphics, bool zeroSized)
+    {
+        // 零尺寸装不下一张合成位图，缓存也没有意义；直接画子项。
+        if (zeroSized)
+        {
+            RenderChildren(graphics);
+            return;
+        }
+
+        var has3D = Transform3D is { IsIdentity: false };
+
+        if (CacheAsBitmap && Effect is null && OpacityMask is null && !has3D)
+        {
+            RenderCached(graphics);
+            return;
+        }
+
+        if (Opacity < 0.999d || Effect is not null || OpacityMask is not null || has3D)
+        {
+            RenderComposited(graphics);
+            return;
+        }
+
+        RenderContent(graphics);
+        RenderChildren(graphics);
     }
 
     /// <summary>Returns whether <paramref name="point"/>, in the parent's coordinates, hits this visual.</summary>
