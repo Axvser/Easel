@@ -996,7 +996,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
                     + (Transform3D is { IsIdentity: false } ? 8f : 0f)
                     + (OpacityMask is not null ? 2f : 0f);
         damage.Inflate(margin, margin);
-        surface.InvalidatePaint(damage);
+        // 带上失效来源：整树平移的帧里，只有普通根自身的整块失效才能当成变换的附带结果。
+        surface.InvalidatePaint(damage, this);
     }
 
     /// <summary>Moves logical focus to this element.</summary>

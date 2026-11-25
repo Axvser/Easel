@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using Easel.Visuals.Controls;
 using XamlVisibility = Easel.Controls.Visibility;
@@ -289,9 +291,9 @@ public class VisualHost : System.Windows.Forms.Control
         Invalidate();
     }
 
-    internal void InvalidatePaint(RectangleF damage)
+    internal void InvalidatePaint(RectangleF damage, VisualElement? source = null)
     {
-        RecordFrameDamage(damage);
+        RecordFrameDamage(damage, source);
 
         if (_damageFull)
         {
@@ -319,7 +321,7 @@ public class VisualHost : System.Windows.Forms.Control
         _framePanDy = 0f;
     }
 
-    private void RecordFrameDamage(RectangleF damage)
+    private void RecordFrameDamage(RectangleF damage, VisualElement? source = null)
     {
         if (_frameDamageFull || damage.Width <= 0f || damage.Height <= 0f)
         {
@@ -329,8 +331,9 @@ public class VisualHost : System.Windows.Forms.Control
         // 已记录整树平移后再出现普通脏区，一次位移解释不了这一帧，退回整帧。
         if (_framePanPending)
         {
-            // 设置变换后显式调用根节点的 InvalidateVisual 会送来整块根脏区；平移本身已经覆盖整帧变化。
-            if (_frameContentStamp == _framePanStamp && IsRootSelfDamage(damage))
+            // 设置变换后宿主会显式调用根节点的 InvalidateVisual 并送来整块根脏区；只有普通根的根自身失效
+            // 才能确定这是变换的附带结果。根类型自己绘制内容、或脏区来自子树时，缓存帧已经过期。
+            if (_frameContentStamp == _framePanStamp && IsTransformOnlyDamage(source, damage))
             {
                 return;
             }
@@ -342,9 +345,14 @@ public class VisualHost : System.Windows.Forms.Control
         _frameDamage = _frameDamage.Width <= 0f ? damage : RectangleF.Union(_frameDamage, damage);
     }
 
-    // 根节点自身没有绘制内容时，覆盖它整块包围盒的失效只可能来自变换本身。
-    private bool IsRootSelfDamage(RectangleF damage)
+    // 只有根元素自身、且其类型不绘制自定义内容时，覆盖整块包围盒的失效才只可能来自变换本身。
+    private bool IsTransformOnlyDamage(VisualElement? source, RectangleF damage)
     {
+        if (source is null || !ReferenceEquals(source, _rootElement) || HasCustomContentRender(source.GetType()))
+        {
+            return false;
+        }
+
         if (_rootElement is not { Background: null, BorderBrush: null } root)
         {
             return false;
@@ -358,6 +366,42 @@ public class VisualHost : System.Windows.Forms.Control
 
         bounds.Inflate(3f, 3f);
         return bounds.Contains(damage);
+    }
+
+    // 逐类型缓存「是否覆写了内容绘制」；普通 Canvas 直到 VisualElement 都没有覆写，仍可走平移快路径。
+    private static readonly ConditionalWeakTable<Type, StrongBox<bool>> CustomContentRenderTypes = new();
+
+    private static bool HasCustomContentRender(Type type)
+    {
+        if (CustomContentRenderTypes.TryGetValue(type, out var cached))
+        {
+            return cached.Value;
+        }
+
+        var custom = false;
+        for (var current = type; current is not null && current != typeof(VisualElement); current = current.BaseType)
+        {
+#pragma warning disable IL2070 // 运行时的具体类型只能反射读取；Easel 不作为裁剪发布的目标。
+            foreach (var method in current.GetMethods(
+                         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+#pragma warning restore IL2070
+            {
+                if (method.Name is "RenderContent" or "OnRender")
+                {
+                    custom = true;
+                    break;
+                }
+            }
+
+            if (custom)
+            {
+                break;
+            }
+        }
+
+        // 结果按类型幂等；并发的重复计算只会被 GetValue 丢弃。
+        var box = new StrongBox<bool>(custom);
+        return CustomContentRenderTypes.GetValue(type, _ => box).Value;
     }
 
     // 根节点的恒等线性部分只改了位移：整帧可以按像素平移复用。
