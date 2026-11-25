@@ -81,6 +81,9 @@ public class RichTextBox : TemplatedControl
         nameof(IsFocused), typeof(bool), typeof(RichTextBox),
         new PropertyMetadata(false) { AffectsRender = false });
 
+    /// <summary>Whether the editor currently owns focus.</summary>
+    public new bool IsFocused => (bool)GetValue(IsFocusedProperty)!;
+
     /// <summary>Whether long lines wrap at the content width.</summary>
     public static readonly DependencyProperty WrapProperty = DependencyProperty.Register(
         nameof(Wrap), typeof(bool), typeof(RichTextBox),

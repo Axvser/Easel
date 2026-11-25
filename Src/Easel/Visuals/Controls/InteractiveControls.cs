@@ -364,11 +364,14 @@ public class TextBox : TemplatedControl
             new PropertyMetadata(false));
 
     /// <summary>Whether the field currently owns focus, including while its native editor island holds the keyboard focus.</summary>
-    /// <remarks>A control template trigger reads this property; the CLR <see cref="VisualElement.IsFocused"/> stays the surface-level flag.</remarks>
+    /// <remarks>A control template trigger reads this property; the inherited <see cref="VisualElement.IsFocused"/> stays the surface-level flag.</remarks>
     public static readonly DependencyProperty IsFocusedProperty =
         DependencyProperty.Register(
             nameof(IsFocused), typeof(bool), typeof(TextBox),
             new PropertyMetadata(false) { AffectsRender = false });
+
+    /// <summary>Whether the field currently owns focus, including the native editor island.</summary>
+    public new bool IsFocused => (bool)GetValue(IsFocusedProperty)!;
 
     /// <summary>Whether the text is drawn as bullets.</summary>
     public static readonly DependencyProperty IsPasswordProperty =
@@ -1967,7 +1970,7 @@ public class TextBox : TemplatedControl
     }
 
     private void UpdateFocusState()
-        => SetValue(IsFocusedProperty, IsFocused || _nativeActive);
+        => SetValue(IsFocusedProperty, base.IsFocused || _nativeActive);
 
     private void ApplyNativeProperties()
     {
