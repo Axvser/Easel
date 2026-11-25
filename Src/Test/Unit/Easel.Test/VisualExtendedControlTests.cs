@@ -37,10 +37,11 @@ public sealed class VisualExtendedControlTests
         surface.ProcessKeyDown(Keys.Up);
         Assert.AreSame(child, tree.SelectedItem, "Up moves to the previous visible row");
 
-        var expanderX = group.AbsoluteBounds.X + 8f;
-        var expanderY = group.AbsoluteBounds.Y + (group.AbsoluteBounds.Height / 2f);
-        surface.ProcessPointerDown(new PointF(expanderX, expanderY), MouseButtons.Left);
-        surface.ProcessPointerUp(new PointF(expanderX, expanderY), MouseButtons.Left);
+        var expander = group.GetTemplateChild<VisualElement>("PART_Expander");
+        Assert.IsNotNull(expander, "the default row template exposes its disclosure part");
+        var expanderCenter = Center(expander!.AbsoluteBounds);
+        surface.ProcessPointerDown(expanderCenter, MouseButtons.Left);
+        surface.ProcessPointerUp(expanderCenter, MouseButtons.Left);
         Assert.IsFalse(group.IsExpanded, "clicking the disclosure triangle collapses the group");
         Assert.HasCount(2, tree.Rows);
     }

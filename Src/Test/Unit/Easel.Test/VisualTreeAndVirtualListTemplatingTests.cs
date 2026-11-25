@@ -116,12 +116,14 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
         tree.Template = null;
         Layout(surface, 320, 240);
 
-        Assert.IsNull(tree.TemplateRoot, "clearing the template removes the root");
+        Assert.IsNotNull(tree.TemplateRoot, "clearing the explicit template reveals the built-in default shell");
         Assert.IsNull(tree.GetTemplateChild<VC.StackPanel>("PART_ItemsPresenter"),
-            "the part scope is cleared with the template");
-        Assert.IsTrue(tree.Children.Contains(group), "rows return to direct children without a template");
-        Assert.IsTrue(tree.Children.Contains(child), "the expanded child is a direct child again");
-        Assert.IsTrue(tree.Children.Contains(second));
+            "the explicit part scope is cleared with the template");
+        var fallbackHost = tree.GetTemplateChild<VC.ItemsPresenter>("PART_ItemsPresenter");
+        Assert.IsNotNull(fallbackHost, "the default shell declares its own presenter");
+        Assert.IsTrue(fallbackHost!.Children.Contains(group), "root rows move into the default host");
+        Assert.IsTrue(fallbackHost.Children.Contains(second));
+        Assert.IsTrue(groupHost.Children.Contains(child), "the row keeps hosting its expanded child");
     }
 
     [TestMethod]
@@ -200,10 +202,13 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
         list.Template = null;
         Layout(surface, 220, 120);
 
-        Assert.IsNull(list.TemplateRoot, "clearing the template removes the root");
-        Assert.AreSame(list, list.Items[0].ParentElement, "rows return to direct children without a template");
+        Assert.IsNotNull(list.TemplateRoot, "clearing the explicit template reveals the built-in default shell");
+        Assert.IsInstanceOfType<VC.ItemsPresenter>(list.TemplateRoot, "the default shell is the realization host");
+        Assert.IsTrue(
+            ((VC.ItemsPresenter)list.TemplateRoot!).Children.Contains(list.Items[0]),
+            "rows move into the default presenter");
         Assert.AreEqual(10, list.FirstRealizedIndex, "virtualization still starts at the scroll offset");
-        Assert.AreEqual(5, list.RealizedCount, "only the visible rows are realized without a template");
+        Assert.AreEqual(5, list.RealizedCount, "only the visible rows are realized without an explicit template");
     }
 
     [TestMethod]

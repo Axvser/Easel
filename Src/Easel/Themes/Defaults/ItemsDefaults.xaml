@@ -3,7 +3,236 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="Easel.Themes.Defaults.ItemsDefaults">
 
-  <!-- Built-in fallback appearance for ListBox, VirtualList and TreeView; added to the implicit style table by Theme.DefaultStyles. -->
-  
+  <!-- Built-in fallback appearance for the data-list family; added to the implicit style table by Theme.DefaultStyles.
+       A shell template hosts one ItemsPresenter; row appearance lives in the container styles so a host can replace
+       the row look without retemplating the list. -->
+
+  <Style TargetType="ItemsControl">
+    <Style.Template>
+      <ControlTemplate TargetType="ItemsControl">
+        <Border Background="{DynamicResource Input}"
+                BorderBrush="{DynamicResource Border}"
+                BorderThickness="1"
+                CornerRadius="{TemplateBinding CornerRadius}"
+                Padding="{TemplateBinding Padding}">
+          <ScrollViewer x:Name="PART_ScrollViewer" HorizontalScrollBarVisibility="Disabled">
+            <ItemsPresenter x:Name="PART_ItemsPresenter" />
+          </ScrollViewer>
+        </Border>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="ListBox">
+    <Style.Template>
+      <ControlTemplate TargetType="ListBox">
+        <Grid x:Name="Root">
+          <Border Background="{DynamicResource Input}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  IsHitTestVisible="False" />
+          <Border Padding="{TemplateBinding Padding}">
+            <ScrollViewer x:Name="PART_ScrollViewer" HorizontalScrollBarVisibility="Disabled">
+              <ItemsPresenter x:Name="PART_ItemsPresenter" />
+            </ScrollViewer>
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsEnabled" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="ListBoxItem">
+    <Style.Template>
+      <ControlTemplate TargetType="ListBoxItem">
+        <Grid IsHitTestVisible="False">
+          <Border x:Name="HoverBand"
+                  Background="{DynamicResource Hover}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  IsHitTestVisible="False" />
+          <Border x:Name="SelectionBand"
+                  Background="{DynamicResource Selection}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  IsHitTestVisible="False" />
+          <Border Padding="{TemplateBinding Padding}" IsHitTestVisible="False">
+            <ContentPresenter IsHitTestVisible="False" />
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSelected" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSelected" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <!-- A VirtualList is hosted by an ancestor ScrollViewer, so its shell is only the realization host. -->
+  <Style TargetType="VirtualList">
+    <Style.Template>
+      <ControlTemplate TargetType="VirtualList">
+        <ItemsPresenter x:Name="PART_ItemsPresenter" />
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="TreeView">
+    <Style.Template>
+      <ControlTemplate TargetType="TreeView">
+        <Grid>
+          <Border Background="{DynamicResource Surface}"
+                  BorderBrush="{DynamicResource Border}"
+                  BorderThickness="1"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <Border x:Name="FocusRing"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="1.5"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  IsHitTestVisible="False" />
+          <Border Padding="{TemplateBinding Padding}" IsHitTestVisible="False">
+            <ItemsPresenter x:Name="PART_ItemsPresenter" />
+          </Border>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="TreeViewItem">
+    <Style.Template>
+      <ControlTemplate TargetType="TreeViewItem">
+        <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid Grid.Row="0">
+            <Border x:Name="HoverBand"
+                    Background="{DynamicResource Raised}"
+                    IsHitTestVisible="False" />
+            <Border x:Name="SelectionBand"
+                    Background="{DynamicResource Selection}"
+                    IsHitTestVisible="False" />
+            <Grid x:Name="PART_Expander"
+                  Width="12"
+                  Height="12"
+                  Margin="6,0,0,0"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  IsHitTestVisible="False">
+              <Path x:Name="ChevronCollapsed"
+                    Data="M 0 0 L 4 4 L 0 8 Z"
+                    Fill="{DynamicResource Muted}"
+                    Width="4"
+                    Height="8"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center" />
+              <Path x:Name="ChevronExpanded"
+                    Data="M 0 0 L 6 0 L 3 4 Z"
+                    Fill="{DynamicResource Muted}"
+                    Width="6"
+                    Height="4"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center" />
+            </Grid>
+            <TextBlock x:Name="PART_Header"
+                       Margin="{TemplateBinding Padding}"
+                       VerticalAlignment="Center"
+                       Font="{TemplateBinding Font}"
+                       Foreground="{TemplateBinding Foreground}"
+                       IsHitTestVisible="False" />
+          </Grid>
+          <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="1" Margin="16,0,0,0" />
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="HoverBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSelected" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsSelected" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="SelectionBand" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsExpanded" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="ChevronExpanded" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsExpanded" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="ChevronCollapsed" Property="Opacity" Value="0" />
+              <Setter TargetName="ChevronExpanded" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="HasItems" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="PART_Expander" Property="Opacity" Value="0" />
+            </Trigger.Setters>
+          </Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
 
 </ResourceDictionary>

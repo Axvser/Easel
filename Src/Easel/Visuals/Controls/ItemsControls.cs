@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Drawing;
 using System.Windows.Forms;
-using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlThickness = Easel.Controls.Thickness;
 using XamlVisibility = Easel.Controls.Visibility;
 
@@ -159,8 +158,16 @@ public class ItemsControl : TemplatedControl
     /// <summary>Creates the visual for one source item.</summary>
     /// <param name="item">The source item; may be <see langword="null"/>.</param>
     /// <returns>The new, unparented item visual.</returns>
+    /// <remarks>A subclass may wrap the projection <see cref="CreateItemContent"/> returns, for example in a row
+    /// container that paints selection; the content stays reachable for recycling.</remarks>
     /// <exception cref="InvalidOperationException">The configured <see cref="ItemFactory"/> returned <see langword="null"/>.</exception>
-    protected virtual VisualElement CreateItemVisual(object? item)
+    protected virtual VisualElement CreateItemVisual(object? item) => CreateItemContent(item);
+
+    /// <summary>Creates the data-bound content visual for one source item, before any container wraps it.</summary>
+    /// <param name="item">The source item; may be <see langword="null"/>.</param>
+    /// <returns>The new, unparented content visual.</returns>
+    /// <exception cref="InvalidOperationException">The configured <see cref="ItemFactory"/> returned <see langword="null"/>.</exception>
+    protected virtual VisualElement CreateItemContent(object? item)
     {
         var selector = ItemTemplateSelector;
         var template = selector?.SelectTemplate(item, null) ?? ItemTemplate;
@@ -186,6 +193,27 @@ public class ItemsControl : TemplatedControl
         }
 
         return visual;
+    }
+
+    /// <summary>Wraps one item's content in the shared list row container.</summary>
+    /// <param name="item">The source item, used for the container's <see cref="VisualElement.DataContext"/>.</param>
+    /// <param name="content">The data-bound content visual.</param>
+    /// <returns>A new, unparented <see cref="ListBoxItem"/>.</returns>
+    protected static ListBoxItem CreateItemContainer(object? item, VisualElement content)
+    {
+        if (content is null) throw new ArgumentNullException(nameof(content));
+
+        var container = new ListBoxItem
+        {
+            Content = content,
+            CornerRadius = Theme.Current.CornerRadius,
+        };
+        if (item is not null)
+        {
+            container.DataContext = item;
+        }
+
+        return container;
     }
 
     /// <summary>Realizes the current source items as children; the base implementation realizes every item.</summary>
@@ -550,6 +578,51 @@ public class ItemsControl : TemplatedControl
     private void OnSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildItems();
 }
 
+/// <summary>The container a <see cref="ListBox"/> or <see cref="VirtualList"/> puts around one realized item.</summary>
+/// <remarks>
+/// <para>
+/// The container paints a row's hover and selection bands from <see cref="IsPointerOver"/> and
+/// <see cref="IsSelected"/>; the owning list only pushes those states. An implicit or host style therefore replaces
+/// the row appearance without retemplating the list. The built-in style lives in <c>ItemsDefaults.xaml</c>.
+/// </para>
+/// <para>
+/// The container stays out of hit testing, so the list keeps pointer selection and maps a press by row bounds. A
+/// custom style may opt into input when a scenario needs per-row interaction.
+/// </para>
+/// </remarks>
+public class ListBoxItem : ContentControl
+{
+    /// <summary>Whether the owning list has this row selected.</summary>
+    public static readonly DependencyProperty IsSelectedProperty = DependencyProperty.Register(
+        nameof(IsSelected), typeof(bool), typeof(ListBoxItem),
+        new PropertyMetadata(false) { AffectsRender = true });
+
+    /// <summary>Whether the pointer is over this row.</summary>
+    public static readonly DependencyProperty IsPointerOverProperty = DependencyProperty.Register(
+        nameof(IsPointerOver), typeof(bool), typeof(ListBoxItem),
+        new PropertyMetadata(false) { AffectsRender = true });
+
+    /// <summary>Creates a row container that leaves pointer hits to its list.</summary>
+    public ListBoxItem()
+    {
+        IsHitTestVisible = false;
+    }
+
+    /// <summary>Whether the owning list has this row selected.</summary>
+    public bool IsSelected
+    {
+        get => (bool)GetValue(IsSelectedProperty)!;
+        set => SetValue(IsSelectedProperty, value);
+    }
+
+    /// <summary>Whether the pointer is over this row.</summary>
+    /// <remarks>This dependency property shadows <see cref="VisualElement.IsPointerOver"/> so a style or template
+    /// trigger can observe the row's hover state.</remarks>
+    public new bool IsPointerOver => (bool)GetValue(IsPointerOverProperty)!;
+
+    internal void SetIsPointerOver(bool value) => SetValue(IsPointerOverProperty, value);
+}
+
 /// <summary>A vertical list whose items can be selected by pointer or keyboard.</summary>
 /// <remarks>
 /// This list realizes every source item, so its selection and pointer mapping stay index-for-index. For a large
@@ -602,47 +675,14 @@ public class ListBox : ItemsControl
     protected virtual void OnSelectionChanged() => SelectionChanged?.Invoke(this, EventArgs.Empty);
 
     /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
-    {
-        if (IsTemplated)
-        {
-            // 选中带与悬停带属于自绘外观；模板用 SelectedIndex/SelectedItem 触发器表达选中态。
-            return;
-        }
-
-        var theme = Theme.Current;
-        if (IsEnabled && _hoverIndex >= 0 && _hoverIndex != SelectedIndex)
-        {
-            PaintRow(graphics, _hoverIndex, Color.FromArgb(18, theme.Foreground), theme.CornerRadius);
-        }
-
-        PaintRow(graphics, SelectedIndex, theme.Selection, theme.CornerRadius);
-    }
-
-    // 悬停带与选中带都按行元素的局部矩形绘制；滚动只是移动列表本身，行坐标不变。
-    private void PaintRow(Graphics graphics, int index, Color color, float radius)
-    {
-        if (index < 0 || index >= Items.Count)
-        {
-            return;
-        }
-
-        var bounds = Items[index].Bounds;
-        if (bounds.Width <= 0f || bounds.Height <= 0f)
-        {
-            return;
-        }
-
-        using var path = XamlDrawing.RoundedRectangle(bounds, radius);
-        using var brush = new SolidBrush(color);
-        graphics.FillPath(brush, path);
-    }
+    protected override VisualElement CreateItemVisual(object? item)
+        => CreateItemContainer(item, CreateItemContent(item));
 
     /// <inheritdoc />
     protected override void OnPointerMoved(VisualPointerEventArgs args)
     {
         base.OnPointerMoved(args);
-        SetHover(IsTemplated ? -1 : IndexAt(args.GetPosition(this)));
+        SetHover(IndexAt(args.GetPosition(this)));
     }
 
     /// <inheritdoc />
@@ -664,8 +704,30 @@ public class ListBox : ItemsControl
             return;
         }
 
+        SetContainerPointerOver(_hoverIndex, false);
         _hoverIndex = index;
+        SetContainerPointerOver(index, true);
         InvalidateVisual();
+    }
+
+    private void SetContainerPointerOver(int index, bool value)
+    {
+        if (index >= 0 && index < Items.Count && Items[index] is ListBoxItem container)
+        {
+            container.SetIsPointerOver(value);
+        }
+    }
+
+    private void SyncContainerStates()
+    {
+        for (var index = 0; index < Items.Count; index++)
+        {
+            if (Items[index] is ListBoxItem container)
+            {
+                container.IsSelected = index == SelectedIndex;
+                container.SetIsPointerOver(IsEnabled && index == _hoverIndex);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -730,12 +792,14 @@ public class ListBox : ItemsControl
         if (ReferenceEquals(e.Property, SelectedIndexProperty))
         {
             SyncSelectedItemFromIndex();
+            SyncContainerStates();
             InvalidateVisual();
             OnSelectionChanged();
         }
         else if (ReferenceEquals(e.Property, SelectedItemProperty))
         {
             SyncSelectedIndexFromItem();
+            SyncContainerStates();
             InvalidateVisual();
             OnSelectionChanged();
         }
@@ -758,6 +822,7 @@ public class ListBox : ItemsControl
             SyncSelectedIndexFromItem();
         }
 
+        SyncContainerStates();
         InvalidateVisual();
     }
 
@@ -847,6 +912,7 @@ public class VirtualList : VirtualizingPanel
 
     private bool _syncingSelection;
     private bool _syncingExtent;
+    private int _hoverIndex = -1;
 
     /// <summary>Creates an empty virtualizing list.</summary>
     public VirtualList()
@@ -887,6 +953,31 @@ public class VirtualList : VirtualizingPanel
     public event EventHandler? SelectionChanged;
 
     /// <inheritdoc />
+    protected override VisualElement CreateItemVisual(object? item)
+        => CreateItemContainer(item, CreateItemContent(item));
+
+    /// <inheritdoc />
+    protected override void BindRecycledItem(VisualElement element, int index)
+    {
+        if (element is ListBoxItem container)
+        {
+            // 池里的容器只换了 DataContext；内容视觉仍绑着旧项，必须按新索引重建。
+            var previous = container.Content as VisualElement;
+            container.Content = CreateItemContent(GetItemAt(index));
+            previous?.Dispose();
+        }
+
+        base.BindRecycledItem(element, index);
+    }
+
+    /// <inheritdoc />
+    protected override void ArrangeOverride(Size finalSize)
+    {
+        base.ArrangeOverride(finalSize);
+        SyncContainerStates();
+    }
+
+    /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
@@ -921,12 +1012,14 @@ public class VirtualList : VirtualizingPanel
         if (ReferenceEquals(e.Property, SelectedIndexProperty))
         {
             SyncSelectedItemFromIndex();
+            SyncContainerStates();
             InvalidateVisual();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
         else if (ReferenceEquals(e.Property, SelectedItemProperty))
         {
             SyncSelectedIndexFromItem();
+            SyncContainerStates();
             InvalidateVisual();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -949,6 +1042,7 @@ public class VirtualList : VirtualizingPanel
             SyncSelectedIndexFromItem();
         }
 
+        SyncContainerStates();
         InvalidateVisual();
     }
 
@@ -1003,32 +1097,49 @@ public class VirtualList : VirtualizingPanel
     }
 
     /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
+    protected override void OnPointerMoved(VisualPointerEventArgs args)
     {
-        // 模板负责选中外观；无模板时在已实现的行上自绘选中带。
-        if (IsTemplated || FirstRealizedIndex < 0 || SelectedIndex < 0)
+        base.OnPointerMoved(args);
+        SetHover(IndexAt(args.Position));
+    }
+
+    /// <inheritdoc />
+    protected override void OnPointerExited(VisualPointerEventArgs args)
+    {
+        base.OnPointerExited(args);
+        SetHover(-1);
+    }
+
+    private void SetHover(int index)
+    {
+        if (!IsEnabled)
+        {
+            index = -1;
+        }
+
+        if (_hoverIndex == index)
         {
             return;
         }
 
-        var offset = SelectedIndex - FirstRealizedIndex;
-        if (offset < 0 || offset >= Items.Count)
-        {
-            return;
-        }
+        _hoverIndex = index;
+        SyncContainerStates();
+        InvalidateVisual();
+    }
 
-        var visual = Items[offset];
-        // 行可能挂在 ItemsPanel 宿主里；绝对矩形换回控件坐标再画。
-        var absolute = visual.AbsoluteBounds;
-        var bounds = new RectangleF(PointFromSurface(absolute.Location), absolute.Size);
-        if (bounds.Width <= 0f || bounds.Height <= 0f)
+    private void SyncContainerStates()
+    {
+        for (var offset = 0; offset < Items.Count; offset++)
         {
-            return;
-        }
+            if (Items[offset] is not ListBoxItem container)
+            {
+                continue;
+            }
 
-        using var path = XamlDrawing.RoundedRectangle(bounds, Theme.Current.CornerRadius);
-        using var brush = new SolidBrush(Theme.Current.Selection);
-        graphics.FillPath(brush, path);
+            var index = FirstRealizedIndex + offset;
+            container.IsSelected = index == SelectedIndex;
+            container.SetIsPointerOver(IsEnabled && index == _hoverIndex);
+        }
     }
 
     private int IndexAt(PointF surfacePoint)

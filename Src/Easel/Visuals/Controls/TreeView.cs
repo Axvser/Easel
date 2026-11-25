@@ -59,6 +59,11 @@ public class TreeViewItem : TemplatedControl
         nameof(IsPressed), typeof(bool), typeof(TreeViewItem),
         new PropertyMetadata(false) { AffectsRender = true });
 
+    /// <summary>Whether this row currently has child rows; templates hide the disclosure glyph when it is false.</summary>
+    public static readonly DependencyProperty HasItemsProperty = DependencyProperty.Register(
+        nameof(HasItems), typeof(bool), typeof(TreeViewItem),
+        new PropertyMetadata(false) { AffectsRender = true });
+
     private VisualElement? _headerPart;
     private VisualElement? _expanderPart;
     private Panel? _childPresenter;
@@ -72,6 +77,7 @@ public class TreeViewItem : TemplatedControl
     {
         IsHitTestVisible = false;
         Padding = new XamlThickness(18f, 5f, 8f, 5f);
+        Items.CollectionChanged += OnItemsCollectionChanged;
     }
 
     /// <summary>The text shown in the row.</summary>
@@ -116,6 +122,9 @@ public class TreeViewItem : TemplatedControl
 
     /// <summary>Whether the left pointer button is held down on the row.</summary>
     public bool IsPressed => (bool)GetValue(IsPressedProperty)!;
+
+    /// <summary>Whether this row currently has child rows.</summary>
+    public bool HasItems => (bool)GetValue(HasItemsProperty)!;
 
     /// <summary>The child rows.</summary>
     public ObservableCollection<TreeViewItem> Items { get; } = [];
@@ -300,6 +309,7 @@ public class TreeViewItem : TemplatedControl
         {
             // 释放时保持子行挂在旧模板根里，让基类的 Dispose 顺着父子链回收它们。
             _disposing = true;
+            Items.CollectionChanged -= OnItemsCollectionChanged;
             if (_expanderPart is { } expander)
             {
                 expander.PropertyChanged -= OnExpanderPropertyChanged;
@@ -310,6 +320,9 @@ public class TreeViewItem : TemplatedControl
 
         base.Dispose(disposing);
     }
+
+    private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        => SetValue(HasItemsProperty, Items.Count > 0);
 
     /// <inheritdoc />
     protected override void OnTemplateChanging()
