@@ -455,8 +455,125 @@ public class DataGrid : TemplatedControl
         nameof(AllowRowReorder), typeof(bool), typeof(DataGrid),
         new PropertyMetadata(true));
 
-    private const float CellPadding = 10f;
-    private const float HeaderPadding = 10f;
+    /// <summary>The normal row fill; an empty value paints no base fill.</summary>
+    public static readonly DependencyProperty RowBackgroundProperty = RegisterBrush(nameof(RowBackground));
+
+    /// <summary>The tint alternate rows receive; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty AlternateRowBackgroundProperty = RegisterBrush(nameof(AlternateRowBackground));
+
+    /// <summary>The tint the row under the pointer receives; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty HoveredRowBackgroundProperty = RegisterBrush(nameof(HoveredRowBackground));
+
+    /// <summary>The selected row fill; <see langword="null"/> uses the theme selection role.</summary>
+    public static readonly DependencyProperty SelectedRowBackgroundProperty = RegisterBrush(nameof(SelectedRowBackground));
+
+    /// <summary>The two-pixel accent bar on the selected row; <see langword="null"/> uses the theme accent.</summary>
+    public static readonly DependencyProperty SelectedRowAccentProperty = RegisterBrush(nameof(SelectedRowAccent));
+
+    /// <summary>The cell text colour; <see langword="null"/> uses the grid foreground, and a column's own colour still wins.</summary>
+    public static readonly DependencyProperty CellForegroundProperty = RegisterBrush(nameof(CellForeground));
+
+    /// <summary>The horizontal inset of one cell's content, in pixels.</summary>
+    public static readonly DependencyProperty CellPaddingProperty = RegisterDouble(nameof(CellPadding), 10d);
+
+    /// <summary>The one-pixel grid line colour; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty GridLineBrushProperty = RegisterBrush(nameof(GridLineBrush));
+
+    /// <summary>The row-number text colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public static readonly DependencyProperty RowNumberForegroundProperty = RegisterBrush(nameof(RowNumberForeground));
+
+    /// <summary>The row-number gutter fill; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty RowNumberBackgroundProperty = RegisterBrush(nameof(RowNumberBackground));
+
+    /// <summary>The column header fill; <see langword="null"/> uses the theme surface-alt role.</summary>
+    public static readonly DependencyProperty ColumnHeaderBackgroundProperty = RegisterBrush(nameof(ColumnHeaderBackground));
+
+    /// <summary>The column header text colour; <see langword="null"/> uses the grid foreground.</summary>
+    public static readonly DependencyProperty ColumnHeaderForegroundProperty = RegisterBrush(nameof(ColumnHeaderForeground));
+
+    /// <summary>The header tint under the pointer; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty ColumnHeaderHoverBackgroundProperty = RegisterBrush(nameof(ColumnHeaderHoverBackground));
+
+    /// <summary>The header's bottom rule colour; <see langword="null"/> uses the theme control border.</summary>
+    public static readonly DependencyProperty ColumnHeaderBorderBrushProperty = RegisterBrush(nameof(ColumnHeaderBorderBrush));
+
+    /// <summary>The font style used for column headers.</summary>
+    public static readonly DependencyProperty ColumnHeaderFontStyleProperty = DependencyProperty.Register(
+        nameof(ColumnHeaderFontStyle), typeof(FontStyle), typeof(DataGrid),
+        new PropertyMetadata(FontStyle.Bold) { AffectsRender = true });
+
+    /// <summary>The horizontal inset of one header label, in pixels.</summary>
+    public static readonly DependencyProperty HeaderPaddingProperty = RegisterDouble(nameof(HeaderPadding), 10d);
+
+    /// <summary>The sort chevron colour; <see langword="null"/> uses the theme accent.</summary>
+    public static readonly DependencyProperty SortIndicatorBrushProperty = RegisterBrush(nameof(SortIndicatorBrush));
+
+    /// <summary>The dashed border around the empty state; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty EmptyStateBorderBrushProperty = RegisterBrush(nameof(EmptyStateBorderBrush));
+
+    /// <summary>The empty-state label colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public static readonly DependencyProperty EmptyStateForegroundProperty = RegisterBrush(nameof(EmptyStateForeground));
+
+    /// <summary>The badge pill fill when the column supplies no colour; <see langword="null"/> uses the theme accent.</summary>
+    public static readonly DependencyProperty BadgeBackgroundProperty = RegisterBrush(nameof(BadgeBackground));
+
+    /// <summary>The badge text colour; <see langword="null"/> picks black or white from the pill fill.</summary>
+    public static readonly DependencyProperty BadgeForegroundProperty = RegisterBrush(nameof(BadgeForeground));
+
+    /// <summary>The badge pill height, in pixels.</summary>
+    public static readonly DependencyProperty BadgeHeightProperty = RegisterDouble(nameof(BadgeHeight), 20d);
+
+    /// <summary>The horizontal inset of the badge text, in pixels.</summary>
+    public static readonly DependencyProperty BadgePaddingProperty = RegisterDouble(nameof(BadgePadding), 9d);
+
+    /// <summary>The badge corner radius; <see cref="double.NaN"/> makes the pill fully rounded.</summary>
+    public static readonly DependencyProperty BadgeCornerRadiusProperty = RegisterDouble(nameof(BadgeCornerRadius), double.NaN);
+
+    /// <summary>The check box fill when checked; <see langword="null"/> uses the theme accent.</summary>
+    public static readonly DependencyProperty CheckFillProperty = RegisterBrush(nameof(CheckFill));
+
+    /// <summary>The check box outline when unchecked; <see langword="null"/> uses the theme control border.</summary>
+    public static readonly DependencyProperty CheckBorderBrushProperty = RegisterBrush(nameof(CheckBorderBrush));
+
+    /// <summary>The check mark stroke; <see langword="null"/> uses the theme accent foreground.</summary>
+    public static readonly DependencyProperty CheckMarkBrushProperty = RegisterBrush(nameof(CheckMarkBrush));
+
+    /// <summary>The check box edge length, in pixels.</summary>
+    public static readonly DependencyProperty CheckSizeProperty = RegisterDouble(nameof(CheckSize), 16d);
+
+    /// <summary>The check box corner radius, in pixels.</summary>
+    public static readonly DependencyProperty CheckCornerRadiusProperty = RegisterDouble(nameof(CheckCornerRadius), 4d);
+
+    /// <summary>The progress track fill; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public static readonly DependencyProperty ProgressTrackBrushProperty = RegisterBrush(nameof(ProgressTrackBrush));
+
+    /// <summary>The progress fill when the column supplies no colour; <see langword="null"/> uses the theme accent.</summary>
+    public static readonly DependencyProperty ProgressFillBrushProperty = RegisterBrush(nameof(ProgressFillBrush));
+
+    /// <summary>The progress label colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public static readonly DependencyProperty ProgressLabelForegroundProperty = RegisterBrush(nameof(ProgressLabelForeground));
+
+    /// <summary>The progress track height, in pixels.</summary>
+    public static readonly DependencyProperty ProgressTrackHeightProperty = RegisterDouble(nameof(ProgressTrackHeight), 6d);
+
+    /// <summary>The progress track and fill corner radius, in pixels.</summary>
+    public static readonly DependencyProperty ProgressCornerRadiusProperty = RegisterDouble(nameof(ProgressCornerRadius), 3d);
+
+    /// <summary>The template part that bounds the column header strip.</summary>
+    public const string ColumnHeadersPartName = "PART_ColumnHeaders";
+
+    /// <summary>The template part that bounds the data row area.</summary>
+    public const string RowsPartName = "PART_Rows";
+
+    /// <summary>The template part that bounds the realized cell elements; falls back to <see cref="RowsPartName"/>.</summary>
+    public const string CellHostPartName = "PART_CellHost";
+
+    /// <summary>The template part that bounds the vertical scroll bar.</summary>
+    public const string ScrollBarPartName = "PART_ScrollBar";
+
+    /// <summary>The decorative template part above the scroll bar; the grid paints it but never arranges content there.</summary>
+    public const string CornerPartName = "PART_Corner";
+
     private const float ScrollBarWidth = 12f;
 
     private readonly ObservableCollection<DataGridColumn> _columns = [];
@@ -484,10 +601,15 @@ public class DataGrid : TemplatedControl
     private float _bodyTop;
     private float _bodyRight;
     private float _bodyBottom;
+    private float _headerLeft;
+    private float _headerTop;
+    private float _headerRight;
+    private float _headerBottom;
     private float _contentWidth;
     private float[] _widths = [];
     private Font? _headerFont;
     private Font? _headerFontBase;
+    private FontStyle _headerFontStyle;
 
     /// <summary>Creates an empty table with the theme's surface, border and corner radius.</summary>
     public DataGrid()
@@ -623,6 +745,244 @@ public class DataGrid : TemplatedControl
     {
         get => (bool)GetValue(AllowRowReorderProperty)!;
         set => SetValue(AllowRowReorderProperty, value);
+    }
+
+    /// <summary>The normal row fill; <see langword="null"/> paints no base fill.</summary>
+    public XamlBrush? RowBackground
+    {
+        get => (XamlBrush?)GetValue(RowBackgroundProperty);
+        set => SetValue(RowBackgroundProperty, value);
+    }
+
+    /// <summary>The tint alternate rows receive; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? AlternateRowBackground
+    {
+        get => (XamlBrush?)GetValue(AlternateRowBackgroundProperty);
+        set => SetValue(AlternateRowBackgroundProperty, value);
+    }
+
+    /// <summary>The tint the row under the pointer receives; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? HoveredRowBackground
+    {
+        get => (XamlBrush?)GetValue(HoveredRowBackgroundProperty);
+        set => SetValue(HoveredRowBackgroundProperty, value);
+    }
+
+    /// <summary>The selected row fill; <see langword="null"/> uses the theme selection role.</summary>
+    public XamlBrush? SelectedRowBackground
+    {
+        get => (XamlBrush?)GetValue(SelectedRowBackgroundProperty);
+        set => SetValue(SelectedRowBackgroundProperty, value);
+    }
+
+    /// <summary>The accent bar on the selected row; <see langword="null"/> uses the theme accent.</summary>
+    public XamlBrush? SelectedRowAccent
+    {
+        get => (XamlBrush?)GetValue(SelectedRowAccentProperty);
+        set => SetValue(SelectedRowAccentProperty, value);
+    }
+
+    /// <summary>The cell text colour; <see langword="null"/> uses the grid foreground, and a column's own colour still wins.</summary>
+    public XamlBrush? CellForeground
+    {
+        get => (XamlBrush?)GetValue(CellForegroundProperty);
+        set => SetValue(CellForegroundProperty, value);
+    }
+
+    /// <summary>The horizontal inset of one cell's content, in pixels.</summary>
+    public double CellPadding
+    {
+        get => (double)GetValue(CellPaddingProperty)!;
+        set => SetValue(CellPaddingProperty, value);
+    }
+
+    /// <summary>The one-pixel grid line colour; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? GridLineBrush
+    {
+        get => (XamlBrush?)GetValue(GridLineBrushProperty);
+        set => SetValue(GridLineBrushProperty, value);
+    }
+
+    /// <summary>The row-number text colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public XamlBrush? RowNumberForeground
+    {
+        get => (XamlBrush?)GetValue(RowNumberForegroundProperty);
+        set => SetValue(RowNumberForegroundProperty, value);
+    }
+
+    /// <summary>The row-number gutter fill; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? RowNumberBackground
+    {
+        get => (XamlBrush?)GetValue(RowNumberBackgroundProperty);
+        set => SetValue(RowNumberBackgroundProperty, value);
+    }
+
+    /// <summary>The column header fill; <see langword="null"/> uses the theme surface-alt role.</summary>
+    public XamlBrush? ColumnHeaderBackground
+    {
+        get => (XamlBrush?)GetValue(ColumnHeaderBackgroundProperty);
+        set => SetValue(ColumnHeaderBackgroundProperty, value);
+    }
+
+    /// <summary>The column header text colour; <see langword="null"/> uses the grid foreground.</summary>
+    public XamlBrush? ColumnHeaderForeground
+    {
+        get => (XamlBrush?)GetValue(ColumnHeaderForegroundProperty);
+        set => SetValue(ColumnHeaderForegroundProperty, value);
+    }
+
+    /// <summary>The header tint under the pointer; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? ColumnHeaderHoverBackground
+    {
+        get => (XamlBrush?)GetValue(ColumnHeaderHoverBackgroundProperty);
+        set => SetValue(ColumnHeaderHoverBackgroundProperty, value);
+    }
+
+    /// <summary>The header's bottom rule colour; <see langword="null"/> uses the theme control border.</summary>
+    public XamlBrush? ColumnHeaderBorderBrush
+    {
+        get => (XamlBrush?)GetValue(ColumnHeaderBorderBrushProperty);
+        set => SetValue(ColumnHeaderBorderBrushProperty, value);
+    }
+
+    /// <summary>The font style used for column headers.</summary>
+    public FontStyle ColumnHeaderFontStyle
+    {
+        get => (FontStyle)GetValue(ColumnHeaderFontStyleProperty)!;
+        set => SetValue(ColumnHeaderFontStyleProperty, value);
+    }
+
+    /// <summary>The horizontal inset of one header label, in pixels.</summary>
+    public double HeaderPadding
+    {
+        get => (double)GetValue(HeaderPaddingProperty)!;
+        set => SetValue(HeaderPaddingProperty, value);
+    }
+
+    /// <summary>The sort chevron colour; <see langword="null"/> uses the theme accent.</summary>
+    public XamlBrush? SortIndicatorBrush
+    {
+        get => (XamlBrush?)GetValue(SortIndicatorBrushProperty);
+        set => SetValue(SortIndicatorBrushProperty, value);
+    }
+
+    /// <summary>The dashed border around the empty state; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? EmptyStateBorderBrush
+    {
+        get => (XamlBrush?)GetValue(EmptyStateBorderBrushProperty);
+        set => SetValue(EmptyStateBorderBrushProperty, value);
+    }
+
+    /// <summary>The empty-state label colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public XamlBrush? EmptyStateForeground
+    {
+        get => (XamlBrush?)GetValue(EmptyStateForegroundProperty);
+        set => SetValue(EmptyStateForegroundProperty, value);
+    }
+
+    /// <summary>The badge pill fill when the column supplies no colour; <see langword="null"/> uses the theme accent.</summary>
+    public XamlBrush? BadgeBackground
+    {
+        get => (XamlBrush?)GetValue(BadgeBackgroundProperty);
+        set => SetValue(BadgeBackgroundProperty, value);
+    }
+
+    /// <summary>The badge text colour; <see langword="null"/> picks black or white from the pill fill.</summary>
+    public XamlBrush? BadgeForeground
+    {
+        get => (XamlBrush?)GetValue(BadgeForegroundProperty);
+        set => SetValue(BadgeForegroundProperty, value);
+    }
+
+    /// <summary>The badge pill height, in pixels.</summary>
+    public double BadgeHeight
+    {
+        get => (double)GetValue(BadgeHeightProperty)!;
+        set => SetValue(BadgeHeightProperty, value);
+    }
+
+    /// <summary>The horizontal inset of the badge text, in pixels.</summary>
+    public double BadgePadding
+    {
+        get => (double)GetValue(BadgePaddingProperty)!;
+        set => SetValue(BadgePaddingProperty, value);
+    }
+
+    /// <summary>The badge corner radius; <see cref="double.NaN"/> makes the pill fully rounded.</summary>
+    public double BadgeCornerRadius
+    {
+        get => (double)GetValue(BadgeCornerRadiusProperty)!;
+        set => SetValue(BadgeCornerRadiusProperty, value);
+    }
+
+    /// <summary>The check box fill when checked; <see langword="null"/> uses the theme accent.</summary>
+    public XamlBrush? CheckFill
+    {
+        get => (XamlBrush?)GetValue(CheckFillProperty);
+        set => SetValue(CheckFillProperty, value);
+    }
+
+    /// <summary>The check box outline when unchecked; <see langword="null"/> uses the theme control border.</summary>
+    public XamlBrush? CheckBorderBrush
+    {
+        get => (XamlBrush?)GetValue(CheckBorderBrushProperty);
+        set => SetValue(CheckBorderBrushProperty, value);
+    }
+
+    /// <summary>The check mark stroke; <see langword="null"/> uses the theme accent foreground.</summary>
+    public XamlBrush? CheckMarkBrush
+    {
+        get => (XamlBrush?)GetValue(CheckMarkBrushProperty);
+        set => SetValue(CheckMarkBrushProperty, value);
+    }
+
+    /// <summary>The check box edge length, in pixels.</summary>
+    public double CheckSize
+    {
+        get => (double)GetValue(CheckSizeProperty)!;
+        set => SetValue(CheckSizeProperty, value);
+    }
+
+    /// <summary>The check box corner radius, in pixels.</summary>
+    public double CheckCornerRadius
+    {
+        get => (double)GetValue(CheckCornerRadiusProperty)!;
+        set => SetValue(CheckCornerRadiusProperty, value);
+    }
+
+    /// <summary>The progress track fill; <see langword="null"/> uses a translucent foreground tint.</summary>
+    public XamlBrush? ProgressTrackBrush
+    {
+        get => (XamlBrush?)GetValue(ProgressTrackBrushProperty);
+        set => SetValue(ProgressTrackBrushProperty, value);
+    }
+
+    /// <summary>The progress fill when the column supplies no colour; <see langword="null"/> uses the theme accent.</summary>
+    public XamlBrush? ProgressFillBrush
+    {
+        get => (XamlBrush?)GetValue(ProgressFillBrushProperty);
+        set => SetValue(ProgressFillBrushProperty, value);
+    }
+
+    /// <summary>The progress label colour; <see langword="null"/> uses the theme muted foreground.</summary>
+    public XamlBrush? ProgressLabelForeground
+    {
+        get => (XamlBrush?)GetValue(ProgressLabelForegroundProperty);
+        set => SetValue(ProgressLabelForegroundProperty, value);
+    }
+
+    /// <summary>The progress track height, in pixels.</summary>
+    public double ProgressTrackHeight
+    {
+        get => (double)GetValue(ProgressTrackHeightProperty)!;
+        set => SetValue(ProgressTrackHeightProperty, value);
+    }
+
+    /// <summary>The progress track and fill corner radius, in pixels.</summary>
+    public double ProgressCornerRadius
+    {
+        get => (double)GetValue(ProgressCornerRadiusProperty)!;
+        set => SetValue(ProgressCornerRadiusProperty, value);
     }
 
     /// <summary>The sorted column index, or -1 for source order.</summary>
@@ -771,7 +1131,7 @@ public class DataGrid : TemplatedControl
     {
         if (IsTemplated)
         {
-            return MeasureTemplate(availableSize);
+            MeasureTemplate(availableSize);
         }
 
         var width = availableSize.Width >= int.MaxValue / 2 ? 560 : Math.Max(0, availableSize.Width);
@@ -788,13 +1148,18 @@ public class DataGrid : TemplatedControl
     {
         if (IsTemplated)
         {
-            ArrangeTemplate(finalSize);
-            _scrollBar.Visibility = XamlVisibility.Collapsed;
-            _cellHost.Reset();
-            _cellHost.Visibility = XamlVisibility.Collapsed;
-            return;
+            ArrangeTemplatedLayout(finalSize);
+        }
+        else
+        {
+            ArrangeSelfDrawnLayout(finalSize);
         }
 
+        ArrangeCellHost(finalSize);
+    }
+
+    private void ArrangeSelfDrawnLayout(Size finalSize)
+    {
         var padding = Padding;
         var border = BorderThickness;
         _bodyLeft = padding.Left + border.Left;
@@ -806,15 +1171,60 @@ public class DataGrid : TemplatedControl
         _bodyTop = top + header;
         _bodyRight = right;
         _bodyBottom = bottom;
+        _headerLeft = _bodyLeft;
+        _headerTop = top;
+        _headerRight = right;
+        _headerBottom = _bodyTop;
 
+        ArrangeBody(finalSize, null);
+    }
+
+    // 模板只提供几何分区：表格仍自绘内容，因此模板部件必须是透明的、只定义位置。
+    private void ArrangeTemplatedLayout(Size finalSize)
+    {
+        var padding = Padding;
+        var border = BorderThickness;
+        var content = new RectangleF(
+            padding.Left + border.Left,
+            padding.Top + border.Top,
+            Math.Max(0f, finalSize.Width - padding.Horizontal - border.Horizontal),
+            Math.Max(0f, finalSize.Height - padding.Vertical - border.Vertical));
+
+        TemplateRoot?.Arrange(content);
+
+        var header = PartBounds(ColumnHeadersPartName);
+        var rows = PartBounds(RowsPartName) ?? PartBounds(CellHostPartName);
+        var bar = PartBounds(ScrollBarPartName);
+
+        var headerHeight = (float)Math.Min(Math.Max(1d, HeaderHeight), content.Height);
+        var headerRect = header ?? new RectangleF(content.X, content.Y, content.Width, headerHeight);
+        var bodyTop = Math.Min(content.Bottom, headerRect.Bottom);
+        var rowsRect = rows ?? new RectangleF(content.X, bodyTop, content.Width, Math.Max(0f, content.Bottom - bodyTop));
+
+        _headerLeft = headerRect.Left;
+        _headerTop = headerRect.Top;
+        _headerRight = headerRect.Right;
+        _headerBottom = headerRect.Bottom;
+        _bodyLeft = rowsRect.Left;
+        _bodyTop = rowsRect.Top;
+        _bodyRight = rowsRect.Right;
+        _bodyBottom = rowsRect.Bottom;
+
+        ArrangeBody(finalSize, bar);
+    }
+
+    private void ArrangeBody(Size finalSize, RectangleF? scrollBarPart)
+    {
         var rowHeight = (float)Math.Max(1d, RowHeight);
         var extent = _view.Count * rowHeight;
         var viewport = _viewportHeight;
         var needsBar = extent > viewport + 0.5f;
         _scrollBar.Visibility = needsBar ? XamlVisibility.Visible : XamlVisibility.Collapsed;
 
-        var contentWidth = Math.Max(0f, right - _bodyLeft);
-        if (needsBar)
+        // 模板把滚动条放在单独的列里时，行区宽度已经让出了滚动条，不能再减一次。
+        var barOutsideBody = scrollBarPart is { } outside && outside.X >= _bodyRight - 0.5f;
+        var contentWidth = Math.Max(0f, _bodyRight - _bodyLeft);
+        if (needsBar && !barOutsideBody)
         {
             contentWidth = Math.Max(0f, contentWidth - ScrollBarWidth);
         }
@@ -823,18 +1233,27 @@ public class DataGrid : TemplatedControl
         _widths = ResolveWidths(contentWidth);
         UpdateScrollBar(needsBar);
 
-        if (needsBar)
+        if (!needsBar)
         {
-            var barWidth = (int)Math.Ceiling(ScrollBarWidth);
-            _scrollBar.Measure(new Size(barWidth, (int)Math.Ceiling(viewport)));
-            _scrollBar.Arrange(new RectangleF(
-                _bodyRight - ScrollBarWidth,
-                _bodyTop,
-                ScrollBarWidth,
-                viewport));
+            return;
         }
 
-        ArrangeCellHost(finalSize);
+        var barRect = scrollBarPart ?? new RectangleF(_bodyRight - ScrollBarWidth, _bodyTop, ScrollBarWidth, viewport);
+        _scrollBar.Measure(new Size((int)Math.Ceiling(barRect.Width), (int)Math.Ceiling(barRect.Height)));
+        _scrollBar.Arrange(barRect);
+    }
+
+    // 模板部件坐标换回本控件局部坐标；部件缺失时返回 null，布局回退到自绘路径。
+    private RectangleF? PartBounds(string name)
+    {
+        if (GetTemplateChild<VisualElement>(name) is not { } part)
+        {
+            return null;
+        }
+
+        var origin = AbsoluteBounds.Location;
+        var bounds = part.AbsoluteBounds;
+        return new RectangleF(bounds.X - origin.X, bounds.Y - origin.Y, bounds.Width, bounds.Height);
     }
 
     // 单元格宿主铺满控件，靠 Clip 裁到表头下方；元素坐标因此与自绘行是同一套。
@@ -884,13 +1303,37 @@ public class DataGrid : TemplatedControl
     }
 
     /// <inheritdoc />
-    protected override void OnRender(Graphics graphics)
+    protected override void RenderContent(Graphics graphics)
     {
-        if (IsTemplated)
+        if (!IsTemplated)
+        {
+            base.RenderContent(graphics);
+            return;
+        }
+
+        // 模板只负责分区；底色与边框仍和自绘路径一致，避免模板里的不透明块盖住行内容。
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var bounds = new Rectangle(
+            0,
+            0,
+            Math.Max(0, (int)Math.Ceiling(Bounds.Width)),
+            Math.Max(0, (int)Math.Ceiling(Bounds.Height)));
+        if (bounds.Width <= 0 || bounds.Height <= 0)
         {
             return;
         }
 
+        if (Background is not null || (BorderBrush is not null && !BorderThickness.IsEmpty))
+        {
+            XamlDrawing.PaintChromeWithBrushes(graphics, bounds, Background, BorderBrush, BorderThickness, CornerRadius);
+        }
+
+        OnRender(graphics);
+    }
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
         var theme = Theme.Current;
         var bounds = new Rectangle(
             0,
@@ -898,11 +1341,13 @@ public class DataGrid : TemplatedControl
             Math.Max(1, (int)Math.Ceiling(Bounds.Width)),
             Math.Max(1, (int)Math.Ceiling(Bounds.Height)));
         var radius = CornerRadius > 0 ? CornerRadius : theme.CornerRadius;
+        var left = Math.Min(_headerLeft, _bodyLeft);
+        var right = Math.Max(_headerRight, _bodyRight);
         var inner = new RectangleF(
-            _bodyLeft,
-            _bodyTop - (float)Math.Min(Math.Max(1d, HeaderHeight), Math.Max(0f, _bodyBottom - _bodyTop)),
-            Math.Max(0f, _bodyRight - _bodyLeft),
-            Math.Max(0f, _bodyBottom - _bodyTop + (float)Math.Min(Math.Max(1d, HeaderHeight), Math.Max(0f, _bodyBottom - _bodyTop))));
+            left,
+            _headerTop,
+            Math.Max(0f, right - left),
+            Math.Max(0f, _bodyBottom - _headerTop));
 
         var foreground = Foreground.IsEmpty ? theme.Foreground : Foreground;
         var font = ResolveFont(DefaultFont);
@@ -921,7 +1366,7 @@ public class DataGrid : TemplatedControl
             graphics.SetClip(clip, CombineMode.Intersect);
         }
 
-        DrawHeader(graphics, inner, headerFont, theme, foreground);
+        DrawHeader(graphics, headerFont, theme, foreground);
 
         // 行必须裁到表头下方：滚动偏移不是行高整数倍时，首行会越过 _bodyTop，画到表头上面。
         var bodyState = graphics.Save();
@@ -993,7 +1438,7 @@ public class DataGrid : TemplatedControl
     /// <inheritdoc />
     protected override void OnPointerPressed(VisualPointerEventArgs args)
     {
-        if (IsTemplated || !IsEnabled || args.Button != MouseButtons.Left)
+        if (!IsEnabled || args.Button != MouseButtons.Left)
         {
             return;
         }
@@ -1038,11 +1483,6 @@ public class DataGrid : TemplatedControl
     /// <inheritdoc />
     protected override void OnPointerMoved(VisualPointerEventArgs args)
     {
-        if (IsTemplated)
-        {
-            return;
-        }
-
         var point = args.GetPosition(this);
         if (_resizeColumn is { } resize && (args.Buttons & MouseButtons.Left) != 0)
         {
@@ -1110,7 +1550,7 @@ public class DataGrid : TemplatedControl
     /// <inheritdoc />
     protected override void OnPointerWheel(VisualPointerEventArgs args)
     {
-        if (IsTemplated || _view.Count == 0)
+        if (_view.Count == 0)
         {
             return;
         }
@@ -1135,7 +1575,7 @@ public class DataGrid : TemplatedControl
     /// <inheritdoc />
     protected override void OnKeyDown(VisualKeyEventArgs args)
     {
-        if (IsTemplated || !IsEnabled || _view.Count == 0)
+        if (!IsEnabled || _view.Count == 0)
         {
             return;
         }
@@ -1571,11 +2011,23 @@ public class DataGrid : TemplatedControl
         return -1;
     }
 
-    private void DrawHeader(Graphics graphics, RectangleF inner, Font headerFont, ThemePalette theme, Color foreground)
+    private void DrawHeader(Graphics graphics, Font headerFont, ThemePalette theme, Color foreground)
     {
-        var height = Math.Min(Math.Max(1d, HeaderHeight), inner.Height);
-        var header = new RectangleF(inner.X, inner.Y, inner.Width, (float)height);
-        using (var fill = new SolidBrush(theme.SurfaceAlt))
+        var header = new RectangleF(
+            _headerLeft,
+            _headerTop,
+            Math.Max(0f, _headerRight - _headerLeft),
+            Math.Max(0f, _headerBottom - _headerTop));
+        if (header.Width <= 0f || header.Height <= 0f)
+        {
+            return;
+        }
+
+        var headerBackground = ResolveColor(ColumnHeaderBackground, theme.SurfaceAlt);
+        var headerForeground = ResolveColor(ColumnHeaderForeground, foreground);
+        var padding = (float)Math.Max(0d, HeaderPadding);
+
+        using (var fill = new SolidBrush(headerBackground))
         {
             graphics.FillRectangle(fill, header);
         }
@@ -1588,7 +2040,7 @@ public class DataGrid : TemplatedControl
                 x += _widths[index];
             }
 
-            using var hover = new SolidBrush(WithAlpha(theme.Foreground, 16));
+            using var hover = new SolidBrush(ResolveColor(ColumnHeaderHoverBackground, WithAlpha(foreground, 16)));
             graphics.FillRectangle(hover, new RectangleF(x, header.Y, _widths[_hoverHeader], header.Height));
         }
 
@@ -1600,7 +2052,7 @@ public class DataGrid : TemplatedControl
                 graphics,
                 "#",
                 headerFont,
-                theme.MutedForeground,
+                ResolveColor(RowNumberForeground, theme.MutedForeground),
                 new RectangleF(xPos, header.Y, (float)RowNumberWidth, header.Height),
                 wrap: false,
                 StringAlignment.Center,
@@ -1617,13 +2069,13 @@ public class DataGrid : TemplatedControl
                 continue;
             }
 
-            var cell = new RectangleF(xPos + HeaderPadding, header.Y, Math.Max(0f, width - (HeaderPadding * 2f)), header.Height);
+            var cell = new RectangleF(xPos + padding, header.Y, Math.Max(0f, width - (padding * 2f)), header.Height);
             VisualText.Draw(
                 this,
                 graphics,
                 column.Header,
                 headerFont,
-                foreground,
+                headerForeground,
                 cell,
                 wrap: false,
                 ToStringAlignment(column.TextAlignment),
@@ -1631,14 +2083,19 @@ public class DataGrid : TemplatedControl
 
             if (_sortColumn == index)
             {
-                DrawSortChevron(graphics, theme, xPos + width - 12f, header.Y + (header.Height / 2f), _sortDirection);
+                DrawSortChevron(
+                    graphics,
+                    ResolveColor(SortIndicatorBrush, theme.Accent),
+                    xPos + width - 12f,
+                    header.Y + (header.Height / 2f),
+                    _sortDirection);
             }
 
             xPos += width;
         }
 
-        using var line = new System.Drawing.Pen(theme.ControlBorder, 1f);
-        graphics.DrawLine(line, inner.X, header.Bottom - 0.5f, inner.Right, header.Bottom - 0.5f);
+        using var line = new System.Drawing.Pen(ResolveColor(ColumnHeaderBorderBrush, theme.ControlBorder), 1f);
+        graphics.DrawLine(line, header.X, header.Bottom - 0.5f, header.Right, header.Bottom - 0.5f);
     }
 
     private void DrawRows(Graphics graphics, Font font, ThemePalette theme, Color foreground)
@@ -1653,7 +2110,7 @@ public class DataGrid : TemplatedControl
 
         if (_view.Count == 0)
         {
-            DrawEmptyState(graphics, theme, font);
+            DrawEmptyState(graphics, theme, font, foreground);
             return;
         }
 
@@ -1669,25 +2126,32 @@ public class DataGrid : TemplatedControl
             var selected = index == SelectedIndex;
             var hovered = index == _hoverRow;
 
+            var baseRow = ResolveColor(RowBackground, Color.Transparent);
+            if (baseRow.A > 0)
+            {
+                using var fill = new SolidBrush(baseRow);
+                graphics.FillRectangle(fill, row);
+            }
+
             if (selected)
             {
-                using var fill = new SolidBrush(theme.Selection);
+                using var fill = new SolidBrush(ResolveColor(SelectedRowBackground, theme.Selection));
                 graphics.FillRectangle(fill, row);
             }
             else if (hovered)
             {
-                using var fill = new SolidBrush(WithAlpha(theme.Foreground, 18));
+                using var fill = new SolidBrush(ResolveColor(HoveredRowBackground, WithAlpha(foreground, 18)));
                 graphics.FillRectangle(fill, row);
             }
             else if (AlternateRows && (index % 2) == 1)
             {
-                using var fill = new SolidBrush(WithAlpha(theme.Foreground, 7));
+                using var fill = new SolidBrush(ResolveColor(AlternateRowBackground, WithAlpha(foreground, 7)));
                 graphics.FillRectangle(fill, row);
             }
 
             if (ShowRowNumbers && gutter > 0f)
             {
-                using (var gutterFill = new SolidBrush(WithAlpha(theme.Foreground, 10)))
+                using (var gutterFill = new SolidBrush(ResolveColor(RowNumberBackground, WithAlpha(foreground, 10))))
                 {
                     graphics.FillRectangle(gutterFill, new RectangleF(row.X, row.Y, gutter, row.Height));
                 }
@@ -1697,7 +2161,7 @@ public class DataGrid : TemplatedControl
                     graphics,
                     (index + 1).ToString(CultureInfo.CurrentCulture),
                     font,
-                    theme.MutedForeground,
+                    ResolveColor(RowNumberForeground, theme.MutedForeground),
                     new RectangleF(row.X, row.Y, gutter - 6f, row.Height),
                     wrap: false,
                     StringAlignment.Far,
@@ -1706,10 +2170,11 @@ public class DataGrid : TemplatedControl
 
             if (selected)
             {
-                using var accent = new SolidBrush(theme.Accent);
+                using var accent = new SolidBrush(ResolveColor(SelectedRowAccent, theme.Accent));
                 graphics.FillRectangle(accent, new RectangleF(row.X, row.Y, 2f, row.Height));
             }
 
+            var cellPadding = (float)Math.Max(0d, CellPadding);
             var x = row.X + gutter;
             for (var columnIndex = 0; columnIndex < _columns.Count && columnIndex < _widths.Length; columnIndex++)
             {
@@ -1720,9 +2185,9 @@ public class DataGrid : TemplatedControl
                 }
 
                 var cell = new RectangleF(
-                    x + CellPadding,
+                    x + cellPadding,
                     row.Y,
-                    Math.Max(0f, width - (CellPadding * 2f)),
+                    Math.Max(0f, width - (cellPadding * 2f)),
                     row.Height);
                 if (!_columns[columnIndex].HasCellElement)
                 {
@@ -1734,14 +2199,14 @@ public class DataGrid : TemplatedControl
 
             if (ShowGridLines)
             {
-                using var line = new System.Drawing.Pen(WithAlpha(theme.Foreground, 20), 1f);
+                using var line = new System.Drawing.Pen(ResolveColor(GridLineBrush, WithAlpha(foreground, 20)), 1f);
                 graphics.DrawLine(line, row.X, row.Bottom - 0.5f, row.Right, row.Bottom - 0.5f);
             }
         }
 
         if (ShowGridLines)
         {
-            using var line = new System.Drawing.Pen(WithAlpha(theme.Foreground, 18), 1f);
+            using var line = new System.Drawing.Pen(ResolveColor(GridLineBrush, WithAlpha(foreground, 18)), 1f);
             var x = _bodyLeft + gutter;
             for (var index = 0; index < _widths.Length; index++)
             {
@@ -1765,7 +2230,7 @@ public class DataGrid : TemplatedControl
         bool selected)
     {
         var text = column.GetText(item);
-        var color = column.Foreground.IsEmpty ? foreground : column.Foreground;
+        var color = column.Foreground.IsEmpty ? ResolveColor(CellForeground, foreground) : column.Foreground;
         var previous = graphics.Save();
         graphics.SetClip(cell, CombineMode.Intersect);
         try
@@ -1779,7 +2244,7 @@ public class DataGrid : TemplatedControl
                     DrawBadge(graphics, column, item, text, cell, font, theme);
                     break;
                 case DataGridColumnKind.Progress:
-                    DrawProgress(graphics, column, item, text, cell, font, theme);
+                    DrawProgress(graphics, column, item, text, cell, font, theme, foreground);
                     break;
                 default:
                     VisualText.Draw(
@@ -1818,12 +2283,21 @@ public class DataGrid : TemplatedControl
         var color = column.GetColor(item);
         if (color.IsEmpty)
         {
-            color = theme.Accent;
+            color = ResolveColor(BadgeBackground, theme.Accent);
         }
 
+        var padding = (float)Math.Max(0d, BadgePadding);
         var measured = VisualText.Measure(text, font, 0f, wrap: false, RenderDpi);
-        var width = Math.Min(cell.Width, measured.Width + 18f);
-        var height = Math.Min(20f, cell.Height - 4f);
+        var width = Math.Min(cell.Width, measured.Width + (padding * 2f));
+        var height = Math.Min((float)Math.Max(0d, BadgeHeight), cell.Height - 4f);
+        if (width <= 0f || height <= 0f)
+        {
+            return;
+        }
+
+        var corner = double.IsNaN(BadgeCornerRadius)
+            ? height / 2f
+            : (float)Math.Max(0d, BadgeCornerRadius);
         var x = column.TextAlignment switch
         {
             XamlTextAlignment.Right => cell.Right - width,
@@ -1831,7 +2305,7 @@ public class DataGrid : TemplatedControl
             _ => cell.X,
         };
         var y = cell.Y + ((cell.Height - height) / 2f);
-        using var path = XamlDrawing.RoundedRectangle(new RectangleF(x, y, width, height), height / 2f);
+        using var path = XamlDrawing.RoundedRectangle(new RectangleF(x, y, width, height), corner);
         using var fill = new SolidBrush(color);
         graphics.FillPath(fill, path);
         VisualText.Draw(
@@ -1839,8 +2313,8 @@ public class DataGrid : TemplatedControl
             graphics,
             text,
             font,
-            ContrastText(color),
-            new RectangleF(x + 6f, y, Math.Max(0f, width - 12f), height),
+            ResolveColor(BadgeForeground, ContrastText(color)),
+            new RectangleF(x + padding, y, Math.Max(0f, width - (padding * 2f)), height),
             wrap: false,
             StringAlignment.Center,
             StringAlignment.Center);
@@ -1853,25 +2327,28 @@ public class DataGrid : TemplatedControl
         string text,
         RectangleF cell,
         Font font,
-        ThemePalette theme)
+        ThemePalette theme,
+        Color foreground)
     {
         var value = column.GetProgress(item);
         var color = column.GetColor(item);
         if (color.IsEmpty)
         {
-            color = theme.Accent;
+            color = ResolveColor(ProgressFillBrush, theme.Accent);
         }
 
+        var trackHeight = (float)Math.Max(1d, ProgressTrackHeight);
+        var corner = (float)Math.Max(0d, ProgressCornerRadius);
         var labelWidth = cell.Width >= 76f ? 36f : 0f;
         var track = new RectangleF(
             cell.X,
-            cell.Y + ((cell.Height - 6f) / 2f),
+            cell.Y + ((cell.Height - trackHeight) / 2f),
             Math.Max(0f, cell.Width - labelWidth - (labelWidth > 0f ? 8f : 0f)),
-            6f);
+            trackHeight);
         if (track.Width > 0f)
         {
-            using (var path = XamlDrawing.RoundedRectangle(track, 3f))
-            using (var fill = new SolidBrush(WithAlpha(theme.Foreground, 30)))
+            using (var path = XamlDrawing.RoundedRectangle(track, corner))
+            using (var fill = new SolidBrush(ResolveColor(ProgressTrackBrush, WithAlpha(foreground, 30))))
             {
                 graphics.FillPath(fill, path);
             }
@@ -1879,7 +2356,7 @@ public class DataGrid : TemplatedControl
             var fillWidth = Math.Max(0f, track.Width * (float)(value / 100d));
             if (fillWidth >= 2f)
             {
-                using var path = XamlDrawing.RoundedRectangle(new RectangleF(track.X, track.Y, fillWidth, track.Height), 3f);
+                using var path = XamlDrawing.RoundedRectangle(new RectangleF(track.X, track.Y, fillWidth, track.Height), corner);
                 using var fill = new SolidBrush(color);
                 graphics.FillPath(fill, path);
             }
@@ -1893,7 +2370,7 @@ public class DataGrid : TemplatedControl
                 graphics,
                 label,
                 font,
-                theme.MutedForeground,
+                ResolveColor(ProgressLabelForeground, theme.MutedForeground),
                 new RectangleF(cell.Right - labelWidth, cell.Y, labelWidth, cell.Height),
                 wrap: false,
                 StringAlignment.Far,
@@ -1923,7 +2400,7 @@ public class DataGrid : TemplatedControl
             isChecked = false;
         }
 
-        const float size = 16f;
+        var size = (float)Math.Max(1d, CheckSize);
         var rect = new RectangleF(
             column.TextAlignment switch
             {
@@ -1934,33 +2411,34 @@ public class DataGrid : TemplatedControl
             cell.Y + ((cell.Height - size) / 2f),
             size,
             size);
-        using var path = XamlDrawing.RoundedRectangle(rect, 4f);
+        using var path = XamlDrawing.RoundedRectangle(rect, (float)Math.Max(0d, CheckCornerRadius));
         if (isChecked)
         {
-            using var fill = new SolidBrush(theme.Accent);
+            using var fill = new SolidBrush(ResolveColor(CheckFill, theme.Accent));
             graphics.FillPath(fill, path);
-            using var check = new System.Drawing.Pen(theme.AccentForeground, 1.8f)
+            using var check = new System.Drawing.Pen(ResolveColor(CheckMarkBrush, theme.AccentForeground), 1.8f)
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round,
             };
+            var scale = size / 16f;
             graphics.DrawLines(check, new[]
             {
-                new PointF(rect.X + 4f, rect.Y + 8f),
-                new PointF(rect.X + 7f, rect.Y + 11f),
-                new PointF(rect.X + 12f, rect.Y + 5f),
+                new PointF(rect.X + (4f * scale), rect.Y + (8f * scale)),
+                new PointF(rect.X + (7f * scale), rect.Y + (11f * scale)),
+                new PointF(rect.X + (12f * scale), rect.Y + (5f * scale)),
             });
         }
         else
         {
-            using var stroke = new System.Drawing.Pen(theme.ControlBorder, 1.2f);
+            using var stroke = new System.Drawing.Pen(ResolveColor(CheckBorderBrush, theme.ControlBorder), 1.2f);
             graphics.DrawPath(stroke, path);
         }
     }
 
-    private void DrawSortChevron(Graphics graphics, ThemePalette theme, float x, float y, ListSortDirection direction)
+    private void DrawSortChevron(Graphics graphics, Color color, float x, float y, ListSortDirection direction)
     {
-        using var brush = new SolidBrush(theme.Accent);
+        using var brush = new SolidBrush(color);
         var points = direction == ListSortDirection.Ascending
             ? new[]
             {
@@ -1977,7 +2455,7 @@ public class DataGrid : TemplatedControl
         graphics.FillPolygon(brush, points);
     }
 
-    private void DrawEmptyState(Graphics graphics, ThemePalette theme, Font font)
+    private void DrawEmptyState(Graphics graphics, ThemePalette theme, Font font, Color foreground)
     {
         var area = new RectangleF(_bodyLeft + 16f, _bodyTop + 12f, Math.Max(0f, _contentWidth - 32f), Math.Max(0f, _viewportHeight - 24f));
         if (area.Width <= 0f || area.Height <= 0f)
@@ -1985,8 +2463,9 @@ public class DataGrid : TemplatedControl
             return;
         }
 
+        var emptyForeground = ResolveColor(EmptyStateForeground, theme.MutedForeground);
         using (var path = XamlDrawing.RoundedRectangle(area, 8f))
-        using (var pen = new System.Drawing.Pen(WithAlpha(theme.Foreground, 60), 1f) { DashStyle = DashStyle.Dash })
+        using (var pen = new System.Drawing.Pen(ResolveColor(EmptyStateBorderBrush, WithAlpha(foreground, 60)), 1f) { DashStyle = DashStyle.Dash })
         {
             graphics.DrawPath(pen, path);
         }
@@ -1997,7 +2476,7 @@ public class DataGrid : TemplatedControl
             graphics,
             EmptyText,
             font,
-            theme.MutedForeground,
+            emptyForeground,
             new RectangleF(area.X, center, area.Width, 20f),
             wrap: false,
             StringAlignment.Center,
@@ -2010,7 +2489,7 @@ public class DataGrid : TemplatedControl
                 graphics,
                 "Drop files, text or rows here",
                 font,
-                WithAlpha(theme.MutedForeground, 170),
+                WithAlpha(emptyForeground, 170),
                 new RectangleF(area.X, center + 20f, area.Width, 20f),
                 wrap: false,
                 StringAlignment.Center,
@@ -2290,14 +2769,16 @@ public class DataGrid : TemplatedControl
 
     private Font GetHeaderFont(Font baseFont)
     {
-        if (_headerFont is not null && ReferenceEquals(_headerFontBase, baseFont))
+        var style = ColumnHeaderFontStyle;
+        if (_headerFont is not null && ReferenceEquals(_headerFontBase, baseFont) && _headerFontStyle == style)
         {
             return _headerFont;
         }
 
         _headerFont?.Dispose();
         _headerFontBase = baseFont;
-        _headerFont = new Font(baseFont, FontStyle.Bold);
+        _headerFontStyle = style;
+        _headerFont = new Font(baseFont, style);
         return _headerFont;
     }
 
@@ -2396,6 +2877,28 @@ public class DataGrid : TemplatedControl
 
     private static Color WithAlpha(Color color, int alpha)
         => color.A == alpha ? color : Color.FromArgb(XamlMath.Clamp(alpha, 0, 255), color.R, color.G, color.B);
+
+    private static DependencyProperty RegisterBrush(string name)
+        => DependencyProperty.Register(
+            name, typeof(XamlBrush), typeof(DataGrid),
+            new PropertyMetadata(null) { AffectsRender = true });
+
+    private static DependencyProperty RegisterDouble(string name, double defaultValue)
+        => DependencyProperty.Register(
+            name, typeof(double), typeof(DataGrid),
+            new PropertyMetadata(defaultValue) { AffectsRender = true });
+
+    // 自绘路径只认单色；渐变笔刷取代表色，和 Foreground 的取值方式一致。
+    private static Color ResolveColor(XamlBrush? brush, Color fallback)
+    {
+        if (brush is null)
+        {
+            return fallback;
+        }
+
+        var color = brush.ApproximateColor;
+        return color.IsEmpty ? fallback : color;
+    }
 
     private static Color ContrastText(Color background)
     {
