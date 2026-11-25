@@ -150,13 +150,20 @@ treat small deltas as noise.
 
 | scenario | pre-templating median | pre-templating p95 | current median | current p95 | delta |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `slider-value` | 1.476 | 1.834 | 1.486 | 2.017 | +0.7% |
-| `splitter-resize` | 4.155 | 6.605 | 2.553 | 3.824 | -38.6% |
-| `full-frame` | 3.210 | 3.800 | 2.383 | 2.990 | -25.8% |
-| `theme-toggle` | 3.253 | 3.694 | 2.498 | 3.181 | -23.2% |
-| `build-page` | 7.246 | 7.598 | 19.699 | 21.660 | +171.9% |
-| `theme-rebuild` | 7.094 | 7.937 | 20.054 | 26.829 | +182.7% |
+| `slider-value` | 2.391 | 3.643 | 2.153 | 3.366 | -10.0% |
+| `splitter-resize` | 3.412 | 3.899 | 2.779 | 3.825 | -18.6% |
+| `full-frame` | 2.906 | 3.582 | 2.485 | 3.755 | -14.5% |
+| `theme-toggle` | 2.983 | 3.422 | 2.335 | 3.206 | -21.7% |
+| `build-page` | 6.650 | 7.447 | 16.768 | 24.006 | +152.2% |
+| `theme-rebuild` | 7.724 | 8.154 | 13.616 | 16.066 | +76.3% |
 
+All interaction and palette-switch scenarios are now below the pre-templating baseline. The page now places one Slider
+inside the initial viewport, so `slider-value` paints the control instead of measuring the fixed full-frame blit.
+Page build remains above the baseline: the current page constructs 524 nodes / 377 template nodes, while the
+baseline constructs 287 / 4. With the ListBox removed the same page builds in ~10.4 ms; the remaining cost is
+per-control template instantiation (factory property writes, bindings, style/trigger application) plus the 200
+index-stable list containers. Going below the no-list floor needs a template clone/pool contract or a generated
+factory change, not more trimming.
 The slider number is the median of three consecutive runs (1.461/1.484/1.486 ms); the other rows are one run of the
 same binary. Interaction and palette switching are now at or below the pre-templating baseline. Page build remains
 2.7–2.8× the baseline: the baseline realizes 200 flat rows, while the decoupled ListBox keeps 200 index-stable
@@ -168,12 +175,12 @@ Visual-tree shape of the canonical page:
 
 | counter | pre-templating `886ab07` | current |
 | --- | ---: | ---: |
-| nodes | 286 | 880 |
-| template-created nodes | 4 | 398 |
-| template roots | 1 | 77 |
-| templated controls | 1 | 76 |
-| arranged nodes | 276 | 850 |
-| visible nodes | 278 | 868 |
+| nodes | 287 | 524 |
+| template-created nodes | 4 | 377 |
+| template roots | 1 | 80 |
+| templated controls | 1 | 79 |
+| arranged nodes | 277 | 498 |
+| visible nodes | 278 | 512 |
 
 Work counters over the measured samples. Layout, paint and trees-built counts are identical on both sides because
 the scenario iteration counts match; the node columns describe the current tree (the baseline tree has 286 nodes
@@ -195,17 +202,15 @@ extra nodes they must measure and paint, not by a change in the slider's own pai
 
 ## Interpretation
 
-- A single slider drag matches the pre-templating baseline: its value change damages a rectangle and never arranges
-  the list.
-- Resize, full-frame repaint and palette switching are now faster than the pre-templating baseline: the shared-brush
-  mutation, full-frame visible-clip culling and per-node state-stack removal more than pay for the extra template
-  nodes on the paint path.
-- Building a page is ~2.7× slower. The baseline has 200 flat rows; the decoupled ListBox keeps 200 index-stable
-  `ListBoxItem` containers and expands the row template only for the ~26 rows inside the viewport (lazy realization).
-  With the list removed the same page builds in ~17 ms, which is the floor of the current design; going below needs
-  true window virtualization with spacers, not more template trimming.
-- The palette toggle is faster than the baseline because shared brushes are mutated in place and the frame is
-  painted directly; the synthetic rebuild scenario measures a path the Gallery no longer uses.
+- Slider drag is ~10% faster than the pre-templating baseline. Its value change damages only the changed fill span
+  and thumb; the one-pass range chrome paints track/fill/thumb/ring without a per-part visual walk.
+- Resize, full-frame repaint and palette switching are 15–22% faster. Full frames cull children outside the visible
+  clip, flat visuals skip the GDI+ state stack, theme brushes mutate in place, and damage culling runs on managed
+  offsets instead of per-node GDI+ matrix checks.
+- Page build is ~2.5× the baseline; rebuild is ~1.8×. The baseline has 200 flat rows; the decoupled ListBox keeps
+  200 index-stable `ListBoxItem` containers, attaches only the ~20-row viewport window, and expands templates only
+  for the visible rows. The measured no-list floor is ~10.4 ms; the remaining cost is template instantiation and
+  container bookkeeping, not markup.
 
 ## Limitations
 
