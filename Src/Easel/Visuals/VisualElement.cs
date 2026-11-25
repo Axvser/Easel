@@ -479,6 +479,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         set => SetValue(TransformProperty, value);
     }
 
+    internal override bool HasTransform => GetValue(TransformProperty) is not null;
+
     /// <inheritdoc />
     public override Transform3D? Transform3D
     {
@@ -1123,7 +1125,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             var current = chain[index];
             point.X -= current.Bounds.X;
             point.Y -= current.Bounds.Y;
-            if (!current.Transform.IsIdentity)
+            if (current.HasTransform)
             {
                 using var inverse = current.Transform.Clone();
                 inverse.Invert();
@@ -1157,7 +1159,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
                     transform3D).Map(point);
             }
 
-            if (!current.Transform.IsIdentity)
+            if (current.HasTransform)
             {
                 var points = new[] { point };
                 current.Transform.TransformPoints(points);

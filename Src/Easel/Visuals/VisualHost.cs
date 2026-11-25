@@ -912,6 +912,7 @@ public class VisualHost : System.Windows.Forms.Control
         var previousGraphics = Visual.RenderGraphics;
         Visual.PushRenderDamage(damage, cull);
         Visual.PushRenderGraphics(graphics);
+        Visual.PushRenderOffset(0f, 0f, true, out var previousX, out var previousY, out var previousIdentity);
 
         var state = graphics.Save();
         try
@@ -925,6 +926,7 @@ public class VisualHost : System.Windows.Forms.Control
             graphics.Restore(state);
             Visual.PushRenderDamage(previousDamage, previousCull);
             Visual.PushRenderGraphics(previousGraphics);
+            Visual.PushRenderOffset(previousX, previousY, previousIdentity);
         }
     }
 

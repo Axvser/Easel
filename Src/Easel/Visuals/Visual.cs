@@ -38,6 +38,9 @@ public abstract class Visual : WinformsObject
 
     private Matrix? _transform;
 
+    /// <summary>Whether a local transform was assigned; identity matrices count as transformed (conservative).</summary>
+    internal virtual bool HasTransform => _transform is not null;
+
     /// <summary>An optional 3D transform projected into this visual's local plane.</summary>
     /// <remarks>
     /// The subtree is composited into a bitmap and drawn through the projected quad; a perspective transform
@@ -132,6 +135,11 @@ public abstract class Visual : WinformsObject
     // 整面重画时的目标 Graphics：用它的可见裁剪区做一次便宜的剔除。
     [ThreadStatic] private static Graphics? _renderGraphics;
 
+    // 脏区剔除用的表面偏移：恒等变换子树不必逐节点拼矩阵。
+    [ThreadStatic] private static float _renderOffsetX;
+    [ThreadStatic] private static float _renderOffsetY;
+    [ThreadStatic] private static bool _renderIdentity = true;
+
     // 阴影、槽环与连线端点会画出 Bounds 之外，剔除时统一外扩这个余量。
     private const float DamageCullMargin = 32f;
 
@@ -148,6 +156,29 @@ public abstract class Visual : WinformsObject
     internal static Graphics? RenderGraphics => _renderGraphics;
 
     internal static void PushRenderGraphics(Graphics? graphics) => _renderGraphics = graphics;
+
+    internal static void PushRenderOffset(float x, float y, bool identity)
+    {
+        _renderOffsetX = x;
+        _renderOffsetY = y;
+        _renderIdentity = identity;
+    }
+
+    internal static void PushRenderOffset(
+        float x,
+        float y,
+        bool identity,
+        out float previousX,
+        out float previousY,
+        out bool previousIdentity)
+    {
+        previousX = _renderOffsetX;
+        previousY = _renderOffsetY;
+        previousIdentity = _renderIdentity;
+        PushRenderOffset(x, y, identity);
+    }
+
+    internal static void PopRenderOffset(float x, float y, bool identity) => PushRenderOffset(x, y, identity);
 
     // 子项整棵子树都落在脏区外才跳过；拿不准是否越界的一律照画。
     internal static bool ShouldRenderChild(Visual? child)
@@ -176,7 +207,7 @@ public abstract class Visual : WinformsObject
         if (visual.CacheAsBitmap
             || visual.Effect is not null
             || visual.OpacityMask is not null
-            || (visual.Transform3D is { IsIdentity: false })
+            || (visual.Transform3D is not null)
             || visual.UnboundedHitTest
             || _renderGraphics is null)
         {
@@ -185,7 +216,7 @@ public abstract class Visual : WinformsObject
 
         // 这里在父级的局部坐标里调用，Graphics 已带上父级的平移/裁剪；用 child.Bounds 而不是表面坐标。
         // 自带变换的子项可能越出 Bounds，保守放行。
-        if (!visual.Transform.IsIdentity)
+        if (visual.HasTransform)
         {
             return true;
         }
@@ -219,17 +250,24 @@ public abstract class Visual : WinformsObject
             return false;
         }
 
-        // 位图缓存、效果与无界命中的绘制范围不受 Bounds 约束，保守起见照画。
+        // 位图缓存、效果、变换与无界命中的绘制范围不受 Bounds 约束，保守起见照画。
         if (visual.CacheAsBitmap
             || visual.Effect is not null
             || visual.OpacityMask is not null
-            || (visual.Transform3D is { IsIdentity: false })
+            || (visual.Transform3D is not null)
+            || visual.HasTransform
             || visual.UnboundedHitTest)
         {
             return true;
         }
 
-        var bounds = visual.GetSurfaceBounds();
+        var bounds = _renderIdentity
+            ? new RectangleF(
+                visual.Bounds.X + _renderOffsetX,
+                visual.Bounds.Y + _renderOffsetY,
+                visual.Bounds.Width,
+                visual.Bounds.Height)
+            : visual.GetSurfaceBounds();
         if (bounds.Width > 0f && bounds.Height > 0f)
         {
             bounds.Inflate(DamageCullMargin, DamageCullMargin);
@@ -292,7 +330,7 @@ public abstract class Visual : WinformsObject
                 y = projected.Y;
             }
 
-            if (current.Transform is { IsIdentity: false } transform)
+            if (current.HasTransform && current.Transform is { } transform)
             {
                 // Elements 每次返回新数组；剔除会按节点反复取包围盒，这里改用可复用的单点缓冲。
                 var buffer = TransformPointBuffer;
@@ -384,51 +422,68 @@ public abstract class Visual : WinformsObject
         var previousGraphics = _renderGraphics;
         _renderGraphics = graphics;
 
-        // 恒等变换且不裁剪时不必 Save/Restore 整套 GDI+ 状态：平移进去再平移回来即可。
-        // 模板化控件每行会多出若干层纯布局容器，这个状态栈开销是真实热路径。
-        if (Transform.IsIdentity && !ClipToBounds && Clip is null)
+        var childIdentity = _renderIdentity && !HasTransform && Transform3D is null;
+        var childOffsetX = childIdentity ? _renderOffsetX + Bounds.X : _renderOffsetX;
+        var childOffsetY = childIdentity ? _renderOffsetY + Bounds.Y : _renderOffsetY;
+        PushRenderOffset(
+            childOffsetX,
+            childOffsetY,
+            childIdentity,
+            out var previousOffsetX,
+            out var previousOffsetY,
+            out var previousIdentity);
+
+        try
         {
-            graphics.TranslateTransform(Bounds.X, Bounds.Y);
+            // 恒等变换且不裁剪时不必 Save/Restore 整套 GDI+ 状态：平移进去再平移回来即可。
+            // 模板化控件每行会多出若干层纯布局容器，这个状态栈开销是真实热路径。
+            if (!HasTransform && !ClipToBounds && Clip is null)
+            {
+                graphics.TranslateTransform(Bounds.X, Bounds.Y);
+                try
+                {
+                    Paint(graphics, zeroSized);
+                }
+                finally
+                {
+                    graphics.TranslateTransform(-Bounds.X, -Bounds.Y);
+                }
+
+                return;
+            }
+
+            var state = graphics.Save();
             try
             {
+                graphics.TranslateTransform(Bounds.X, Bounds.Y);
+                if (HasTransform)
+                {
+                    // The transform belongs to the visual's own coordinate space: prepending it keeps the Bounds
+                    // translation (and every ancestor translation) unscaled. Appending would scale the card's
+                    // position as well, which is what made a Viewbox's child drift at any zoom other than 1.
+                    graphics.MultiplyTransform(Transform, MatrixOrder.Prepend);
+                }
+
+                if (ClipToBounds)
+                {
+                    graphics.SetClip(new RectangleF(0f, 0f, Bounds.Width, Bounds.Height), CombineMode.Intersect);
+                }
+
+                if (Clip is { } clip)
+                {
+                    graphics.SetClip(clip, CombineMode.Intersect);
+                }
+
                 Paint(graphics, zeroSized);
             }
             finally
             {
-                graphics.TranslateTransform(-Bounds.X, -Bounds.Y);
-                _renderGraphics = previousGraphics;
+                graphics.Restore(state);
             }
-
-            return;
-        }
-
-        var state = graphics.Save();
-        try
-        {
-            graphics.TranslateTransform(Bounds.X, Bounds.Y);
-            if (!Transform.IsIdentity)
-            {
-                // The transform belongs to the visual's own coordinate space: prepending it keeps the Bounds
-                // translation (and every ancestor translation) unscaled. Appending would scale the card's
-                // position as well, which is what made a Viewbox's child drift at any zoom other than 1.
-                graphics.MultiplyTransform(Transform, MatrixOrder.Prepend);
-            }
-
-            if (ClipToBounds)
-            {
-                graphics.SetClip(new RectangleF(0f, 0f, Bounds.Width, Bounds.Height), CombineMode.Intersect);
-            }
-
-            if (Clip is { } clip)
-            {
-                graphics.SetClip(clip, CombineMode.Intersect);
-            }
-
-            Paint(graphics, zeroSized);
         }
         finally
         {
-            graphics.Restore(state);
+            PopRenderOffset(previousOffsetX, previousOffsetY, previousIdentity);
             _renderGraphics = previousGraphics;
         }
     }
@@ -481,7 +536,7 @@ public abstract class Visual : WinformsObject
         local.X -= Bounds.X;
         local.Y -= Bounds.Y;
 
-        if (!Transform.IsIdentity)
+        if (HasTransform)
         {
             using var inverse = Transform.Clone();
             inverse.Invert();
@@ -602,7 +657,7 @@ public abstract class Visual : WinformsObject
         var local = point;
         local.X -= Bounds.X;
         local.Y -= Bounds.Y;
-        if (!Transform.IsIdentity)
+        if (HasTransform)
         {
             using var inverse = Transform.Clone();
             inverse.Invert();
