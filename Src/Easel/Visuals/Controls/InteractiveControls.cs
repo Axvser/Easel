@@ -529,13 +529,13 @@ public class TextBox : TemplatedControl
     }
 
     /// <summary>The first selected character.</summary>
-    public int SelectionStart => Math.Min(_selectionAnchor, _caretIndex);
+    public int SelectionStart => XamlMath.Clamp(Math.Min(_selectionAnchor, _caretIndex), 0, Text.Length);
 
     /// <summary>The number of selected characters.</summary>
-    public int SelectionLength => Math.Abs(_selectionAnchor - _caretIndex);
+    public int SelectionLength => XamlMath.Clamp(Math.Abs(_selectionAnchor - _caretIndex), 0, Text.Length - SelectionStart);
 
     /// <summary>The caret index, which can be either end of the selection.</summary>
-    public int CaretIndex => _caretIndex;
+    public int CaretIndex => XamlMath.Clamp(_caretIndex, 0, Text.Length);
 
     /// <summary>The horizontal scroll offset applied to long single-line text.</summary>
     public float HorizontalOffset
@@ -1419,13 +1419,15 @@ public class TextBox : TemplatedControl
 
     private void ReplaceSelection(string replacement)
     {
+        // 原生编辑器同步、绑定回写和布局都可能让选择落在文本之外；先夹回边界再切片。
+        ClampSelection();
         PushUndo();
         var start = SelectionStart;
         var length = SelectionLength;
         var before = Text.Substring(0, start);
         var after = Text.Substring(start + length);
         SetTextInternal(before + replacement + after);
-        _caretIndex = before.Length + replacement.Length;
+        _caretIndex = XamlMath.Clamp(before.Length + replacement.Length, 0, Text.Length);
         _selectionAnchor = _caretIndex;
         ResetCaretBlink();
         EnsureCaretVisible();
@@ -1439,6 +1441,7 @@ public class TextBox : TemplatedControl
 
     private void Backspace()
     {
+        ClampSelection();
         if (SelectionLength > 0)
         {
             ReplaceSelection(string.Empty);
@@ -1466,6 +1469,7 @@ public class TextBox : TemplatedControl
 
     private void Delete()
     {
+        ClampSelection();
         if (SelectionLength > 0)
         {
             ReplaceSelection(string.Empty);
@@ -1492,6 +1496,7 @@ public class TextBox : TemplatedControl
 
     private void Copy()
     {
+        ClampSelection();
         if (SelectionLength > 0 && !IsPassword)
         {
             try

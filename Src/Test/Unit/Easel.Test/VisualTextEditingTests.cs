@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Reflection;
 using System.Windows.Forms;
 using Easel;
 using Easel.Visuals;
@@ -269,6 +270,29 @@ public sealed class VisualTextEditingTests
         Assert.IsTrue(text.IsUsingNativeEditor, "the native island still opens for a transparent visual field");
         Assert.AreEqual(Color.FromArgb(255, 13, 17, 23), text.NativeEditor.BackColor,
             "the native TextBox gets the nearest opaque ancestor colour, never transparent");
+    }
+
+    [TestMethod]
+    public void TypingSurvivesAnOutOfRangeSelection()
+    {
+        using var surface = new VisualHost { Size = new Size(220, 60) };
+        using var box = new VC.TextBox { Text = "abc", Width = 180, Height = 30, UseNativeEditor = false };
+        surface.Root = box;
+        Layout(surface, 220, 60);
+        Assert.IsTrue(box.Focus());
+
+        var caret = typeof(VC.TextBox).GetField("_caretIndex", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var anchor = typeof(VC.TextBox).GetField("_selectionAnchor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        caret.SetValue(box, -1);
+        anchor.SetValue(box, -1);
+        surface.ProcessTextInput("x");
+        Assert.AreEqual("xabc", box.Text, "a negative selection is clamped to the start");
+
+        caret.SetValue(box, 99);
+        anchor.SetValue(box, 99);
+        surface.ProcessTextInput("y");
+        Assert.AreEqual("xabcy", box.Text, "a selection past the end is clamped to the text length");
     }
 
     private static VisualHost CreateSurface(int width, int height)
