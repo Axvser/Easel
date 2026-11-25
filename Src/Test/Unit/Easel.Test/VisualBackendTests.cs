@@ -454,6 +454,31 @@ public sealed class VisualBackendTests
         Assert.IsNull(failure, failure?.ToString() ?? "the MTA thread failed");
     }
 
+    [TestMethod]
+    public void ClickingANonFocusableAreaOutsideTheFieldClearsFocus()
+    {
+        using var surface = new VisualHost { Size = new Size(240, 120) };
+        var root = new VC.StackPanel { Spacing = 6 };
+        using var box = new VC.TextBox { Width = 160, Height = 30, UseNativeEditor = false };
+        using var plate = new VC.Border { Width = 160, Height = 30, Background = new SolidColorBrush(Color.Blue) };
+        root.Add(box);
+        root.Add(plate);
+        surface.Root = root;
+        Layout(surface, 240, 120);
+
+        PointF CenterOf(RectangleF bounds) => new(bounds.X + (bounds.Width / 2f), bounds.Y + (bounds.Height / 2f));
+        var boxCenter = CenterOf(box.AbsoluteBounds);
+        surface.ProcessPointerDown(boxCenter, MouseButtons.Left);
+        surface.ProcessPointerUp(boxCenter, MouseButtons.Left);
+        Assert.AreSame(box, surface.FocusedElement);
+
+        var plateCenter = CenterOf(plate.AbsoluteBounds);
+        surface.ProcessPointerDown(plateCenter, MouseButtons.Left);
+        surface.ProcessPointerUp(plateCenter, MouseButtons.Left);
+
+        Assert.IsNull(surface.FocusedElement, "clicking a non-focusable area outside the field clears focus");
+    }
+
     private static VisualHost CreateSurface(int width, int height)
         => new() { Size = new Size(width, height) };
 

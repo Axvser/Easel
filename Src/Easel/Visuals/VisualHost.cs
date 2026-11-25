@@ -972,6 +972,14 @@ public class VisualHost : System.Windows.Forms.Control
             {
                 FocusElement(focusable);
             }
+            else if (_focused is { } focused
+                     && !IsInside(focused, inputTarget)
+                     && !IsInsidePopup(inputTarget))
+            {
+                // 点在不可聚焦、且不在当前焦点子树里的区域：按“点空白处失焦”的直觉清掉焦点。
+                // 弹层自己管理焦点与键盘转发，点它的非可聚焦背景不清焦点。
+                FocusElement(null);
+            }
         }
 
         _capture = inputTarget;
@@ -2348,6 +2356,32 @@ public class VisualHost : System.Windows.Forms.Control
     // 输入目标必须自身与所有祖先都启用；否则这一笔输入整段作废。
     private static VisualElement? ResolveInputTarget(VisualElement? element)
         => element is not null && element.IsEffectivelyEnabled ? element : null;
+
+    private static bool IsInsidePopup(VisualElement element)
+    {
+        for (VisualElement? current = element; current is not null; current = current.ParentElement)
+        {
+            if (current is Controls.VisualPopup)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsInside(VisualElement ancestor, VisualElement element)
+    {
+        for (VisualElement? current = element; current is not null; current = current.ParentElement)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static VisualElement? FindFocusableAncestor(VisualElement? element)
     {
