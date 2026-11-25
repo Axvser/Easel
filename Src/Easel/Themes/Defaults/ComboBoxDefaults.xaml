@@ -36,24 +36,44 @@
                    Padding="{TemplateBinding Padding}"
                    Margin="0,0,22,0"
                    Foreground="{TemplateBinding Foreground}" />
-          <Polygon x:Name="ChevronDown"
-                   IsHitTestVisible="False"
-                   Width="8"
-                   Height="5"
-                   HorizontalAlignment="Right"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"
-                   Points="0,0 8,0 4,5"
-                   Fill="{DynamicResource Text}" />
-          <Polygon x:Name="ChevronUp"
-                   IsHitTestVisible="False"
-                   Width="8"
-                   Height="5"
-                   HorizontalAlignment="Right"
-                   VerticalAlignment="Center"
-                   Margin="0,0,8,0"
-                   Points="0,5 8,5 4,0"
-                   Fill="{DynamicResource Text}" />
+          <!-- Each chevron layer pairs the theme colour with a control-Foreground overlay; the overlay's
+               TemplateBinding clears when Foreground is unset, so the theme brush underneath shows through. -->
+          <Grid x:Name="ChevronDown"
+                IsHitTestVisible="False"
+                Width="8"
+                Height="5"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0">
+            <Polygon IsHitTestVisible="False"
+                     Points="0,0 8,0 4,5"
+                     Fill="{DynamicResource Text}" />
+            <Polygon IsHitTestVisible="False"
+                     Points="0,0 8,0 4,5"
+                     Fill="{TemplateBinding Foreground}" />
+          </Grid>
+          <Grid x:Name="ChevronUp"
+                IsHitTestVisible="False"
+                Width="8"
+                Height="5"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0">
+            <Polygon IsHitTestVisible="False"
+                     Points="0,5 8,5 4,0"
+                     Fill="{DynamicResource Text}" />
+            <Polygon IsHitTestVisible="False"
+                     Points="0,5 8,5 4,0"
+                     Fill="{TemplateBinding Foreground}" />
+          </Grid>
+          <!-- The whole chevron strip is one interactive transparent region; the ComboBox template owns the
+               arrow artwork, so the region itself paints nothing. -->
+          <Border x:Name="PART_Arrow"
+                  IsHitTestVisible="True"
+                  Background="Transparent"
+                  Width="22"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Stretch" />
           <VisualPopup x:Name="PART_Popup">
             <VisualPopup.Child>
               <ScrollViewer>
@@ -111,6 +131,18 @@
               <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Collapsed" />
             </Trigger.Setters>
           </Trigger>
+          <!-- The placeholder is the display part's text when no item is selected; dimming it keeps the row
+               readable without a second text element. -->
+          <Trigger Property="HasSelection" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="PART_Display" Property="Opacity" Value="0.65" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="HasSelection" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="PART_Display" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
           <Trigger Property="IsEnabled" Value="False">
             <Trigger.Setters>
               <Setter TargetName="Root" Property="Opacity" Value="0.55" />
@@ -119,6 +151,16 @@
         </ControlTemplate.Triggers>
       </ControlTemplate>
     </Style.Template>
+  </Style>
+
+  <!-- Inline ComboBoxItem rows take their geometry from this implicit style; the text colour stays on
+       TextBlock's theme-aware default so a host can override either part without touching data items. -->
+  <Style TargetType="ComboBoxItem">
+    <Style.Setters>
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="TextAlignment" Value="Left" />
+      <Setter Property="Wrap" Value="False" />
+    </Style.Setters>
   </Style>
 
 </ResourceDictionary>

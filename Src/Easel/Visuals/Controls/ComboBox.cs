@@ -31,8 +31,11 @@ namespace Easel.Visuals.Controls;
 /// <see cref="ItemsControl.SetIsItemsHost"/>; the realized list is parented into that host. A template may also
 /// declare <c>PART_Display</c> (a <see cref="Easel.Visuals.Controls.TextBlock"/>); the selected item's display text
 /// or the placeholder is written to it. An editable template may declare <c>PART_EditableTextBox</c> (a
-/// <see cref="Easel.Visuals.Controls.TextBox"/>) and a toggle named <c>PART_ToggleButton</c> or
-/// <c>PART_Arrow</c>. A missing required part throws <see cref="InvalidOperationException"/> instead of leaving the
+/// <see cref="Easel.Visuals.Controls.TextBox"/>); pressing it opens the drop-down instead of letting the editor's
+/// caret handling swallow the gesture. A toggle named <c>PART_ToggleButton</c> or <c>PART_Arrow</c> drives the
+/// drop-down: a <see cref="Easel.Visuals.Controls.Button"/> uses <c>Click</c>, a
+/// <see cref="Easel.Visuals.Controls.ToggleButton"/> uses <c>IsChecked</c>, and any other hit-testable element is a
+/// plain press region. A missing required part throws <see cref="InvalidOperationException"/> instead of leaving the
 /// chrome unchanged.
 /// </para>
 /// </remarks>
@@ -86,6 +89,11 @@ public class ComboBox : TemplatedControl
         nameof(IsDropDownOpen), typeof(bool), typeof(ComboBox),
         new PropertyMetadata(false) { AffectsRender = true });
 
+    /// <summary>Whether an item is selected; template triggers use it to mute the placeholder.</summary>
+    public static readonly DependencyProperty HasSelectionProperty = DependencyProperty.Register(
+        nameof(HasSelection), typeof(bool), typeof(ComboBox),
+        new PropertyMetadata(false) { AffectsRender = false });
+
     /// <summary>The property read from each item for its display text; empty uses <see cref="object.ToString"/>.</summary>
     public static readonly DependencyProperty DisplayMemberPathProperty = DependencyProperty.Register(
         nameof(DisplayMemberPath), typeof(string), typeof(ComboBox),
@@ -110,6 +118,7 @@ public class ComboBox : TemplatedControl
     private VisualTextBox? _editablePart;
     private VisualButton? _toggleButton;
     private ToggleButton? _toggleSwitch;
+    private VisualElement? _arrowPart;
     private TextBlock? _displayPart;
     private bool _syncingSelection;
     private bool _syncingOpen;
@@ -185,6 +194,9 @@ public class ComboBox : TemplatedControl
         get => (bool)GetValue(IsDropDownOpenProperty)!;
         set => SetValue(IsDropDownOpenProperty, value);
     }
+
+    /// <summary>Whether an item is selected; false while the placeholder is showing.</summary>
+    public bool HasSelection => (bool)GetValue(HasSelectionProperty)!;
 
     /// <summary>The property read from each item for its display text; empty uses <see cref="object.ToString"/>.</summary>
     public string DisplayMemberPath
@@ -538,6 +550,7 @@ public class ComboBox : TemplatedControl
             SyncListSelection();
             SyncEditableText();
             SyncDisplayText();
+            UpdateHasSelection();
             InvalidateMeasure();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             return;
@@ -549,6 +562,7 @@ public class ComboBox : TemplatedControl
             SyncListSelection();
             SyncEditableText();
             SyncDisplayText();
+            UpdateHasSelection();
             InvalidateMeasure();
             SelectionChanged?.Invoke(this, EventArgs.Empty);
             return;
@@ -780,6 +794,8 @@ public class ComboBox : TemplatedControl
         _editablePart = editable;
         _editablePart.PropertyChanged -= OnEditablePropertyChanged;
         _editablePart.PropertyChanged += OnEditablePropertyChanged;
+        _editablePart.PointerPressed -= OnEditablePointerPressed;
+        _editablePart.PointerPressed += OnEditablePointerPressed;
         SyncEditableText();
     }
 
@@ -804,6 +820,12 @@ public class ComboBox : TemplatedControl
                 throw new InvalidOperationException(
                     $"ComboBox toggle part '{other.GetType().Name}' must be a Button or ToggleButton so the "
                     + "drop-down state can be driven.");
+            case { } region:
+                // 普通命中区域（如默认模板的透明 Border）只驱动开合，不承担按钮外观或选中状态。
+                _arrowPart = region;
+                region.PointerPressed -= OnArrowPointerPressed;
+                region.PointerPressed += OnArrowPointerPressed;
+                break;
         }
     }
 
@@ -842,6 +864,7 @@ public class ComboBox : TemplatedControl
         if (_editablePart is { } editable)
         {
             editable.PropertyChanged -= OnEditablePropertyChanged;
+            editable.PointerPressed -= OnEditablePointerPressed;
             _editablePart = null;
         }
     }
@@ -860,6 +883,12 @@ public class ComboBox : TemplatedControl
         {
             toggle.PropertyChanged -= OnTogglePropertyChanged;
             _toggleSwitch = null;
+        }
+
+        if (_arrowPart is { } region)
+        {
+            region.PointerPressed -= OnArrowPointerPressed;
+            _arrowPart = null;
         }
     }
 
@@ -907,6 +936,16 @@ public class ComboBox : TemplatedControl
         _displayPart.Text = DisplayText;
     }
 
+    // 占位符是空选择时的文本；布尔属性让模板触发器能把占位文本调暗。
+    private void UpdateHasSelection()
+    {
+        var hasSelection = SelectedItem is not null;
+        if (HasSelection != hasSelection)
+        {
+            SetValue(HasSelectionProperty, hasSelection);
+        }
+    }
+
     private void SyncToggleChecked()
     {
         if (_toggleSwitch is null)
@@ -923,6 +962,17 @@ public class ComboBox : TemplatedControl
         {
             _syncingOpen = false;
         }
+    }
+
+    // 编辑器自己吞掉按下来定位光标；这里补开下拉，让可编辑控件点编辑器也能展开。
+    private void OnEditablePointerPressed(object? sender, VisualPointerEventArgs args)
+    {
+        if (!IsEnabled || args.Button != MouseButtons.Left || IsDropDownOpen)
+        {
+            return;
+        }
+
+        IsDropDownOpen = true;
     }
 
     private void OnEditablePropertyChanged(object? sender, DependencyPropertyChangedEventArgs e)
@@ -975,6 +1025,19 @@ public class ComboBox : TemplatedControl
     {
         Focus();
         IsDropDownOpen = !IsDropDownOpen;
+    }
+
+    // 命中区域在按下时开合；标记处理后指针链不会再走到控件本身，避免同一次点击翻转两次。
+    private void OnArrowPointerPressed(object? sender, VisualPointerEventArgs args)
+    {
+        if (!IsEnabled || args.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        Focus();
+        IsDropDownOpen = !IsDropDownOpen;
+        args.Handled = true;
     }
 
     private void OnTogglePropertyChanged(object? sender, DependencyPropertyChangedEventArgs e)
@@ -1300,11 +1363,7 @@ public class ComboBox : TemplatedControl
 }
 
 /// <summary>An inline item for <see cref="ComboBox.Items"/>; its text is its display text.</summary>
+/// <remarks>The row padding comes from the implicit default style so a host can restyle the row.</remarks>
 public class ComboBoxItem : TextBlock
 {
-    /// <summary>Creates an empty item with the drop-down row padding.</summary>
-    public ComboBoxItem()
-    {
-        Padding = new XamlThickness(8f, 4f);
-    }
 }
