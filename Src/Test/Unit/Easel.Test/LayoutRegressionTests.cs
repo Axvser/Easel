@@ -18,21 +18,17 @@ public sealed class LayoutRegressionTests
         surface.Root = slider;
         Layout(surface, 320, 80);
 
-        var fill = slider.GetTemplateChild<VisualElement>("PART_Fill");
-        var thumb = slider.GetTemplateChild<VisualElement>("PART_Thumb");
-        Assert.IsNotNull(fill);
-        Assert.IsNotNull(thumb);
-        var startFill = fill.Bounds.Width;
-        var startThumb = thumb.Bounds.X;
+        var chrome = slider.GetTemplateChild<VC.SliderChrome>("PART_Chrome");
+        Assert.IsNotNull(chrome);
+        var startFraction = chrome!.Fraction;
 
         var layouts = 0;
         surface.LayoutUpdated += (_, _) => layouts++;
 
         slider.Value = 80;
 
-        Assert.AreEqual(0, layouts, "a value change arranges the template parts without a surface layout pass");
-        Assert.IsGreaterThan(startFill, fill.Bounds.Width, "the fill follows the value");
-        Assert.IsGreaterThan(startThumb, thumb.Bounds.X, "the thumb follows the value");
+        Assert.AreEqual(0, layouts, "a value change updates the chrome without a surface layout pass");
+        Assert.IsGreaterThan(startFraction, chrome.Fraction, "the chrome follows the value");
     }
 
     [TestMethod]

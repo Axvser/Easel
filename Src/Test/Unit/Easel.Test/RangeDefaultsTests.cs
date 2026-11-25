@@ -8,42 +8,27 @@ using XamlVerticalAlignment = Easel.Controls.VerticalAlignment;
 
 namespace Easel.Test;
 
-/// <summary>The built-in Slider and ProgressBar templates keep their parts and interaction contract.</summary>
+/// <summary>The built-in Slider and ProgressBar templates keep their chrome and interaction contract.</summary>
 [STATestClass]
 public sealed class RangeDefaultsTests
 {
     [TestMethod]
-    public void SliderDefaultTemplate_ExposesTrackFillThumbAndFocusParts()
+    public void SliderDefaultTemplate_UsesOneChromeInsteadOfSeparateParts()
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 50 };
         surface.Root = slider;
         Layout(surface, 320, 240);
 
-        Assert.IsNotNull(slider.TemplateRoot, "the implicit Slider style supplies the built-in template");
-        var track = slider.GetTemplateChild<VisualElement>("PART_Track");
-        var fill = slider.GetTemplateChild<VisualElement>("PART_Fill");
-        var thumb = slider.GetTemplateChild<VisualElement>("PART_Thumb");
-        var ring = slider.GetTemplateChild<VisualElement>("PART_FocusRing");
-        Assert.IsNotNull(track);
-        Assert.IsNotNull(fill);
-        Assert.IsNotNull(thumb);
-        Assert.IsNotNull(ring);
-
-        Assert.IsFalse(track!.IsHitTestVisible, "the track is decorative");
-        Assert.IsFalse(fill!.IsHitTestVisible, "the fill is decorative");
-        Assert.IsFalse(thumb!.IsHitTestVisible, "the thumb is decorative");
-        Assert.IsFalse(ring!.IsHitTestVisible, "the focus ring is decorative");
-
-        Assert.AreEqual(186f, track.Bounds.Width, 0.75f, "the track is inset by the thumb radius on both ends");
-        Assert.AreEqual(track.Bounds.Width * 0.5f, fill.Bounds.Width, 0.75f, "the fill covers half the track");
-        Assert.AreEqual(track.Bounds.Height, fill.Bounds.Height, 0.01f, "the fill matches the track height");
-        Assert.AreEqual(
-            track.Bounds.X + (track.Bounds.Width / 2f),
-            thumb.Bounds.X + (thumb.Bounds.Width / 2f),
-            0.75f,
-            "the thumb sits at the value along the track");
-        Assert.AreEqual(0d, ring.Opacity, 0.01d, "the focus ring stays hidden without keyboard focus");
+        var chrome = slider.TemplateRoot as VC.SliderChrome;
+        Assert.IsNotNull(chrome, "the implicit Slider style supplies the built-in chrome");
+        Assert.AreEqual(0, chrome!.Children.Count, "the chrome paints track, fill, thumb and ring itself");
+        Assert.IsNull(slider.GetTemplateChild<VisualElement>("PART_Track"), "no separate part visuals are created");
+        Assert.IsNull(slider.GetTemplateChild<VisualElement>("PART_Fill"));
+        Assert.IsNull(slider.GetTemplateChild<VisualElement>("PART_Thumb"));
+        Assert.IsNull(slider.GetTemplateChild<VisualElement>("PART_FocusRing"));
+        Assert.IsFalse(chrome.IsHitTestVisible, "the chrome is decorative");
+        Assert.AreEqual(0.5d, chrome.Fraction, 0.001d, "the chrome is told the current fraction");
     }
 
     [TestMethod]
@@ -57,7 +42,7 @@ public sealed class RangeDefaultsTests
         var bounds = slider.AbsoluteBounds;
         var centerY = bounds.Y + (bounds.Height / 2f);
         var press = new PointF(bounds.X + (bounds.Width * 0.8f), centerY);
-        Assert.AreSame(slider, surface.FindElementAt(press), "decorative parts do not steal the press");
+        Assert.AreSame(slider, surface.FindElementAt(press), "the chrome does not steal the press");
         surface.ProcessPointerDown(press, MouseButtons.Left);
         surface.ProcessPointerUp(press, MouseButtons.Left);
         Assert.IsGreaterThan(70d, slider.Value);
@@ -82,18 +67,19 @@ public sealed class RangeDefaultsTests
         surface.Root = slider;
         Layout(surface, 320, 240);
 
-        var ring = slider.GetTemplateChild<VisualElement>("PART_FocusRing");
-        Assert.IsNotNull(ring);
+        var chrome = slider.GetTemplateChild<VC.SliderChrome>("PART_Chrome");
+        Assert.IsNotNull(chrome);
+        Assert.IsFalse(chrome!.ShowFocusRing, "the ring stays hidden without keyboard focus");
 
         var bounds = slider.AbsoluteBounds;
         var point = new PointF(bounds.X + 40f, bounds.Y + (bounds.Height / 2f));
         surface.ProcessPointerDown(point, MouseButtons.Left);
         surface.ProcessPointerUp(point, MouseButtons.Left);
-        Assert.AreEqual(0d, ring!.Opacity, 0.01d, "pointer focus keeps the ring hidden");
+        Assert.IsFalse(chrome.ShowFocusRing, "pointer focus keeps the ring hidden");
 
         surface.ProcessKeyDown(Keys.Right);
         Assert.IsTrue(slider.IsFocusVisible, "keyboard input shows the focus-visible state");
-        Assert.AreEqual(1d, ring.Opacity, 0.01d, "keyboard focus raises the ring through the template trigger");
+        Assert.IsTrue(chrome.ShowFocusRing, "keyboard focus raises the ring through the template binding");
     }
 
     [TestMethod]
@@ -163,20 +149,18 @@ public sealed class RangeDefaultsTests
         Layout(surface, 320, 240);
 
         Assert.IsFalse(bar.IsHitTestVisible, "a progress bar never takes pointer input");
-        Assert.IsNotNull(bar.TemplateRoot, "the implicit ProgressBar style supplies the built-in template");
-        var track = bar.GetTemplateChild<VisualElement>("PART_Track");
-        var fill = bar.GetTemplateChild<VisualElement>("PART_Fill");
-        Assert.IsNotNull(track);
-        Assert.IsNotNull(fill);
-        Assert.IsFalse(track!.IsHitTestVisible);
-        Assert.IsFalse(fill!.IsHitTestVisible);
-        Assert.AreEqual(200f, track.Bounds.Width, 0.75f);
-        Assert.AreEqual(50f, fill.Bounds.Width, 0.75f);
+        var chrome = bar.TemplateRoot as VC.ProgressBarChrome;
+        Assert.IsNotNull(chrome, "the implicit ProgressBar style supplies the built-in chrome");
+        Assert.AreEqual(0, chrome!.Children.Count);
+        Assert.AreEqual(0.25d, chrome.Fraction, 0.001d, "the chrome is told the current fraction");
+        Assert.IsNull(bar.GetTemplateChild<VisualElement>("PART_Track"), "no separate part visuals are created");
+        Assert.IsNull(bar.GetTemplateChild<VisualElement>("PART_Fill"));
 
         bar.Value = 75;
-        Layout(surface, 320, 240);
+        Assert.AreEqual(0.75d, chrome.Fraction, 0.001d, "a new value updates the chrome without another layout");
 
-        Assert.AreEqual(150f, fill.Bounds.Width, 0.75f, "a new value re-arranges the fill");
+        Layout(surface, 320, 240);
+        Assert.AreEqual(0.75d, chrome.Fraction, 0.001d, "layout keeps the same fraction");
     }
 
     [TestMethod]
@@ -192,32 +176,31 @@ public sealed class RangeDefaultsTests
         surface.Root = slider;
         Layout(surface, 320, 240);
 
-        var track = slider.GetTemplateChild<VisualElement>("PART_Track");
-        var fill = slider.GetTemplateChild<VisualElement>("PART_Fill");
-        Assert.IsNotNull(track);
-        Assert.IsNotNull(fill);
-        Assert.AreEqual(trackColor.ToArgb(), track!.Background!.ApproximateColor.ToArgb());
-        Assert.AreEqual(accentColor.ToArgb(), fill!.Background!.ApproximateColor.ToArgb());
+        var chrome = slider.GetTemplateChild<VC.SliderChrome>("PART_Chrome");
+        Assert.IsNotNull(chrome);
+        Assert.AreEqual(trackColor.ToArgb(), chrome!.TrackBrush!.ApproximateColor.ToArgb());
+        Assert.AreEqual(accentColor.ToArgb(), chrome.FillBrush!.ApproximateColor.ToArgb());
+        Assert.AreEqual(accentColor.ToArgb(), chrome.ThumbBrush!.ApproximateColor.ToArgb());
     }
 
     [TestMethod]
-    public void SliderValueChange_MovesThePartsWithoutAnotherLayoutPass()
+    public void SliderValueChange_MovesTheChromeWithoutAnotherLayoutPass()
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 20 };
         surface.Root = slider;
         Layout(surface, 320, 240);
 
-        var fill = slider.GetTemplateChild<VisualElement>("PART_Fill")!;
+        var chrome = slider.GetTemplateChild<VC.SliderChrome>("PART_Chrome")!;
         var layouts = 0;
         surface.LayoutUpdated += (_, _) => layouts++;
         var paints = surface.PaintCount;
-        var filled = fill.Bounds.Width;
+        var fraction = chrome.Fraction;
 
         slider.Value = 80;
 
-        Assert.AreEqual(0, layouts, "the value change only re-arranges template parts, it does not run layout");
-        Assert.IsGreaterThan(filled, fill.Bounds.Width, "the fill follows the value immediately");
+        Assert.AreEqual(0, layouts, "the value change only updates the chrome, it does not run layout");
+        Assert.IsGreaterThan(fraction, chrome.Fraction, "the chrome follows the value immediately");
         Assert.AreEqual(paints, surface.PaintCount, "nothing paints until the surface is rendered");
 
         Layout(surface, 320, 240);
@@ -226,27 +209,22 @@ public sealed class RangeDefaultsTests
     }
 
     [TestMethod]
-    public void SliderFocusRing_IsPositionedAtTheCurrentValueWhenFocusBecomesVisible()
+    public void SliderFocusRing_IsDrawnAtTheCurrentValueWhenFocusBecomesVisible()
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 20 };
         surface.Root = slider;
         Layout(surface, 320, 240);
 
-        var thumb = slider.GetTemplateChild<VisualElement>("PART_Thumb")!;
-        var ring = slider.GetTemplateChild<VisualElement>("PART_FocusRing")!;
-        Assert.AreEqual(0d, ring.Opacity, 0.01d);
+        var chrome = slider.GetTemplateChild<VC.SliderChrome>("PART_Chrome")!;
+        Assert.IsFalse(chrome.ShowFocusRing);
 
         slider.Value = 75;
         Assert.IsTrue(slider.Focus());
         surface.ProcessKeyDown(Keys.Right);
 
-        Assert.AreEqual(1d, ring.Opacity, 0.01d, "keyboard focus shows the ring");
-        Assert.AreEqual(
-            thumb.Bounds.X + (thumb.Bounds.Width / 2f),
-            ring.Bounds.X + (ring.Bounds.Width / 2f),
-            0.75f,
-            "the ring follows the thumb so it is not stale when focus appears");
+        Assert.IsTrue(chrome.ShowFocusRing, "keyboard focus shows the ring");
+        Assert.AreEqual(0.76d, chrome.Fraction, 0.01d, "the ring is drawn at the updated value, not a stale one");
     }
 
     [TestMethod]
@@ -260,7 +238,7 @@ public sealed class RangeDefaultsTests
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 25 };
         surface.Root = slider;
         Layout(surface, 320, 240);
-        Assert.AreNotSame(fill, slider.GetTemplateChild<VC.Border>("PART_Fill"), "the built-in template is still active");
+        Assert.IsNull(slider.GetTemplateChild<VC.Border>("PART_Fill"), "the built-in chrome is still active");
 
         slider.Template = template;
         Layout(surface, 320, 240);
@@ -272,21 +250,21 @@ public sealed class RangeDefaultsTests
     }
 
     [TestMethod]
-    public void ProgressBarValueChange_UpdatesTheFillWithoutAnotherLayoutPass()
+    public void ProgressBarValueChange_UpdatesTheChromeWithoutAnotherLayoutPass()
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         using var bar = new VC.ProgressBar { Width = 200, Height = 10, Minimum = 0, Maximum = 100, Value = 25 };
         surface.Root = bar;
         Layout(surface, 320, 240);
 
-        var fill = bar.GetTemplateChild<VisualElement>("PART_Fill")!;
+        var chrome = bar.GetTemplateChild<VC.ProgressBarChrome>("PART_Chrome")!;
         var layouts = 0;
         surface.LayoutUpdated += (_, _) => layouts++;
 
         bar.Value = 75;
 
         Assert.AreEqual(0, layouts, "the bar moves its fill without a layout pass");
-        Assert.AreEqual(150f, fill.Bounds.Width, 0.75f, "the fill follows the value immediately");
+        Assert.AreEqual(0.75d, chrome.Fraction, 0.001d, "the chrome follows the value immediately");
     }
 
     [TestMethod]

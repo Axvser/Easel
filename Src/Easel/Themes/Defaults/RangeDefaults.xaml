@@ -7,50 +7,17 @@
 <Style TargetType="Slider">
     <Style.Template>
       <ControlTemplate TargetType="Slider">
-        <Grid x:Name="Root" IsHitTestVisible="False">
-          <Border x:Name="PART_Track"
-                  IsHitTestVisible="False"
-                  Height="4"
-                  Margin="7,0,7,0"
-                  VerticalAlignment="Center"
-                  Background="{DynamicResource SurfaceAlt}"
-                  CornerRadius="2" />
-          <Border x:Name="PART_Fill"
-                  IsHitTestVisible="False"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch"
-                  Background="{DynamicResource Accent}"
-                  CornerRadius="2" />
-          <Ellipse x:Name="PART_Thumb"
-                   IsHitTestVisible="False"
-                   Width="14"
-                   Height="14"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Fill="{DynamicResource Accent}" />
-          <Ellipse x:Name="PART_FocusRing"
-                   IsHitTestVisible="False"
-                   Width="18"
-                   Height="18"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Stroke="{DynamicResource Focus}"
-                   StrokeThickness="1.4" />
-        </Grid>
+        <SliderChrome x:Name="PART_Chrome"
+                      IsHitTestVisible="False"
+                      TrackBrush="{DynamicResource SurfaceAlt}"
+                      FillBrush="{DynamicResource Accent}"
+                      ThumbBrush="{DynamicResource Accent}"
+                      FocusRingBrush="{DynamicResource Focus}"
+                      ShowFocusRing="{TemplateBinding IsFocusVisible}" />
         <ControlTemplate.Triggers>
-          <Trigger Property="IsFocusVisible" Value="True">
-            <Trigger.Setters>
-              <Setter TargetName="PART_FocusRing" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsFocusVisible" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="PART_FocusRing" Property="Opacity" Value="0" />
-            </Trigger.Setters>
-          </Trigger>
           <Trigger Property="IsEnabled" Value="False">
             <Trigger.Setters>
-              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+              <Setter TargetName="PART_Chrome" Property="Opacity" Value="0.55" />
             </Trigger.Setters>
           </Trigger>
         </ControlTemplate.Triggers>
@@ -61,20 +28,11 @@
 <Style TargetType="ProgressBar">
     <Style.Template>
       <ControlTemplate TargetType="ProgressBar">
-        <Grid IsHitTestVisible="False">
-          <Border x:Name="PART_Track"
-                  IsHitTestVisible="False"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch"
-                  Background="{DynamicResource SurfaceAlt}"
-                  CornerRadius="{TemplateBinding CornerRadius}" />
-          <Border x:Name="PART_Fill"
-                  IsHitTestVisible="False"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch"
-                  Background="{DynamicResource Accent}"
-                  CornerRadius="{TemplateBinding CornerRadius}" />
-        </Grid>
+        <ProgressBarChrome x:Name="PART_Chrome"
+                           IsHitTestVisible="False"
+                           TrackBrush="{DynamicResource SurfaceAlt}"
+                           FillBrush="{DynamicResource Accent}"
+                           CornerRadius="{TemplateBinding CornerRadius}" />
       </ControlTemplate>
     </Style.Template>
   </Style>

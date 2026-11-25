@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using Easel;
+using XamlBrush = Easel.Brush;
 using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlThickness = Easel.Controls.Thickness;
 
@@ -17,7 +18,9 @@ public class ProgressBar : TemplatedControl
 {
     private VisualElement? _trackPart;
     private VisualElement? _fillPart;
+    private ProgressBarChrome? _chrome;
     private RectangleF _trackRect;
+    private RectangleF? _valueDamage;
     private bool _trackRectValid;
     private bool _partsResolved;
 
@@ -66,7 +69,7 @@ public class ProgressBar : TemplatedControl
 
     /// <summary>The covered fraction in the range 0..1.</summary>
     protected double Fraction
-        => Maximum <= Minimum ? 0d : XamlMath.Clamp((Value - Minimum) / (Maximum - Minimum), 0d, 1d);
+        => RangeParts.FractionOf(Value, Minimum, Maximum);
 
     /// <inheritdoc />
     protected override bool HitTestContent(PointF point) => IsHitTestVisible;
@@ -95,6 +98,11 @@ public class ProgressBar : TemplatedControl
         }
 
         ResolveParts();
+        if (_chrome is { } chrome)
+        {
+            chrome.Fraction = Fraction;
+        }
+
         var track = refreshTrack || !_trackRectValid ? GetTrackRect() : _trackRect;
         if (track.Width <= 0f)
         {
@@ -144,6 +152,7 @@ public class ProgressBar : TemplatedControl
 
         _trackPart = GetTemplateChild<VisualElement>("PART_Track");
         _fillPart = GetTemplateChild<VisualElement>("PART_Fill");
+        _chrome = GetTemplateChild<ProgressBarChrome>("PART_Chrome");
         _partsResolved = true;
     }
 
@@ -153,6 +162,7 @@ public class ProgressBar : TemplatedControl
         base.OnTemplateChanging();
         _trackPart = null;
         _fillPart = null;
+        _chrome = null;
         _trackRectValid = false;
         _partsResolved = false;
     }
@@ -191,9 +201,16 @@ public class ProgressBar : TemplatedControl
     }
 
     /// <inheritdoc />
+    protected override RectangleF GetInvalidationBounds()
+        => _valueDamage ?? base.GetInvalidationBounds();
+
+    /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
+        _valueDamage = ComputeValueDamage(e);
         base.OnPropertyChanged(e);
+        _valueDamage = null;
+
         if (ReferenceEquals(e.Property, ValueProperty))
         {
             var coerced = XamlMath.Clamp(Value, Minimum, Maximum);
@@ -209,7 +226,6 @@ public class ProgressBar : TemplatedControl
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
             // 值变化只移动模板部件，不让整棵模板重排；拖动时每帧一次 Arrange 会放大到整页布局。
-            // Value/Minimum/Maximum 的元数据已经是 AffectsRender，基础类已经报过脏区，这里不再重复失效。
             if (Bounds.Width > 0f && Bounds.Height > 0f)
             {
                 ArrangeTemplateParts(Bounds.Size, refreshTrack: false);
@@ -219,6 +235,56 @@ public class ProgressBar : TemplatedControl
                 InvalidateArrange();
             }
         }
+    }
+
+    // 默认铬件只在填充末端变化；值变化只脏这段，不必重画整条轨道和同带相邻节点。
+    private RectangleF? ComputeValueDamage(DependencyPropertyChangedEventArgs e)
+    {
+        if (IsTemplated && _chrome is null)
+        {
+            return null;
+        }
+
+        if (!ReferenceEquals(e.Property, ValueProperty)
+            && !ReferenceEquals(e.Property, MinimumProperty)
+            && !ReferenceEquals(e.Property, MaximumProperty))
+        {
+            return null;
+        }
+
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+        if (width <= 0f || height <= 0f)
+        {
+            return null;
+        }
+
+        var oldMinimum = Minimum;
+        var oldMaximum = Maximum;
+        var oldValue = Value;
+        var newValue = Value;
+        if (ReferenceEquals(e.Property, MinimumProperty))
+        {
+            oldMinimum = (double)e.OldValue!;
+        }
+        else if (ReferenceEquals(e.Property, MaximumProperty))
+        {
+            oldMaximum = (double)e.OldValue!;
+        }
+        else
+        {
+            oldValue = (double)e.OldValue!;
+            newValue = (double)e.NewValue!;
+        }
+
+        var oldFraction = RangeParts.FractionOf(oldValue, oldMinimum, oldMaximum);
+        var newFraction = RangeParts.FractionOf(newValue, Minimum, Maximum);
+        var oldFill = width * (float)oldFraction;
+        var newFill = width * (float)newFraction;
+        var reach = Math.Max(2f, CornerRadius + 1f);
+        var left = Math.Max(0f, Math.Min(oldFill, newFill) - reach);
+        var right = Math.Min(width, Math.Max(oldFill, newFill) + reach);
+        return new RectangleF(left, 0f, Math.Max(1f, right - left), height);
     }
 }
 
@@ -235,7 +301,9 @@ public class Slider : TemplatedControl
     private VisualElement? _fillPart;
     private VisualElement? _thumbPart;
     private VisualElement? _focusRingPart;
+    private SliderChrome? _chrome;
     private RectangleF _trackRect;
+    private RectangleF? _valueDamage;
     private bool _trackRectValid;
     private bool _partsResolved;
     private bool _dragging;
@@ -255,8 +323,8 @@ public class Slider : TemplatedControl
         nameof(Value), typeof(double), typeof(Slider),
         new PropertyMetadata(0d) { AffectsRender = true });
 
-    private const float ThumbRadius = 7f;
-    private const float TrackHeight = 4f;
+    internal const float ThumbRadius = 7f;
+    internal const float TrackHeight = 4f;
 
     /// <summary>Creates a focusable slider.</summary>
     public Slider()
@@ -292,7 +360,7 @@ public class Slider : TemplatedControl
     }
 
     private double Fraction
-        => Maximum <= Minimum ? 0d : XamlMath.Clamp((Value - Minimum) / (Maximum - Minimum), 0d, 1d);
+        => RangeParts.FractionOf(Value, Minimum, Maximum);
 
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
@@ -308,8 +376,13 @@ public class Slider : TemplatedControl
     /// <inheritdoc />
     protected override RectangleF GetInvalidationBounds()
     {
-        // 模板部件可以画满整块；自绘时只有中间一条轨道，窄的失效区能避免整列重画。
-        if (IsTemplated)
+        if (_valueDamage is { } valueDamage)
+        {
+            return valueDamage;
+        }
+
+        // 模板部件可以画满整块；默认铬件和自绘一样只占中间轨道带，窄的失效区能避免整列重画。
+        if (IsTemplated && _chrome is null)
         {
             return new RectangleF(0f, 0f, Bounds.Width, Bounds.Height);
         }
@@ -334,6 +407,11 @@ public class Slider : TemplatedControl
         }
 
         ResolveParts();
+        if (_chrome is { } chrome)
+        {
+            chrome.Fraction = Fraction;
+        }
+
         var track = refreshTrack || !_trackRectValid ? GetTrackRect() : _trackRect;
         _trackRect = track;
         _trackRectValid = true;
@@ -374,6 +452,7 @@ public class Slider : TemplatedControl
         _fillPart = GetTemplateChild<VisualElement>("PART_Fill");
         _thumbPart = GetTemplateChild<VisualElement>("PART_Thumb");
         _focusRingPart = GetTemplateChild<VisualElement>("PART_FocusRing");
+        _chrome = GetTemplateChild<SliderChrome>("PART_Chrome");
         _partsResolved = true;
     }
 
@@ -385,6 +464,7 @@ public class Slider : TemplatedControl
         _fillPart = null;
         _thumbPart = null;
         _focusRingPart = null;
+        _chrome = null;
         _trackRectValid = false;
         _partsResolved = false;
     }
@@ -394,6 +474,12 @@ public class Slider : TemplatedControl
     {
         base.OnTemplateChanged();
         ResolveParts();
+        // 换模板可能把整块外观换成另一个形状：整块失效一次，旧的满幅像素才不会剩下。
+        if (Bounds.Width > 0f && Bounds.Height > 0f)
+        {
+            InvalidateVisual(new RectangleF(0f, 0f, Bounds.Width, Bounds.Height));
+        }
+
         InvalidateArrange();
     }
 
@@ -501,7 +587,10 @@ public class Slider : TemplatedControl
     /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
+        _valueDamage = ComputeValueDamage(e);
         base.OnPropertyChanged(e);
+        _valueDamage = null;
+
         if (ReferenceEquals(e.Property, ValueProperty))
         {
             ValueChanged?.Invoke(this, EventArgs.Empty);
@@ -513,7 +602,6 @@ public class Slider : TemplatedControl
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
             // 值变化只移动模板部件，不让整棵模板重排；拖动时每帧一次 Arrange 会放大到整页布局。
-            // Value/Minimum/Maximum 的元数据已经是 AffectsRender，基础类已经报过脏区，这里不再重复失效。
             if (Bounds.Width > 0f && Bounds.Height > 0f)
             {
                 ArrangeTemplateParts(Bounds.Size, refreshTrack: false);
@@ -523,6 +611,60 @@ public class Slider : TemplatedControl
                 InvalidateArrange();
             }
         }
+    }
+
+    // 默认铬件的轨道不变，只有填充末端、拇指和焦点环会移动：脏区取旧/新位置的并集。
+    private RectangleF? ComputeValueDamage(DependencyPropertyChangedEventArgs e)
+    {
+        if (IsTemplated && _chrome is null)
+        {
+            return null;
+        }
+
+        if (!ReferenceEquals(e.Property, ValueProperty)
+            && !ReferenceEquals(e.Property, MinimumProperty)
+            && !ReferenceEquals(e.Property, MaximumProperty))
+        {
+            return null;
+        }
+
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+        var trackWidth = width - (ThumbRadius * 2f);
+        if (width <= 0f || height <= 0f || trackWidth <= 0f)
+        {
+            return null;
+        }
+
+        var oldMinimum = Minimum;
+        var oldMaximum = Maximum;
+        var oldValue = Value;
+        var newValue = Value;
+        if (ReferenceEquals(e.Property, MinimumProperty))
+        {
+            oldMinimum = (double)e.OldValue!;
+        }
+        else if (ReferenceEquals(e.Property, MaximumProperty))
+        {
+            oldMaximum = (double)e.OldValue!;
+        }
+        else
+        {
+            oldValue = (double)e.OldValue!;
+            newValue = (double)e.NewValue!;
+        }
+
+        var oldFraction = RangeParts.FractionOf(oldValue, oldMinimum, oldMaximum);
+        var newFraction = RangeParts.FractionOf(newValue, Minimum, Maximum);
+        var oldThumb = ThumbRadius + (trackWidth * (float)oldFraction);
+        var newThumb = ThumbRadius + (trackWidth * (float)newFraction);
+        var reach = ThumbRadius + 5f;
+        var left = Math.Max(0f, Math.Min(oldThumb, newThumb) - reach);
+        var right = Math.Min(width, Math.Max(oldThumb, newThumb) + reach);
+        var center = height / 2f;
+        var top = Math.Max(0f, center - reach);
+        var bottom = Math.Min(height, center + reach);
+        return new RectangleF(left, top, Math.Max(1f, right - left), Math.Max(1f, bottom - top));
     }
 
     // 模板轨道的已排矩形是拖动的行程；没有 PART_Track 时退回自绘轨道的内缩矩形。
@@ -554,9 +696,242 @@ public class Slider : TemplatedControl
     }
 }
 
+// Slider 的默认外观：轨道、填充、拇指、焦点环一次 OnRender 画完。
+// 拆成四个模板零件时，值变化要多走四遍子树绘制与 GDI+ 状态栈；单一铬件把同一几何压成一次绘制。
+internal sealed class SliderChrome : VisualElement
+{
+    internal static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(XamlBrush), typeof(SliderChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FillBrushProperty = DependencyProperty.Register(
+        nameof(FillBrush), typeof(XamlBrush), typeof(SliderChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty ThumbBrushProperty = DependencyProperty.Register(
+        nameof(ThumbBrush), typeof(XamlBrush), typeof(SliderChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FocusRingBrushProperty = DependencyProperty.Register(
+        nameof(FocusRingBrush), typeof(XamlBrush), typeof(SliderChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FractionProperty = DependencyProperty.Register(
+        nameof(Fraction), typeof(double), typeof(SliderChrome),
+        // 值变化由 Slider 自己按旧/新位置报脏区；铬件再报一次整块会把脏区扩回整条轨道。
+        new PropertyMetadata(0d) { AffectsRender = false });
+
+    internal static readonly DependencyProperty ShowFocusRingProperty = DependencyProperty.Register(
+        nameof(ShowFocusRing), typeof(bool), typeof(SliderChrome),
+        new PropertyMetadata(false) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FocusRingThicknessProperty = DependencyProperty.Register(
+        nameof(FocusRingThickness), typeof(double), typeof(SliderChrome),
+        new PropertyMetadata(1.4d) { AffectsRender = true });
+
+    internal SliderChrome()
+    {
+        IsHitTestVisible = false;
+    }
+
+    internal XamlBrush? TrackBrush
+    {
+        get => (XamlBrush?)GetValue(TrackBrushProperty);
+        set => SetValue(TrackBrushProperty, value);
+    }
+
+    internal XamlBrush? FillBrush
+    {
+        get => (XamlBrush?)GetValue(FillBrushProperty);
+        set => SetValue(FillBrushProperty, value);
+    }
+
+    internal XamlBrush? ThumbBrush
+    {
+        get => (XamlBrush?)GetValue(ThumbBrushProperty);
+        set => SetValue(ThumbBrushProperty, value);
+    }
+
+    internal XamlBrush? FocusRingBrush
+    {
+        get => (XamlBrush?)GetValue(FocusRingBrushProperty);
+        set => SetValue(FocusRingBrushProperty, value);
+    }
+
+    internal double Fraction
+    {
+        get => (double)GetValue(FractionProperty)!;
+        set => SetValue(FractionProperty, XamlMath.Clamp(value, 0d, 1d));
+    }
+
+    internal bool ShowFocusRing
+    {
+        get => (bool)GetValue(ShowFocusRingProperty)!;
+        set => SetValue(ShowFocusRingProperty, value);
+    }
+
+    internal double FocusRingThickness
+    {
+        get => (double)GetValue(FocusRingThicknessProperty)!;
+        set => SetValue(FocusRingThicknessProperty, value);
+    }
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+        if (width <= 0f || height <= 0f)
+        {
+            return;
+        }
+
+        var center = height / 2f;
+        var track = new RectangleF(
+            Slider.ThumbRadius,
+            center - (Slider.TrackHeight / 2f),
+            Math.Max(0f, width - (Slider.ThumbRadius * 2f)),
+            Slider.TrackHeight);
+        var radius = Slider.TrackHeight / 2f;
+        if (TrackBrush is { } trackBrush)
+        {
+            using var path = XamlDrawing.RoundedRectangle(track, radius);
+            trackBrush.FillPath(graphics, path);
+        }
+
+        var thumbX = track.Left + (track.Width * (float)Fraction);
+        var fillWidth = Math.Max(0f, thumbX - track.Left);
+        if (fillWidth > 0f && FillBrush is { } fillBrush)
+        {
+            using var path = XamlDrawing.RoundedRectangle(
+                new RectangleF(track.Left, track.Top, fillWidth, track.Height),
+                radius);
+            fillBrush.FillPath(graphics, path);
+        }
+
+        if (ThumbBrush is { } thumbBrush)
+        {
+            FillEllipse(
+                graphics,
+                thumbBrush,
+                thumbX - Slider.ThumbRadius,
+                center - Slider.ThumbRadius,
+                Slider.ThumbRadius * 2f,
+                Slider.ThumbRadius * 2f);
+        }
+
+        if (ShowFocusRing && FocusRingBrush is { } ringBrush)
+        {
+            var ringRadius = Slider.ThumbRadius + 2f;
+            using var pen = new Pen(ringBrush, (float)FocusRingThickness);
+            graphics.DrawEllipse(
+                pen,
+                thumbX - ringRadius,
+                center - ringRadius,
+                ringRadius * 2f,
+                ringRadius * 2f);
+        }
+    }
+
+    private static void FillEllipse(Graphics graphics, XamlBrush brush, float x, float y, float width, float height)
+    {
+        if (width <= 0f || height <= 0f)
+        {
+            return;
+        }
+
+        var native = brush.AcquireNativeBrush(new RectangleF(x, y, width, height), out var owns);
+        if (native is null)
+        {
+            return;
+        }
+
+        try
+        {
+            graphics.FillEllipse(native, x, y, width, height);
+        }
+        finally
+        {
+            if (owns)
+            {
+                native.Dispose();
+            }
+        }
+    }
+}
+
+// ProgressBar 的默认外观：整块轨道与按比例覆盖的填充，同样一次 OnRender。
+internal sealed class ProgressBarChrome : VisualElement
+{
+    internal static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(XamlBrush), typeof(ProgressBarChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FillBrushProperty = DependencyProperty.Register(
+        nameof(FillBrush), typeof(XamlBrush), typeof(ProgressBarChrome),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    internal static readonly DependencyProperty FractionProperty = DependencyProperty.Register(
+        nameof(Fraction), typeof(double), typeof(ProgressBarChrome),
+        // 填充末端由 ProgressBar 报脏；铬件不重复扩大脏区。
+        new PropertyMetadata(0d) { AffectsRender = false });
+
+    internal ProgressBarChrome()
+    {
+        IsHitTestVisible = false;
+    }
+
+    internal XamlBrush? TrackBrush
+    {
+        get => (XamlBrush?)GetValue(TrackBrushProperty);
+        set => SetValue(TrackBrushProperty, value);
+    }
+
+    internal XamlBrush? FillBrush
+    {
+        get => (XamlBrush?)GetValue(FillBrushProperty);
+        set => SetValue(FillBrushProperty, value);
+    }
+
+    internal double Fraction
+    {
+        get => (double)GetValue(FractionProperty)!;
+        set => SetValue(FractionProperty, XamlMath.Clamp(value, 0d, 1d));
+    }
+
+    /// <inheritdoc />
+    protected override void OnRender(Graphics graphics)
+    {
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+        if (width <= 0f || height <= 0f)
+        {
+            return;
+        }
+
+        var radius = Math.Max(0f, CornerRadius);
+        var bounds = new RectangleF(0f, 0f, width, height);
+        if (TrackBrush is { } trackBrush)
+        {
+            using var path = XamlDrawing.RoundedRectangle(bounds, radius);
+            trackBrush.FillPath(graphics, path);
+        }
+
+        var fillWidth = Math.Max(0f, width * (float)Fraction);
+        if (fillWidth > 0f && FillBrush is { } fillBrush)
+        {
+            using var path = XamlDrawing.RoundedRectangle(new RectangleF(0f, 0f, fillWidth, height), radius);
+            fillBrush.FillPath(graphics, path);
+        }
+    }
+}
+
 // 模板部件可能嵌在面板里：换算到控件坐标系，再把控件坐标系的槽减回部件父级坐标。
 internal static class RangeParts
 {
+    internal static double FractionOf(double value, double minimum, double maximum)
+        => maximum <= minimum ? 0d : XamlMath.Clamp((value - minimum) / (maximum - minimum), 0d, 1d);
+
     internal static RectangleF ToControlBounds(VisualElement owner, VisualElement part)
     {
         var origin = ParentOrigin(owner, part);
