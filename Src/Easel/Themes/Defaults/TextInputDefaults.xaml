@@ -15,15 +15,21 @@
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
                   BorderThickness="1.5"
-                  CornerRadius="{TemplateBinding CornerRadius}"
-                  Opacity="0" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border Padding="{TemplateBinding Padding}">
             <RichTextContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />
           </Border>
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsFocused" Value="True">
-            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocused" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
           </Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate>
@@ -41,15 +47,21 @@
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
                   BorderThickness="1.5"
-                  CornerRadius="{TemplateBinding CornerRadius}"
-                  Opacity="0" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border Padding="{TemplateBinding Padding}">
             <TextBoxContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />
           </Border>
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsFocused" Value="True">
-            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocused" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
           </Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate>

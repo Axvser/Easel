@@ -17,13 +17,11 @@
           <Border x:Name="Hover"
                   IsHitTestVisible="False"
                   Background="{DynamicResource Hover}"
-                  CornerRadius="{TemplateBinding CornerRadius}"
-                  Opacity="0" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="Pressed"
                   IsHitTestVisible="False"
                   Background="{DynamicResource Pressed}"
-                  CornerRadius="{TemplateBinding CornerRadius}"
-                  Opacity="0" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border IsHitTestVisible="False"
                   Background="{TemplateBinding Background}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
@@ -31,8 +29,7 @@
                   IsHitTestVisible="False"
                   BorderBrush="{DynamicResource Focus}"
                   BorderThickness="1.5"
-                  CornerRadius="{TemplateBinding CornerRadius}"
-                  Opacity="0" />
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border IsHitTestVisible="False" Padding="{TemplateBinding Padding}">
             <TextBlock IsHitTestVisible="False"
                        Text="{TemplateBinding Text}"
@@ -44,16 +41,39 @@
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsPointerOver" Value="True">
-            <Setter TargetName="Hover" Property="Opacity" Value="1" />
+            <Trigger.Setters>
+              <Setter TargetName="Hover" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPointerOver" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Hover" Property="Opacity" Value="0" />
+            </Trigger.Setters>
           </Trigger>
           <Trigger Property="IsPressed" Value="True">
-            <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+            <Trigger.Setters>
+              <Setter TargetName="Pressed" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsPressed" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="Pressed" Property="Opacity" Value="0" />
+            </Trigger.Setters>
           </Trigger>
           <Trigger Property="IsFocusVisible" Value="True">
-            <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
+            </Trigger.Setters>
+          </Trigger>
+          <Trigger Property="IsFocusVisible" Value="False">
+            <Trigger.Setters>
+              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+            </Trigger.Setters>
           </Trigger>
           <Trigger Property="IsEnabled" Value="False">
-            <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            <Trigger.Setters>
+              <Setter TargetName="Root" Property="Opacity" Value="0.55" />
+            </Trigger.Setters>
           </Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate>
