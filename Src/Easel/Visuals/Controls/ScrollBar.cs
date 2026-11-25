@@ -542,11 +542,34 @@ public class ScrollBar : VisualElement
             var local = ToScrollBarCoordinates(track);
             if (local.Width > 0f && local.Height > 0f)
             {
-                return local;
+                // 预留角不属于轨道：模板轨道铺满整条时，命中和拇指仍止于默认轨道末端。
+                return ClipReservedCorner(local);
             }
         }
 
         return GetDefaultTrackRect();
+    }
+
+    private RectangleF ClipReservedCorner(RectangleF track)
+    {
+        var reserve = (float)Math.Max(0d, ReserveCornerSize);
+        if (reserve <= 0f)
+        {
+            return track;
+        }
+
+        if (Orientation == Orientation.Vertical)
+        {
+            var maxBottom = Math.Max(track.Top, Bounds.Height - (float)Padding.Bottom - reserve);
+            track.Height = Math.Min(track.Height, Math.Max(0f, maxBottom - track.Top));
+        }
+        else
+        {
+            var maxRight = Math.Max(track.Left, Bounds.Width - (float)Padding.Right - reserve);
+            track.Width = Math.Min(track.Width, Math.Max(0f, maxRight - track.Left));
+        }
+
+        return track;
     }
 
     private RectangleF GetDefaultTrackRect()

@@ -5,4 +5,54 @@
 
   <!-- Built-in fallback appearance for ScrollBar, HeaderedContentControl and DropZone; added to the implicit style table by Theme.DefaultStyles. -->
 
+  <!-- The thumb stays the control's fallback painting: a hit-testable template thumb would claim the
+       ScrollViewer strip before its bar does. PART_Track still drives the track rect and its reserved corner. -->
+  <Style TargetType="ScrollBar">
+    <Style.Template>
+      <ControlTemplate TargetType="ScrollBar">
+        <Grid IsHitTestVisible="False">
+          <Border x:Name="PART_Track"
+                  IsHitTestVisible="False"
+                  Padding="0"
+                  Background="{DynamicResource SurfaceAlt}"
+                  CornerRadius="{DynamicResource ScrollBarThumbRadius}" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="HeaderedContentControl">
+    <Style.Template>
+      <ControlTemplate TargetType="HeaderedContentControl">
+        <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="24" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <TextBlock x:Name="PART_Header"
+                     Text="{TemplateBinding Header}"
+                     Opacity="0.65"
+                     VerticalAlignment="Center"
+                     IsHitTestVisible="False" />
+          <Grid x:Name="PART_ContentHost"
+                Grid.Row="1"
+                IsHitTestVisible="False" />
+        </Grid>
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
+  <Style TargetType="DropZone">
+    <Style.Template>
+      <ControlTemplate TargetType="DropZone">
+        <DropZoneChrome x:Name="Chrome"
+                        IsHitTestVisible="False"
+                        Title="{TemplateBinding Title}"
+                        Detail="{TemplateBinding Detail}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}" />
+      </ControlTemplate>
+    </Style.Template>
+  </Style>
+
 </ResourceDictionary>

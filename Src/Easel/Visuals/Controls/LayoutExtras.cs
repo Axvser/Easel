@@ -314,7 +314,11 @@ public class Decorator : VisualElement
 }
 
 /// <summary>A header line above one content element.</summary>
-public class HeaderedContentControl : VisualElement
+/// <remarks>
+/// The default template parts are <c>PART_Header</c> (the header label) and <c>PART_ContentHost</c> (where
+/// <see cref="Content"/> is parented while a template is applied).
+/// </remarks>
+public class HeaderedContentControl : TemplatedControl
 {
     /// <summary>The header text.</summary>
     public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register(
@@ -327,6 +331,17 @@ public class HeaderedContentControl : VisualElement
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
 
     private const float HeaderHeight = 24f;
+
+    private VisualElement? _contentHost;
+    private VisualElement? _hostedContent;
+    private TextBlock? _headerPart;
+    private bool _disposing;
+
+    /// <summary>Creates an empty header and content pair.</summary>
+    public HeaderedContentControl()
+    {
+        IsHitTestVisible = true;
+    }
 
     /// <summary>The header text.</summary>
     public string Header
@@ -343,15 +358,38 @@ public class HeaderedContentControl : VisualElement
     }
 
     /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        _disposing = disposing;
+        base.Dispose(disposing);
+    }
+
+    /// <inheritdoc />
+    protected override bool HitTestContent(PointF point) => IsHitTestVisible;
+
+    /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
     {
+        if (IsTemplated)
+        {
+            return base.MeasureOverride(availableSize);
+        }
+
         var desired = Content?.Measure(new Size(availableSize.Width, Math.Max(0, availableSize.Height - (int)HeaderHeight))) ?? Size.Empty;
         return new Size(desired.Width, desired.Height + (int)HeaderHeight);
     }
 
     /// <inheritdoc />
     protected override void ArrangeOverride(Size finalSize)
-        => Content?.Arrange(new RectangleF(0f, HeaderHeight, finalSize.Width, Math.Max(0f, finalSize.Height - HeaderHeight)));
+    {
+        if (IsTemplated)
+        {
+            base.ArrangeOverride(finalSize);
+            return;
+        }
+
+        Content?.Arrange(new RectangleF(0f, HeaderHeight, finalSize.Width, Math.Max(0f, finalSize.Height - HeaderHeight)));
+    }
 
     /// <inheritdoc />
     protected override void OnRender(Graphics graphics)
@@ -369,27 +407,91 @@ public class HeaderedContentControl : VisualElement
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (!ReferenceEquals(e.Property, ContentProperty))
+        if (ReferenceEquals(e.Property, ContentProperty))
+        {
+            SyncContent();
+        }
+        else if (ReferenceEquals(e.Property, HeaderProperty))
+        {
+            SyncHeader();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        if (!_disposing)
+        {
+            DetachHostedContent();
+        }
+
+        _contentHost = null;
+        _headerPart = null;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanged()
+    {
+        _contentHost = GetTemplateChild<VisualElement>("PART_ContentHost");
+        _headerPart = GetTemplateChild<TextBlock>("PART_Header");
+        SyncHeader();
+        SyncContent();
+    }
+
+    private void SyncHeader()
+    {
+        if (_headerPart is { } header)
+        {
+            header.Text = Header;
+        }
+    }
+
+    private void SyncContent()
+    {
+        var content = Content;
+        if (!ReferenceEquals(_hostedContent, content))
+        {
+            DetachHostedContent();
+            _hostedContent = content;
+        }
+
+        if (content is not null)
+        {
+            if (_contentHost is { } host)
+            {
+                if (!ReferenceEquals(content.ParentElement, host))
+                {
+                    content.ParentElement?.RemoveChild(content);
+                    host.Add(content);
+                }
+            }
+            else if (!ReferenceEquals(content.ParentElement, this))
+            {
+                content.ParentElement?.RemoveChild(content);
+                base.Add(content);
+            }
+        }
+
+        InvalidateMeasure();
+    }
+
+    private void DetachHostedContent()
+    {
+        if (_hostedContent is not { } content)
         {
             return;
         }
 
-        if (e.OldValue is VisualElement old && Children.Contains(old))
+        if (ReferenceEquals(content.ParentElement, this))
         {
-            RemoveChild(old);
+            RemoveChild(content);
+        }
+        else if (_contentHost is { } host && ReferenceEquals(content.ParentElement, host))
+        {
+            host.RemoveChild(content);
         }
 
-        if (e.NewValue is VisualElement next)
-        {
-            if (next.Parent is ContainerVisual parent)
-            {
-                parent.Remove(next);
-            }
-
-            Add(next);
-        }
-
-        InvalidateMeasure();
+        _hostedContent = null;
     }
 }
 
