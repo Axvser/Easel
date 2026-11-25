@@ -80,7 +80,7 @@ public class DropZone : TemplatedControl
     {
         IsHitTestVisible = true;
         AllowDrop = true;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         MinHeight = 88d;
         Padding = new XamlThickness(18f, 14f);
     }

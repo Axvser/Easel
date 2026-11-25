@@ -74,6 +74,10 @@ public sealed class GalleryForm : Form
     public void ToggleThemeForCapture()
         => _theme.SelectIndex((_theme.SelectedIndex + 1) % _theme.Options.Count);
 
+    /// <summary>Selects one palette option; used by capture mode to walk a fixed theme sequence.</summary>
+    /// <param name="index">The option index (0 = Dark+, 1 = Light+, 2 = High contrast, 3 = Follow system).</param>
+    public void SelectThemeForCapture(int index) => _theme.SelectIndex(index);
+
     /// <inheritdoc />
     protected override void OnHandleCreated(EventArgs e)
     {

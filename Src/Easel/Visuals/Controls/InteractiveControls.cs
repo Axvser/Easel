@@ -47,8 +47,8 @@ public class Button : ButtonBase
         IsHitTestVisible = true;
         Cursor = Cursors.Hand;
         Padding = new XamlThickness(14f, 6f);
-        MinHeight = Theme.Current.ControlHeight;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
     }
 
     /// <summary>The text drawn inside the button.</summary>
@@ -534,8 +534,8 @@ public class TextBox : TemplatedControl
         IsHitTestVisible = true;
         Cursor = Cursors.IBeam;
         Padding = new XamlThickness(8f, 6f);
-        MinHeight = Theme.Current.ControlHeight;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
     }
 
     /// <summary>The current text.</summary>

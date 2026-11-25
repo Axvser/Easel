@@ -132,8 +132,8 @@ public class ComboBox : TemplatedControl
         IsHitTestVisible = true;
         Cursor = Cursors.Hand;
         Padding = new XamlThickness(10f, 6f);
-        MinHeight = Theme.Current.ControlHeight;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         _items.CollectionChanged += OnItemsCollectionChanged;
 
         _list.Focusable = false;

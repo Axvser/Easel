@@ -290,6 +290,12 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private string? _resolvedFontFamily;
     private bool _resolvedFontWeighted;
     private bool _resolvedFontBold;
+    private List<ThemeMetric>? _themeMetrics;
+    private bool _themeMetricsSubscribed;
+
+    // 主题度量必须单占一层：与 Style 同层会在样式卸载时被一并清掉；Inherited(4) 让本地值、
+    // 样式触发器、模板与样式 setter 都排在它前面，主题只做兜底。
+    private const BindingPriority ThemeMetricPriority = BindingPriority.Inherited;
 
     /// <summary>The outer spacing around this element.</summary>
     public XamlThickness Margin
@@ -1234,6 +1240,15 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         _explicitStyle = null;
         _implicitStyle = null;
 
+        // 主题是静态事件；不摘订阅，切换主题时会把已释放的元素留在内存里。
+        if (_themeMetricsSubscribed)
+        {
+            Theme.Changed -= OnThemeMetricsChanged;
+            _themeMetricsSubscribed = false;
+        }
+
+        _themeMetrics = null;
+
         // 动态/延迟资源订阅也要摘掉，否则字典的 Changed 会把已释放的元素一直留在内存里。
         if (_resourceBindings is not null)
         {
@@ -1599,6 +1614,60 @@ public abstract class VisualElement : ContainerVisual, IDisposable
 
         return Surface?.Styles.FindMatch(this) ?? Easel.Theme.FindDefaultStyle(this);
     }
+
+    /// <summary>Seeds a dependency property from the active palette and keeps it current when the palette changes.</summary>
+    /// <param name="property">The dependency property to seed, such as a corner radius or a minimum control height.</param>
+    /// <param name="select">Returns the value that <paramref name="property"/> should take for a palette.</param>
+    /// <remarks>
+    /// The seeded value lives below local values, bindings, style triggers, templates and style setters, so an
+    /// explicit assignment or a host style still wins. The element subscribes to <see cref="Theme.Changed"/> once and
+    /// rewrites only this layer, which re-measures and repaints a control whose metric changed without rebuilding it.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="property"/> or <paramref name="select"/> is
+    /// <see langword="null"/>.</exception>
+    protected void SetThemeMetric(DependencyProperty property, Func<ThemePalette, object?> select)
+    {
+        if (property is null) throw new ArgumentNullException(nameof(property));
+        if (select is null) throw new ArgumentNullException(nameof(select));
+
+        _themeMetrics ??= [];
+        var metric = new ThemeMetric(property, select);
+        var index = _themeMetrics.FindIndex(entry => ReferenceEquals(entry.Property, property));
+        if (index >= 0)
+        {
+            _themeMetrics[index] = metric;
+        }
+        else
+        {
+            _themeMetrics.Add(metric);
+        }
+
+        if (!_themeMetricsSubscribed)
+        {
+            _themeMetricsSubscribed = true;
+            Theme.Changed += OnThemeMetricsChanged;
+        }
+
+        SetValue(property, select(Theme.Current), ThemeMetricPriority);
+    }
+
+    private void OnThemeMetricsChanged(object? sender, EventArgs e)
+    {
+        if (_themeMetrics is null)
+        {
+            return;
+        }
+
+        var palette = Theme.Current;
+        foreach (var metric in _themeMetrics)
+        {
+            SetValue(metric.Property, metric.Select(palette), ThemeMetricPriority);
+        }
+    }
+
+    private readonly record struct ThemeMetric(
+        DependencyProperty Property,
+        Func<ThemePalette, object?> Select);
 
     internal void SetFocused(bool focused)
     {

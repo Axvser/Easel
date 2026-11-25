@@ -80,7 +80,7 @@ public class VisualPopup : VisualElement
         Background = Theme.Current.Surface;
         BorderBrush = Theme.Current.ControlBorder;
         BorderThickness = new XamlThickness(1f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Padding = new XamlThickness(2f);
     }
 

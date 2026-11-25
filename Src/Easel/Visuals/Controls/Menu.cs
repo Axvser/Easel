@@ -475,7 +475,7 @@ public class VisualContextMenu : VisualPopup
         Background = Theme.Current.SurfaceAlt;
         BorderBrush = Theme.Current.ControlBorder;
         BorderThickness = new XamlThickness(1f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Closed += (_, _) =>
         {
             CloseSubmenu();

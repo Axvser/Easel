@@ -659,7 +659,7 @@ public class DataGrid : TemplatedControl
         Background = Theme.Current.Surface;
         BorderBrush = Theme.Current.ControlBorder;
         BorderThickness = new XamlThickness(1f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
 
         _columns.CollectionChanged += OnColumnsChanged;
         // 单元格元素在自绘内容之上、滚动条之下；先加宿主再把滚动条加在它后面。

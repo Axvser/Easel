@@ -51,7 +51,7 @@ public class Border : VisualElement
     public Border()
     {
         IsHitTestVisible = false;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Padding = new XamlThickness(12f);
     }
 

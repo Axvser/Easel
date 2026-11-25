@@ -152,8 +152,8 @@ public class RichTextBox : TemplatedControl
         Focusable = true;
         IsHitTestVisible = true;
         Padding = new XamlThickness(10f, 8f);
-        MinHeight = Theme.Current.ControlHeight;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Cursor = Cursors.IBeam;
 
         _caretTimer = new System.Windows.Forms.Timer { Interval = 530 };

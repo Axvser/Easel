@@ -82,6 +82,7 @@ internal static class GalleryCapture
         var previewOnly = HasFlag(args, "--preview-only");
         var includeGroups = HasFlag(args, "--include-groups");
         _ = includeGroups;
+        var themeCycle = ReadIntList(args, "--theme-cycle");
 
         PlaceOnCaptureScreen(form);
         form.TopMost = true;
@@ -121,19 +122,34 @@ internal static class GalleryCapture
                         Pump(form, 4);
                     }
 
+                    // 同一进程里按给定顺序切主题，验证的是原地切换而不是重建后的新控件。
+                    if (themeCycle.Count > 0)
+                    {
+                        for (var step = 0; step < themeCycle.Count; step++)
+                        {
+                            var themeIndex = themeCycle[step];
+                            gallery.SelectThemeForCapture(themeIndex);
+                            Pump(form, 8);
+
+                            var themed = targets.Count == 1
+                                ? $"{SafeName(id)}-theme{step}-{themeIndex}"
+                                : $"{index:00}-{SafeName(id)}-theme{step}-{themeIndex}";
+                            Capture(form, Path.Combine(directory, themed + ".png"));
+                            if (dump)
+                            {
+                                WriteDump(gallery, form, Path.Combine(directory, themed + ".txt"));
+                            }
+                        }
+
+                        continue;
+                    }
+
                     var name = targets.Count == 1 ? SafeName(id) : $"{index:00}-{SafeName(id)}";
                     Capture(form, Path.Combine(directory, name + ".png"));
 
                     if (dump)
                     {
-                        var builder = new StringBuilder();
-                        builder.AppendLine($"window {form.Bounds}");
-                        if (gallery.Surface.Root is VisualElement root)
-                        {
-                            Dump(root, builder, 0);
-                        }
-
-                        File.WriteAllText(Path.Combine(directory, name + ".txt"), builder.ToString());
+                        WriteDump(gallery, form, Path.Combine(directory, name + ".txt"));
                     }
                 }
             }
@@ -207,6 +223,33 @@ internal static class GalleryCapture
     {
         var text = ReadOption(args, name);
         return int.TryParse(text, out var value) ? value : fallback;
+    }
+
+    private static List<int> ReadIntList(string[] args, string name)
+    {
+        var text = ReadOption(args, name);
+        if (text is null)
+        {
+            return [];
+        }
+
+        return text
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static part => int.TryParse(part, out var value) ? value : -1)
+            .Where(static value => value >= 0)
+            .ToList();
+    }
+
+    private static void WriteDump(GalleryForm gallery, Form form, string path)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"window {form.Bounds}");
+        if (gallery.Surface.Root is VisualElement root)
+        {
+            Dump(root, builder, 0);
+        }
+
+        File.WriteAllText(path, builder.ToString());
     }
 
     private static bool HasFlag(string[] args, string name)
@@ -286,6 +329,8 @@ internal static class GalleryCapture
 
         builder.Append(' ').Append(element.AbsoluteBounds);
         builder.Append(" vis=").Append(element.Visibility);
+        builder.Append(" r=").Append(element.CornerRadius);
+        builder.Append(" min=").Append(element.MinHeight);
         if (element.Background is { } background)
         {
             builder.Append(" bg=").Append(background.ApproximateColor.ToArgb().ToString("X8"));

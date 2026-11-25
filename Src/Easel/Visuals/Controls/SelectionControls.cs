@@ -22,8 +22,8 @@ public abstract class ToggleButtonBase : ButtonBase
         Focusable = true;
         IsHitTestVisible = true;
         Cursor = Cursors.Hand;
-        MinWidth = Theme.Current.ControlHeight;
-        MinHeight = Theme.Current.ControlHeight;
+        SetThemeMetric(MinWidthProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
     }
 
     /// <summary>Raised when the control changes from a non-checked state to checked.</summary>

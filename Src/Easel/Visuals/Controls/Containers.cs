@@ -42,7 +42,7 @@ public class Expander : TemplatedControl
     {
         Focusable = true;
         Padding = new XamlThickness(0f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
     }
 
     /// <summary>The text shown in the header.</summary>

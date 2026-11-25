@@ -58,7 +58,7 @@ public class CalendarItem : TemplatedControl
     {
         IsHitTestVisible = true;
         Padding = new XamlThickness(6f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
     }
 
     /// <summary>The month-title and day-number colour as a brush value; an empty colour uses the active theme.</summary>
@@ -641,7 +641,7 @@ public class Calendar : TemplatedControl
         Background = Theme.Current.Surface;
         BorderBrush = Theme.Current.ControlBorder;
         BorderThickness = new XamlThickness(1f);
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         DisplayMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
     }
 
@@ -1073,8 +1073,8 @@ public class DatePicker : TemplatedControl
         IsHitTestVisible = true;
         Cursor = Cursors.Hand;
         Padding = new XamlThickness(10f, 6f);
-        MinHeight = Theme.Current.ControlHeight;
-        CornerRadius = Theme.Current.CornerRadius;
+        SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
 
         _calendar.Width = 250f;
         _calendar.Height = 226f;
