@@ -749,7 +749,7 @@ public abstract class Visual : WinformsObject
         }
     }
 
-    // 单应性贴图：逐像素逆映射 + 双线性采样。GDI+ 只有仿射贴图，分格近似会留下透视误差。
+    // 单应性贴图：逐像素逆映射 + 按局部足迹选择面积/双线性/Catmull-Rom 采样。GDI+ 只有仿射贴图，分格近似会留下透视误差。
     internal static void DrawProjected(
         Graphics target,
         Bitmap source,
@@ -809,8 +809,6 @@ public abstract class Visual : WinformsObject
 
             var destinationBytes = new byte[width * height * 4];
             var bottomUp = sourceData.Stride < 0;
-            var edgeU = 1.5d / Math.Max(1f, sourceRect.Width);
-            var edgeV = 1.5d / Math.Max(1f, sourceRect.Height);
             var sourceLeft = (double)sourceRect.Left;
             var sourceTop = (double)sourceRect.Top;
             var sourceWidth = (double)sourceRect.Width;
@@ -824,65 +822,13 @@ public abstract class Visual : WinformsObject
                 for (var column = 0; column < width; column++)
                 {
                     var centerX = left + column + 0.5d;
-                    if (!projection.TryUnmapNormalized(new PointF((float)centerX, (float)centerY), out var u, out var v))
+                    if (!VisualProjectionFilter.Sample(
+                            sourceBytes, sourceStride, sourcePixelWidth, sourcePixelHeight, bottomUp,
+                            projection, sourceLeft, sourceTop, sourceWidth, sourceHeight,
+                            centerX, centerY,
+                            out var blue, out var green, out var red, out var alpha))
                     {
                         continue;
-                    }
-
-                    var inside = u >= 0d && u <= 1d && v >= 0d && v <= 1d;
-                    var nearEdge = u >= -edgeU && u <= 1d + edgeU && v >= -edgeV && v <= 1d + edgeV
-                                   && (u < edgeU || u > 1d - edgeU || v < edgeV || v > 1d - edgeV);
-
-                    double blue = 0d, green = 0d, red = 0d, alpha = 0d;
-                    if (!nearEdge)
-                    {
-                        if (!inside)
-                        {
-                            continue;
-                        }
-
-                        SampleBilinear(
-                            sourceBytes, sourceStride, sourcePixelWidth, sourcePixelHeight, bottomUp,
-                            sourceLeft + (u * sourceWidth), sourceTop + (v * sourceHeight),
-                            out blue, out green, out red, out alpha);
-                    }
-                    else
-                    {
-                        var samples = 0;
-                        for (var subY = 0; subY < 2; subY++)
-                        {
-                            var sampleY = top + row + (subY == 0 ? 0.25d : 0.75d);
-                            for (var subX = 0; subX < 2; subX++)
-                            {
-                                var sampleX = left + column + (subX == 0 ? 0.25d : 0.75d);
-                                if (!projection.TryUnmapNormalized(new PointF((float)sampleX, (float)sampleY), out var su, out var sv)
-                                    || su < 0d || su > 1d || sv < 0d || sv > 1d)
-                                {
-                                    continue;
-                                }
-
-                                samples++;
-                                SampleBilinear(
-                                    sourceBytes, sourceStride, sourcePixelWidth, sourcePixelHeight, bottomUp,
-                                    sourceLeft + (su * sourceWidth), sourceTop + (sv * sourceHeight),
-                                    out var sb, out var sg, out var sr, out var sa);
-                                blue += sb;
-                                green += sg;
-                                red += sr;
-                                alpha += sa;
-                            }
-                        }
-
-                        if (samples == 0)
-                        {
-                            continue;
-                        }
-
-                        // 未覆盖的子样本贡献 0：除以 4 就是覆盖率加权的平均色。
-                        blue /= 4d;
-                        green /= 4d;
-                        red /= 4d;
-                        alpha /= 4d;
                     }
 
                     var offset = rowOffset + (column * 4);
@@ -976,64 +922,6 @@ public abstract class Visual : WinformsObject
 
     private static byte ToByte(double value)
         => value <= 0d ? (byte)0 : value >= 255d ? (byte)255 : (byte)Math.Round(value);
-
-    private static void SampleBilinear(
-        byte[] pixels,
-        int stride,
-        int width,
-        int height,
-        bool bottomUp,
-        double x,
-        double y,
-        out double blue,
-        out double green,
-        out double red,
-        out double alpha)
-    {
-        var sampleX = x - 0.5d;
-        var sampleY = y - 0.5d;
-        var x0 = (int)Math.Floor(sampleX);
-        var y0 = (int)Math.Floor(sampleY);
-        var fx = sampleX - x0;
-        var fy = sampleY - y0;
-
-        ReadPremultiplied(pixels, stride, width, height, bottomUp, x0, y0, out var b00, out var g00, out var r00, out var a00);
-        ReadPremultiplied(pixels, stride, width, height, bottomUp, x0 + 1, y0, out var b10, out var g10, out var r10, out var a10);
-        ReadPremultiplied(pixels, stride, width, height, bottomUp, x0, y0 + 1, out var b01, out var g01, out var r01, out var a01);
-        ReadPremultiplied(pixels, stride, width, height, bottomUp, x0 + 1, y0 + 1, out var b11, out var g11, out var r11, out var a11);
-
-        var w00 = (1d - fx) * (1d - fy);
-        var w10 = fx * (1d - fy);
-        var w01 = (1d - fx) * fy;
-        var w11 = fx * fy;
-        blue = (b00 * w00) + (b10 * w10) + (b01 * w01) + (b11 * w11);
-        green = (g00 * w00) + (g10 * w10) + (g01 * w01) + (g11 * w11);
-        red = (r00 * w00) + (r10 * w10) + (r01 * w01) + (r11 * w11);
-        alpha = (a00 * w00) + (a10 * w10) + (a01 * w01) + (a11 * w11);
-    }
-
-    private static void ReadPremultiplied(
-        byte[] pixels,
-        int stride,
-        int width,
-        int height,
-        bool bottomUp,
-        int x,
-        int y,
-        out double blue,
-        out double green,
-        out double red,
-        out double alpha)
-    {
-        x = x < 0 ? 0 : x >= width ? width - 1 : x;
-        y = y < 0 ? 0 : y >= height ? height - 1 : y;
-        var row = bottomUp ? height - 1 - y : y;
-        var offset = (row * stride) + (x * 4);
-        blue = pixels[offset];
-        green = pixels[offset + 1];
-        red = pixels[offset + 2];
-        alpha = pixels[offset + 3];
-    }
 
     // 大尺寸/退化时的旧路径：GDI+ 仿射分格贴图。
     private static void DrawProjectedAffine(
@@ -1160,6 +1048,7 @@ public class ContainerVisual : Visual
 {
     private readonly VisualCollection _children;
     private readonly List<(Visual Visual, int Index)> _zOrder = [];
+    private bool _zOrderInUse;
 
     /// <summary>Creates an empty container.</summary>
     public ContainerVisual()
@@ -1202,12 +1091,20 @@ public class ContainerVisual : Visual
     /// <inheritdoc />
     protected override void RenderChildren(Graphics graphics)
     {
-        foreach (var (child, _) in BuildZOrder())
+        var order = BeginZOrder();
+        try
         {
-            if (ShouldRenderChild(child))
+            foreach (var (child, _) in order)
             {
-                child.Render(graphics);
+                if (ShouldRenderChild(child))
+                {
+                    child.Render(graphics);
+                }
             }
+        }
+        finally
+        {
+            EndZOrder(order);
         }
     }
 
@@ -1223,46 +1120,64 @@ public class ContainerVisual : Visual
     protected override bool HitTestChildren(PointF point, out Visual? visual)
     {
         // 命中顺序与绘制相反：ZIndex 高的先命中，同值按声明顺序的逆序（后声明的在上）。
-        var order = BuildZOrder();
-        for (var index = order.Count - 1; index >= 0; index--)
+        var order = BeginZOrder();
+        try
         {
-            var child = order[index].Visual;
-            if (child is null)
+            for (var index = order.Count - 1; index >= 0; index--)
             {
-                continue;
+                var child = order[index].Visual;
+                if (child is null)
+                {
+                    continue;
+                }
+
+                var hit = child.HitTestVisual(point);
+                if (hit is not null)
+                {
+                    visual = hit;
+                    return true;
+                }
             }
 
-            var hit = child.HitTestVisual(point);
-            if (hit is not null)
-            {
-                visual = hit;
-                return true;
-            }
+            visual = null;
+            return false;
         }
-
-        visual = null;
-        return false;
+        finally
+        {
+            EndZOrder(order);
+        }
     }
 
     // 稳定的 ZIndex 序：List.Sort 不稳定，用原始下标打破平局，保证同值子项保持声明顺序。
-    private List<(Visual Visual, int Index)> BuildZOrder()
+    // 渲染或命中在子树里重入（例如子项绘制时反查父级命中）时，复用缓冲会被清空；重入那一层改用独立列表。
+    private List<(Visual Visual, int Index)> BeginZOrder()
     {
-        _zOrder.Clear();
+        var order = _zOrderInUse ? new List<(Visual Visual, int Index)>(_children.Count) : _zOrder;
+        _zOrderInUse = true;
+        order.Clear();
         for (var index = 0; index < _children.Count; index++)
         {
             var child = _children[index];
             if (child is not null)
             {
-                _zOrder.Add((child, index));
+                order.Add((child, index));
             }
         }
 
-        _zOrder.Sort(static (left, right) =>
+        order.Sort(static (left, right) =>
         {
             var byZIndex = ZIndexOf(left.Visual).CompareTo(ZIndexOf(right.Visual));
             return byZIndex != 0 ? byZIndex : left.Index.CompareTo(right.Index);
         });
-        return _zOrder;
+        return order;
+    }
+
+    private void EndZOrder(List<(Visual Visual, int Index)> order)
+    {
+        if (ReferenceEquals(order, _zOrder))
+        {
+            _zOrderInUse = false;
+        }
     }
 
     private static int ZIndexOf(Visual visual)

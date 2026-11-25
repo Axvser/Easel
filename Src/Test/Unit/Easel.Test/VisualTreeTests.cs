@@ -132,6 +132,19 @@ public sealed class VisualTreeTests
         Assert.AreEqual(0, host.Controls.Count);
     }
 
+    [TestMethod]
+    public void AReentrantHitTestDuringAChildRenderDoesNotBreakTheWalk()
+    {
+        using var host = new VisualHost { Size = new Size(80, 80) };
+        var parent = new ContainerVisual { Bounds = new RectangleF(0f, 0f, 80f, 80f) };
+        parent.Add(new HitProbeVisual(parent) { Bounds = new RectangleF(0f, 0f, 40f, 40f) });
+        host.Root!.Add(parent);
+
+        using var bitmap = Render(host, 80, 80);
+
+        Assert.AreEqual(Color.White.ToArgb(), bitmap.GetPixel(70, 70).ToArgb());
+    }
+
     private static Bitmap Render(VisualHost host, int width, int height)
     {
         var bitmap = new Bitmap(width, height);
@@ -142,5 +155,15 @@ public sealed class VisualTreeTests
         }
 
         return bitmap;
+    }
+
+    // 子项在绘制时反查父级的命中：父级的 Z 序缓冲正在被 RenderChildren 枚举，重入必须不打断它。
+    private sealed class HitProbeVisual(ContainerVisual parent) : ContainerVisual
+    {
+        protected override void RenderContent(Graphics graphics)
+        {
+            base.RenderContent(graphics);
+            parent.HitTestVisual(new PointF(1f, 1f));
+        }
     }
 }
