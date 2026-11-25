@@ -257,6 +257,39 @@ public class ItemsControl : TemplatedControl
         AttachToItemsHost(visual);
     }
 
+    /// <summary>Adds a realized item visual to <see cref="Items"/> without attaching it to a host.</summary>
+    /// <param name="visual">The item visual to add.</param>
+    /// <remarks>A subclass that realizes a window keeps the remaining visuals here until they enter the viewport.</remarks>
+    protected void AddRealizedItemUnattached(VisualElement visual)
+    {
+        if (visual is null) throw new ArgumentNullException(nameof(visual));
+        _items.Add(visual);
+    }
+
+    /// <summary>Records that <see cref="RealizeItems"/> created one visual for every source item.</summary>
+    protected void MarkAllItemsRealized() => _realizesAllItems = true;
+
+    /// <summary>Attaches the realized items to the active host; the base implementation attaches every item.</summary>
+    protected virtual void AttachRealizedItemsToHost()
+    {
+        var host = ResolveItemsHost();
+        foreach (var item in _items)
+        {
+            AttachToHost(host, item);
+        }
+    }
+
+    /// <summary>Detaches every realized item from its host while keeping the instances.</summary>
+    protected virtual void DetachRealizedItemsFromHost()
+    {
+        for (var index = _items.Count - 1; index >= 0; index--)
+        {
+            // 直接摘父级，不走 RemoveChild：那条路会为每行重解隐式样式并逐次 InvalidateMeasure，
+            // 而这里要么马上挂进新宿主（Add 会重挂表面通知），要么整行即将释放。
+            _items[index].Parent?.Children.Remove(_items[index]);
+        }
+    }
+
     // item 挂在模板里的宿主或控件自身；宿主解析只在模板根变化时重查，不为每行遍历模板树。
     private void AttachToItemsHost(VisualElement visual)
     {
@@ -507,15 +540,7 @@ public class ItemsControl : TemplatedControl
     }
 
     // 摘下旧宿主但保留 _items，等下一次模板应用重新挂载。
-    private void DetachRealizedItems()
-    {
-        for (var index = _items.Count - 1; index >= 0; index--)
-        {
-            // 直接摘父级，不走 RemoveChild：那条路会为每行重解隐式样式并逐次 InvalidateMeasure，
-            // 而这里要么马上挂进新宿主（Add 会重挂表面通知），要么整行即将释放。
-            _items[index].Parent?.Children.Remove(_items[index]);
-        }
-    }
+    private void DetachRealizedItems() => DetachRealizedItemsFromHost();
 
     // 模板应用后把保留的 item 挂到新宿主；只有源或工厂已变化（数量对不上）时才真的重建。
     private void ReattachRealizedItems()
@@ -531,10 +556,7 @@ public class ItemsControl : TemplatedControl
             return;
         }
 
-        foreach (var item in _items)
-        {
-            AttachToItemsHost(item);
-        }
+        AttachRealizedItemsToHost();
 
         InvalidateMeasure();
         OnItemsRebuilt();
@@ -746,9 +768,17 @@ public class ListBoxItem : ContentControl
 
 /// <summary>A vertical list whose items can be selected by pointer or keyboard.</summary>
 /// <remarks>
-/// This list realizes every source item, so its selection and pointer mapping stay index-for-index. For a large
-/// fixed-row source use <see cref="VirtualList"/>; a virtualized mode here would have to route selection and input
-/// through the realized window, so it is not enabled on <see cref="ListBox"/> itself.
+/// <para>
+/// The list keeps one <see cref="ListBoxItem"/> per source item, so <see cref="ItemsControl.Items"/> stays
+/// index-for-index and selection by index does not depend on what the viewport shows. When the built-in shell hosts
+/// the list inside a <see cref="ScrollViewer"/>, only the rows intersecting the viewport (plus a small margin) are
+/// attached to the presenter; two spacer elements take the place of the rows above and below. Rows outside the
+/// window keep their content visual but have no control template until they enter it.
+/// </para>
+/// <para>
+/// A source larger than the viewport therefore costs the same per update as the visible rows, not the whole source.
+/// For a fixed-row source without a list shell use <see cref="VirtualList"/>.
+/// </para>
 /// </remarks>
 public class ListBox : ItemsControl
 {
@@ -764,8 +794,20 @@ public class ListBox : ItemsControl
             nameof(SelectedItem), typeof(object), typeof(ListBox),
             new PropertyMetadata(null) { AffectsRender = true });
 
+    // 窗口两端的占位元素；未知行高用已量到行高的均值估算。
+    private const float RealizationMargin = 48f;
+    private const int WindowPassLimit = 4;
+
     private bool _syncingSelection;
     private int _hoverIndex = -1;
+    private float[] _rowHeights = [];
+    private float _rowEstimate;
+    private Panel? _windowHost;
+    private VisualElement? _leadingSpacer;
+    private VisualElement? _trailingSpacer;
+    private int _windowFirst = -1;
+    private int _windowLast = -1;
+    private bool _updatingWindow;
 
     /// <summary>Creates a focusable list with theme metrics.</summary>
     public ListBox()
@@ -805,83 +847,352 @@ public class ListBox : ItemsControl
     }
 
     /// <inheritdoc />
-    protected override void ArrangeOverride(Size finalSize)
+    protected override void RealizeItems()
     {
-        base.ArrangeOverride(finalSize);
-        RealizeVisibleRows();
-    }
+        ResetWindow(disposeSpacers: true);
+        var count = SourceItems.Count;
+        _rowHeights = count == 0 ? [] : new float[count];
+        _rowEstimate = 0f;
 
-    // 行的文档位置由 ItemsPresenter 排好后才知道，因此在 Arrange 之后按视口实现模板。
-    private void RealizeVisibleRows()
-    {
-        var count = Items.Count;
-        if (count == 0)
-        {
-            return;
-        }
-
-        // 没有自己的滚动视口时不裁行，必须全部实现，否则行会不显示。
-        if (GetTemplateChild<ScrollViewer>("PART_ScrollViewer") is not { ContentPresenter: { } presenter })
-        {
-            for (var index = 0; index < count; index++)
-            {
-                if (Items[index] is ListBoxItem deferred)
-                {
-                    deferred.RealizeTemplate();
-                }
-            }
-
-            return;
-        }
-
-        // 行是 presenter 的直接子项，Bounds 已是 presenter 坐标；用偏移和视口比较，避免每行走一遍父链求绝对框。
-        var host = ResolveItemsHost();
-        var offset = presenter.VerticalOffset;
-        var viewportHeight = presenter.ViewportHeight;
-        if (viewportHeight <= 0f)
-        {
-            return;
-        }
-
-        var changed = false;
+        // 行容器全部先建出来（Items 的索引语义不变），但挂进宿主的工作交给窗口。
         for (var index = 0; index < count; index++)
         {
-            if (Items[index] is not ListBoxItem row)
+            AddRealizedItemUnattached(CreateItemVisual(SourceItems[index]));
+        }
+
+        MarkAllItemsRealized();
+        AttachRealizedItemsToHost();
+    }
+
+    /// <inheritdoc />
+    protected override void AttachRealizedItemsToHost()
+    {
+        var host = ResolveItemsHost();
+        if (host is null)
+        {
+            // 内置样式随后会给出宿主；先不挂，免得建好一行又整批摘下来。
+            ResetWindow(disposeSpacers: true);
+            return;
+        }
+
+        if (!TryResolveScrollViewport(out var presenter) || !IsInsidePresentedContent(host, presenter))
+        {
+            // 没有自己的滚动视口（或行宿主不在滚动内容里）时不裁行：所有行都必须挂着，否则不会显示。
+            ResetWindow(disposeSpacers: true);
+            base.AttachRealizedItemsToHost();
+            RealizeDeferredTemplates();
+            return;
+        }
+
+        PrepareWindowHost(host);
+        // 模板刚应用时视图口还没量过，Height 也可能是 NaN；先用控件高度撑出首屏，下一次 arrange 再校正。
+        var height = (float)Height;
+        var fallback = height > 0f ? height : 1f;
+        var viewport = presenter.ViewportHeight > 0f ? presenter.ViewportHeight : fallback;
+        UpdateWindow(host, presenter.VerticalOffset, viewport);
+    }
+
+    /// <inheritdoc />
+    protected override void DetachRealizedItemsFromHost()
+    {
+        // 占位元素随旧模板根一起释放；这里只丢引用，避免之后误用作新宿主的子项。
+        _windowHost = null;
+        _leadingSpacer = null;
+        _trailingSpacer = null;
+        _windowFirst = -1;
+        _windowLast = -1;
+        base.DetachRealizedItemsFromHost();
+    }
+
+    /// <inheritdoc />
+    protected override void ArrangeOverride(Size finalSize)
+    {
+        if (!IsTemplated)
+        {
+            // 没有模板的 ListBox 由控件自己竖排，行必须挂在控件或 ItemsPanel 上才能在首帧出现。
+            if (ItemCount > 0 && (Items[0].ParentElement is null || Items[ItemCount - 1].ParentElement is null))
             {
-                continue;
+                base.DetachRealizedItemsFromHost();
+                base.AttachRealizedItemsToHost();
             }
 
-            var bounds = row.Bounds;
-            if (bounds.Height <= 0f)
+            base.ArrangeOverride(finalSize);
+            RealizeDeferredTemplates();
+            return;
+        }
+
+        if (!TryResolveScrollViewport(out var presenter)
+            || ResolveItemsHost() is not { } host
+            || !IsInsidePresentedContent(host, presenter))
+        {
+            base.ArrangeOverride(finalSize);
+            RealizeDeferredTemplates();
+            return;
+        }
+
+        PrepareWindowHost(host);
+        ArrangeTemplate(finalSize);
+
+        // 行高要量过才知道：窗口、占位高度和估算值互相影响，所以每轮量完再算，直到稳定。
+        for (var pass = 0; pass < WindowPassLimit; pass++)
+        {
+            CaptureRowHeights(host);
+            var viewport = presenter.ViewportHeight > 0f ? presenter.ViewportHeight : finalSize.Height;
+            if (!UpdateWindow(host, presenter.VerticalOffset, viewport))
             {
-                continue;
+                break;
             }
 
-            // 不走模板 presenter 的行（自定义 ItemsPanel）无法用滚动偏移判断，直接实现，保持原有可见性。
-            if (!ReferenceEquals(row.ParentElement, host))
+            RealizeVisibleRows(host);
+            MeasureTemplate(finalSize);
+            ArrangeTemplate(finalSize);
+        }
+
+        CaptureRowHeights(host);
+        RealizeVisibleRows(host);
+    }
+
+    private bool TryResolveScrollViewport(out ScrollContentPresenter presenter)
+    {
+        if (GetTemplateChild<ScrollViewer>("PART_ScrollViewer") is { ContentPresenter: { } contentPresenter })
+        {
+            presenter = contentPresenter;
+            return true;
+        }
+
+        presenter = null!;
+        return false;
+    }
+
+    // 行必须在滚动内容里，presenter 的偏移才和行坐标同一套；自定义 ItemsPanel 挂在外壳之外时退回全量。
+    private static bool IsInsidePresentedContent(VisualElement host, ScrollContentPresenter presenter)
+    {
+        for (var current = host; current is not null; current = current.ParentElement)
+        {
+            if (ReferenceEquals(current, presenter.PresentedContent))
             {
-                if (row.IsTemplateDeferred)
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void PrepareWindowHost(Panel host)
+    {
+        if (ReferenceEquals(_windowHost, host) && _leadingSpacer is not null && _trailingSpacer is not null)
+        {
+            return;
+        }
+
+        ResetWindow(disposeSpacers: true);
+        _windowHost = host;
+        _leadingSpacer = new Grid { IsHitTestVisible = false };
+        _trailingSpacer = new Grid { IsHitTestVisible = false };
+        host.Children.Insert(0, _leadingSpacer);
+        host.Children.Add(_trailingSpacer);
+        _windowFirst = -1;
+        _windowLast = -1;
+    }
+
+    private void ResetWindow(bool disposeSpacers)
+    {
+        if (disposeSpacers)
+        {
+            RemoveSpacer(_leadingSpacer);
+            RemoveSpacer(_trailingSpacer);
+        }
+
+        _leadingSpacer = null;
+        _trailingSpacer = null;
+        _windowHost = null;
+        _windowFirst = -1;
+        _windowLast = -1;
+
+        static void RemoveSpacer(VisualElement? spacer)
+        {
+            if (spacer is null)
+            {
+                return;
+            }
+
+            spacer.Parent?.Children.Remove(spacer);
+            spacer.Dispose();
+        }
+    }
+
+    // 只挂视口窗口内的行；首尾各一个占位元素撑住整份源的高度。
+    private bool UpdateWindow(Panel host, float offset, float viewport)
+    {
+        if (_updatingWindow || _leadingSpacer is null || _trailingSpacer is null)
+        {
+            return false;
+        }
+
+        _updatingWindow = true;
+        try
+        {
+            var count = ItemCount;
+            var estimate = ResolveRowEstimate();
+            var start = Math.Max(0f, offset - RealizationMargin);
+            var end = offset + Math.Max(1f, viewport) + RealizationMargin;
+
+            var top = 0f;
+            var first = 0;
+            while (first < count)
+            {
+                var height = RowHeightAt(first, estimate);
+                if (top + height > start)
                 {
-                    row.RealizeTemplate();
-                    changed = true;
+                    break;
                 }
 
+                top += height;
+                first++;
+            }
+
+            var windowBottom = top;
+            var last = first;
+            while (last < count && windowBottom < end)
+            {
+                windowBottom += RowHeightAt(last, estimate);
+                last++;
+            }
+
+            var total = windowBottom;
+            for (var index = last; index < count; index++)
+            {
+                total += RowHeightAt(index, estimate);
+            }
+
+            var changed = false;
+            for (var index = _windowLast; index >= _windowFirst; index--)
+            {
+                if (index < 0)
+                {
+                    break;
+                }
+
+                if (index >= first && index < last)
+                {
+                    continue;
+                }
+
+                DetachWindowRow(host, index);
+                changed = true;
+            }
+
+            for (var index = first; index < last; index++)
+            {
+                var row = Items[index];
+                if (row.ParentElement == host)
+                {
+                    continue;
+                }
+
+                var childIndex = Math.Min(1 + (index - first), host.Children.Count);
+                host.Children.Insert(childIndex, row);
+                row.RefreshStyle();
+                changed = true;
+            }
+
+            _windowFirst = first;
+            _windowLast = last - 1;
+            changed |= SetSpacerHeight(_leadingSpacer, top);
+            changed |= SetSpacerHeight(_trailingSpacer, Math.Max(0f, total - windowBottom));
+            return changed;
+        }
+        finally
+        {
+            _updatingWindow = false;
+        }
+    }
+
+    private void DetachWindowRow(Panel host, int index)
+    {
+        var row = Items[index];
+        if (row.ParentElement == host)
+        {
+            host.Children.Remove(row);
+        }
+
+        if (row is ListBoxItem item)
+        {
+            item.ReleaseTemplate();
+        }
+    }
+
+    private static bool SetSpacerHeight(VisualElement spacer, float height)
+    {
+        if (!double.IsNaN(spacer.Height) && Math.Abs(spacer.Height - height) < 0.01d)
+        {
+            return false;
+        }
+
+        spacer.Height = height;
+        return true;
+    }
+
+    private float RowHeightAt(int index, float estimate)
+        => index >= 0 && index < _rowHeights.Length && _rowHeights[index] > 0f ? _rowHeights[index] : estimate;
+
+    private float ResolveRowEstimate()
+        => _rowEstimate > 0f ? _rowEstimate : Math.Max(1f, Theme.Current.ControlHeight);
+
+    // 量到的行高写回表里；均值用于还没进过视口的行。
+    private void CaptureRowHeights(Panel host)
+    {
+        var sum = 0f;
+        var known = 0;
+        for (var index = 0; index < _rowHeights.Length; index++)
+        {
+            if (_rowHeights[index] > 0f)
+            {
+                sum += _rowHeights[index];
+                known++;
+            }
+        }
+
+        for (var index = _windowFirst; index >= 0 && index <= _windowLast; index++)
+        {
+            var row = Items[index];
+            if (row.ParentElement != host || row.Bounds.Height <= 0f)
+            {
                 continue;
             }
 
-            var top = bounds.Y;
-            var bottom = bounds.Y + bounds.Height;
-            if (row.IsTemplateDeferred)
+            var height = row.Bounds.Height;
+            var previous = _rowHeights[index];
+            if (Math.Abs(previous - height) <= 0.01f)
             {
-                if (bottom > offset && top < offset + viewportHeight)
-                {
-                    row.RealizeTemplate();
-                    changed = true;
-                }
+                continue;
             }
-            else if (bottom <= offset - RealizationMargin || top >= offset + viewportHeight + RealizationMargin)
+
+            if (previous <= 0f)
             {
-                row.ReleaseTemplate();
+                sum += height;
+                known++;
+            }
+            else
+            {
+                sum += height - previous;
+            }
+
+            _rowHeights[index] = height;
+        }
+
+        _rowEstimate = known > 0 ? sum / known : 0f;
+    }
+
+    // 行在窗口内才需要模板；窗口已含实现边距，不必再按 Bounds 二次判断。
+    private void RealizeVisibleRows(Panel host)
+    {
+        var changed = false;
+        for (var index = _windowFirst; index >= 0 && index <= _windowLast; index++)
+        {
+            if (Items[index] is ListBoxItem { IsTemplateDeferred: true } row && row.ParentElement == host)
+            {
+                row.RealizeTemplate();
                 changed = true;
             }
         }
@@ -893,8 +1204,24 @@ public class ListBox : ItemsControl
         }
     }
 
-    // 释放边界比实现边界宽出一小段，滚动到边界附近不会抖。
-    private const float RealizationMargin = 48f;
+    private void RealizeDeferredTemplates()
+    {
+        var changed = false;
+        for (var index = 0; index < Items.Count; index++)
+        {
+            if (Items[index] is ListBoxItem { IsTemplateDeferred: true } row)
+            {
+                row.RealizeTemplate();
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            SyncContainerStates();
+            InvalidateMeasure();
+        }
+    }
 
     /// <inheritdoc />
     protected override void OnPointerMoved(VisualPointerEventArgs args)
@@ -1011,6 +1338,7 @@ public class ListBox : ItemsControl
         {
             SyncSelectedItemFromIndex();
             SyncContainerStates();
+            ScrollSelectedIndexIntoView();
             InvalidateVisual();
             OnSelectionChanged();
         }
@@ -1018,6 +1346,7 @@ public class ListBox : ItemsControl
         {
             SyncSelectedIndexFromItem();
             SyncContainerStates();
+            ScrollSelectedIndexIntoView();
             InvalidateVisual();
             OnSelectionChanged();
         }
@@ -1041,13 +1370,78 @@ public class ListBox : ItemsControl
         }
 
         SyncContainerStates();
+        ScrollSelectedIndexIntoView();
         InvalidateVisual();
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // 占位元素随模板根释放；丢引用即可，不能在这里二次释放。
+            _leadingSpacer = null;
+            _trailingSpacer = null;
+            _windowHost = null;
+        }
+
+        base.Dispose(disposing);
+    }
+
+    // 选中的行不在视口里时把滚动位置推到它；窗口外的行没有 Bounds，只能按行高估算。
+    private void ScrollSelectedIndexIntoView()
+    {
+        var index = SelectedIndex;
+        if (_windowHost is null || index < 0 || index >= ItemCount)
+        {
+            return;
+        }
+
+        if (!TryResolveScrollViewport(out var presenter) || presenter.ViewportHeight <= 0f)
+        {
+            return;
+        }
+
+        var estimate = ResolveRowEstimate();
+        var top = 0f;
+        for (var candidate = 0; candidate < index && candidate < _rowHeights.Length; candidate++)
+        {
+            top += RowHeightAt(candidate, estimate);
+        }
+
+        var bottom = top + RowHeightAt(index, estimate);
+        var offset = presenter.VerticalOffset;
+        var viewport = presenter.ViewportHeight;
+        if (top >= offset && bottom <= offset + viewport)
+        {
+            return;
+        }
+
+        var target = Math.Max(0f, bottom > offset + viewport ? bottom - viewport : top);
+        if (GetTemplateChild<ScrollViewer>("PART_ScrollViewer") is { } scroll)
+        {
+            scroll.VerticalOffset = target;
+        }
     }
 
     private int IndexAt(PointF local)
     {
         // 模板里的 item 挂在 ItemsHost 下，Bounds 不是列表坐标；统一换到表面坐标再比。
         var surfacePoint = PointToSurface(local);
+        if (_windowHost is { } host)
+        {
+            for (var index = _windowFirst; index >= 0 && index <= _windowLast; index++)
+            {
+                var row = Items[index];
+                if (row.ParentElement == host && row.AbsoluteBounds.Contains(surfacePoint))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
         for (var index = 0; index < Items.Count; index++)
         {
             if (Items[index].AbsoluteBounds.Contains(surfacePoint))
