@@ -909,7 +909,9 @@ public class VisualHost : System.Windows.Forms.Control
     {
         var previousDamage = Visual.RenderDamage;
         var previousCull = Visual.CullToDamage;
+        var previousGraphics = Visual.RenderGraphics;
         Visual.PushRenderDamage(damage, cull);
+        Visual.PushRenderGraphics(graphics);
 
         var state = graphics.Save();
         try
@@ -922,6 +924,7 @@ public class VisualHost : System.Windows.Forms.Control
         {
             graphics.Restore(state);
             Visual.PushRenderDamage(previousDamage, previousCull);
+            Visual.PushRenderGraphics(previousGraphics);
         }
     }
 

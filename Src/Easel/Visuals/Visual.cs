@@ -129,6 +129,9 @@ public abstract class Visual : WinformsObject
     // 是否按脏区剔除子树。整面重画时为 false。
     [ThreadStatic] private static bool _cullToDamage;
 
+    // 整面重画时的目标 Graphics：用它的可见裁剪区做一次便宜的剔除。
+    [ThreadStatic] private static Graphics? _renderGraphics;
+
     // 阴影、槽环与连线端点会画出 Bounds 之外，剔除时统一外扩这个余量。
     private const float DamageCullMargin = 32f;
 
@@ -142,6 +145,10 @@ public abstract class Visual : WinformsObject
         _cullToDamage = cull;
     }
 
+    internal static Graphics? RenderGraphics => _renderGraphics;
+
+    internal static void PushRenderGraphics(Graphics? graphics) => _renderGraphics = graphics;
+
     // 子项整棵子树都落在脏区外才跳过；拿不准是否越界的一律照画。
     internal static bool ShouldRenderChild(Visual? child)
     {
@@ -150,7 +157,59 @@ public abstract class Visual : WinformsObject
             return false;
         }
 
-        return !_cullToDamage || IntersectsRenderDamage(child, _renderDamage);
+        if (_cullToDamage)
+        {
+            return IntersectsRenderDamage(child, _renderDamage);
+        }
+
+        return IsInsideVisibleClip(child);
+    }
+
+    // 整面重画时用 Graphics 的可见裁剪区剔除子树。位图缓存、效果、无界容器等保守放行。
+    private static bool IsInsideVisibleClip(Visual visual)
+    {
+        if (!visual.IsVisible || visual.Opacity <= 0d)
+        {
+            return false;
+        }
+
+        if (visual.CacheAsBitmap
+            || visual.Effect is not null
+            || visual.OpacityMask is not null
+            || (visual.Transform3D is { IsIdentity: false })
+            || visual.UnboundedHitTest
+            || _renderGraphics is null)
+        {
+            return true;
+        }
+
+        // 这里在父级的局部坐标里调用，Graphics 已带上父级的平移/裁剪；用 child.Bounds 而不是表面坐标。
+        // 自带变换的子项可能越出 Bounds，保守放行。
+        if (!visual.Transform.IsIdentity)
+        {
+            return true;
+        }
+
+        var bounds = visual.Bounds;
+        if (bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            // 零尺寸容器可能仍画出子项；只在它有未裁剪子项时放行。
+            if (visual is ContainerVisual zero && !visual.ClipToBounds)
+            {
+                foreach (var child in zero.Children)
+                {
+                    if (child is not null && child.IsVisible)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        bounds.Inflate(DamageCullMargin, DamageCullMargin);
+        return _renderGraphics.IsVisible(bounds);
     }
 
     private static bool IntersectsRenderDamage(Visual visual, RectangleF damage)
@@ -322,6 +381,8 @@ public abstract class Visual : WinformsObject
             return;
         }
 
+        var previousGraphics = _renderGraphics;
+        _renderGraphics = graphics;
         var state = graphics.Save();
         try
         {
@@ -371,6 +432,7 @@ public abstract class Visual : WinformsObject
         finally
         {
             graphics.Restore(state);
+            _renderGraphics = previousGraphics;
         }
     }
 
@@ -591,8 +653,17 @@ public abstract class Visual : WinformsObject
             using (var graphics = Graphics.FromImage(_cache))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                RenderContent(graphics);
-                RenderChildren(graphics);
+                var previousGraphics = _renderGraphics;
+                _renderGraphics = graphics;
+                try
+                {
+                    RenderContent(graphics);
+                    RenderChildren(graphics);
+                }
+                finally
+                {
+                    _renderGraphics = previousGraphics;
+                }
             }
         }
         finally
@@ -673,8 +744,17 @@ public abstract class Visual : WinformsObject
         {
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             graphics.TranslateTransform(padding, padding);
-            RenderContent(graphics);
-            RenderChildren(graphics);
+            var previousGraphics = _renderGraphics;
+            _renderGraphics = graphics;
+            try
+            {
+                RenderContent(graphics);
+                RenderChildren(graphics);
+            }
+            finally
+            {
+                _renderGraphics = previousGraphics;
+            }
         }
 
         if (OpacityMask is { } mask)
