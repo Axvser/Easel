@@ -97,7 +97,12 @@ public class VisualHost : System.Windows.Forms.Control
             true);
         DoubleBuffered = true;
         TabStop = true;
-        AllowDrop = true;
+        // OLE 拖放只能在 STA 线程注册；MTA 线程上的宿主没有原生拖放，视觉树本身仍然可用。
+        if (System.Threading.Thread.CurrentThread.GetApartmentState() == System.Threading.ApartmentState.STA)
+        {
+            AllowDrop = true;
+        }
+
         Root = new ContainerVisual();
         _styles.Changed += (_, _) => RefreshStyles();
         _overlay.SetSurfaceRoot(this);

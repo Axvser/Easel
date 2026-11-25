@@ -431,6 +431,29 @@ public sealed class VisualBackendTests
         Assert.AreEqual(Color.Red.ToArgb(), bitmap.GetPixel(10, 10).ToArgb(), "body");
     }
 
+    [TestMethod]
+    public void AnMtaThreadCanCreateTheSurfaceHandle()
+    {
+        Exception? failure = null;
+        var thread = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                using var surface = new VisualHost { Size = new Size(80, 40) };
+                _ = surface.Handle;
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(System.Threading.ApartmentState.MTA);
+        thread.Start();
+
+        Assert.IsTrue(thread.Join(TimeSpan.FromSeconds(10)), "the MTA thread finished");
+        Assert.IsNull(failure, failure?.ToString() ?? "the MTA thread failed");
+    }
+
     private static VisualHost CreateSurface(int width, int height)
         => new() { Size = new Size(width, height) };
 
