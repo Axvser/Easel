@@ -200,6 +200,138 @@ public sealed class RangeDefaultsTests
         Assert.AreEqual(accentColor.ToArgb(), fill!.Background!.ApproximateColor.ToArgb());
     }
 
+    [TestMethod]
+    public void SliderValueChange_MovesThePartsWithoutAnotherLayoutPass()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 20 };
+        surface.Root = slider;
+        Layout(surface, 320, 240);
+
+        var fill = slider.GetTemplateChild<VisualElement>("PART_Fill")!;
+        var layouts = 0;
+        surface.LayoutUpdated += (_, _) => layouts++;
+        var paints = surface.PaintCount;
+        var filled = fill.Bounds.Width;
+
+        slider.Value = 80;
+
+        Assert.AreEqual(0, layouts, "the value change only re-arranges template parts, it does not run layout");
+        Assert.IsGreaterThan(filled, fill.Bounds.Width, "the fill follows the value immediately");
+        Assert.AreEqual(paints, surface.PaintCount, "nothing paints until the surface is rendered");
+
+        Layout(surface, 320, 240);
+        Assert.AreEqual(paints + 1, surface.PaintCount, "the value change still damages the surface");
+        Assert.AreEqual(0, layouts, "rendering the value change still does not run layout");
+    }
+
+    [TestMethod]
+    public void SliderFocusRing_IsPositionedAtTheCurrentValueWhenFocusBecomesVisible()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 20 };
+        surface.Root = slider;
+        Layout(surface, 320, 240);
+
+        var thumb = slider.GetTemplateChild<VisualElement>("PART_Thumb")!;
+        var ring = slider.GetTemplateChild<VisualElement>("PART_FocusRing")!;
+        Assert.AreEqual(0d, ring.Opacity, 0.01d);
+
+        slider.Value = 75;
+        Assert.IsTrue(slider.Focus());
+        surface.ProcessKeyDown(Keys.Right);
+
+        Assert.AreEqual(1d, ring.Opacity, 0.01d, "keyboard focus shows the ring");
+        Assert.AreEqual(
+            thumb.Bounds.X + (thumb.Bounds.Width / 2f),
+            ring.Bounds.X + (ring.Bounds.Width / 2f),
+            0.75f,
+            "the ring follows the thumb so it is not stale when focus appears");
+    }
+
+    [TestMethod]
+    public void SliderTemplateReplacement_RearrangesAgainstTheNewParts()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        var track = new VC.Border { Height = 6f, Padding = default, Background = Color.Green, VerticalAlignment = XamlVerticalAlignment.Center };
+        var fill = new VC.Border { Padding = default, Background = Color.Orange };
+        var template = CreateTemplate(track, fill, thumb: null);
+
+        using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 25 };
+        surface.Root = slider;
+        Layout(surface, 320, 240);
+        Assert.AreNotSame(fill, slider.GetTemplateChild<VC.Border>("PART_Fill"), "the built-in template is still active");
+
+        slider.Template = template;
+        Layout(surface, 320, 240);
+        Assert.AreSame(fill, slider.GetTemplateChild<VC.Border>("PART_Fill"), "the replacement exposes its own fill");
+
+        slider.Value = 60;
+        Assert.AreEqual(track.Bounds.Width * 0.6f, fill.Bounds.Width, 0.75f,
+            "the cached parts were discarded and the new fill is arranged by value");
+    }
+
+    [TestMethod]
+    public void ProgressBarValueChange_UpdatesTheFillWithoutAnotherLayoutPass()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var bar = new VC.ProgressBar { Width = 200, Height = 10, Minimum = 0, Maximum = 100, Value = 25 };
+        surface.Root = bar;
+        Layout(surface, 320, 240);
+
+        var fill = bar.GetTemplateChild<VisualElement>("PART_Fill")!;
+        var layouts = 0;
+        surface.LayoutUpdated += (_, _) => layouts++;
+
+        bar.Value = 75;
+
+        Assert.AreEqual(0, layouts, "the bar moves its fill without a layout pass");
+        Assert.AreEqual(150f, fill.Bounds.Width, 0.75f, "the fill follows the value immediately");
+    }
+
+    [TestMethod]
+    public void SliderCustomTemplateWithoutATrackPart_KeepsTheFullWidthTravel()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        var fill = new VC.Border { Padding = default, Background = Color.Orange };
+        using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 50 };
+        slider.Template = CreateTemplate(track: null, fill, thumb: null);
+        surface.Root = slider;
+        Layout(surface, 320, 240);
+
+        slider.Value = 80;
+
+        Assert.AreEqual(186f * 0.8f, fill.Bounds.Width, 0.75f,
+            "without PART_Track the control falls back to its own inset track as the travel");
+    }
+
+    private static VisualControlTemplate CreateTemplate(VC.Border? track, VC.Border fill, VC.Border? thumb)
+    {
+        return new VisualControlTemplate(scope =>
+        {
+            var root = new VC.Grid();
+            if (track is not null)
+            {
+                root.Add(track);
+                scope.Register("PART_Track", track);
+            }
+
+            root.Add(fill);
+            scope.Register("PART_Fill", fill);
+
+            if (thumb is not null)
+            {
+                root.Add(thumb);
+                scope.Register("PART_Thumb", thumb);
+            }
+
+            return root;
+        })
+        {
+            TargetType = typeof(VC.Slider),
+        };
+    }
+
     private static void Layout(VisualHost surface, int width, int height)
     {
         using var bitmap = new Bitmap(1, 1);

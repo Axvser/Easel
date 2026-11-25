@@ -15,6 +15,12 @@ namespace Easel.Visuals.Controls;
 /// </remarks>
 public class ProgressBar : TemplatedControl
 {
+    private VisualElement? _trackPart;
+    private VisualElement? _fillPart;
+    private RectangleF _trackRect;
+    private bool _trackRectValid;
+    private bool _partsResolved;
+
     /// <summary>The lowest value.</summary>
     public static readonly DependencyProperty MinimumProperty = DependencyProperty.Register(
         nameof(Minimum), typeof(double), typeof(ProgressBar),
@@ -78,25 +84,27 @@ public class ProgressBar : TemplatedControl
     protected override void ArrangeOverride(Size finalSize)
     {
         base.ArrangeOverride(finalSize);
-        ArrangeTemplateParts(finalSize);
+        ArrangeTemplateParts(finalSize, refreshTrack: true);
     }
 
-    private void ArrangeTemplateParts(SizeF finalSize)
+    private void ArrangeTemplateParts(SizeF finalSize, bool refreshTrack)
     {
         if (!IsTemplated)
         {
             return;
         }
 
-        var track = GetTemplateChild<VisualElement>("PART_Track") is { } trackPart
-            ? RangeParts.ToControlBounds(this, trackPart)
-            : new RectangleF(0f, 0f, finalSize.Width, finalSize.Height);
+        ResolveParts();
+        var track = refreshTrack || !_trackRectValid ? GetTrackRect() : _trackRect;
         if (track.Width <= 0f)
         {
             track = new RectangleF(track.X, track.Y, Math.Max(0f, finalSize.Width), track.Height);
         }
 
-        if (GetTemplateChild<VisualElement>("PART_Fill") is { } fill)
+        _trackRect = track;
+        _trackRectValid = true;
+
+        if (_fillPart is { } fill)
         {
             RangeParts.Arrange(
                 this,
@@ -109,10 +117,51 @@ public class ProgressBar : TemplatedControl
         }
     }
 
+    private RectangleF GetTrackRect()
+    {
+        if (IsTemplated)
+        {
+            ResolveParts();
+            if (_trackPart is { } trackPart)
+            {
+                var arranged = RangeParts.ToControlBounds(this, trackPart);
+                if (arranged.Width > 0f)
+                {
+                    return arranged;
+                }
+            }
+        }
+
+        return new RectangleF(0f, 0f, Bounds.Width, Bounds.Height);
+    }
+
+    private void ResolveParts()
+    {
+        if (_partsResolved)
+        {
+            return;
+        }
+
+        _trackPart = GetTemplateChild<VisualElement>("PART_Track");
+        _fillPart = GetTemplateChild<VisualElement>("PART_Fill");
+        _partsResolved = true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        base.OnTemplateChanging();
+        _trackPart = null;
+        _fillPart = null;
+        _trackRectValid = false;
+        _partsResolved = false;
+    }
+
     /// <inheritdoc />
     protected override void OnTemplateChanged()
     {
         base.OnTemplateChanged();
+        ResolveParts();
         InvalidateArrange();
     }
 
@@ -160,10 +209,10 @@ public class ProgressBar : TemplatedControl
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
             // 值变化只移动模板部件，不让整棵模板重排；拖动时每帧一次 Arrange 会放大到整页布局。
+            // Value/Minimum/Maximum 的元数据已经是 AffectsRender，基础类已经报过脏区，这里不再重复失效。
             if (Bounds.Width > 0f && Bounds.Height > 0f)
             {
-                ArrangeTemplateParts(Bounds.Size);
-                InvalidateVisual();
+                ArrangeTemplateParts(Bounds.Size, refreshTrack: false);
             }
             else
             {
@@ -182,6 +231,15 @@ public class ProgressBar : TemplatedControl
 /// </remarks>
 public class Slider : TemplatedControl
 {
+    private VisualElement? _trackPart;
+    private VisualElement? _fillPart;
+    private VisualElement? _thumbPart;
+    private VisualElement? _focusRingPart;
+    private RectangleF _trackRect;
+    private bool _trackRectValid;
+    private bool _partsResolved;
+    private bool _dragging;
+
     /// <summary>The lowest value.</summary>
     public static readonly DependencyProperty MinimumProperty = DependencyProperty.Register(
         nameof(Minimum), typeof(double), typeof(Slider),
@@ -197,7 +255,6 @@ public class Slider : TemplatedControl
         nameof(Value), typeof(double), typeof(Slider),
         new PropertyMetadata(0d) { AffectsRender = true });
 
-    private bool _dragging;
     private const float ThumbRadius = 7f;
     private const float TrackHeight = 4f;
 
@@ -266,19 +323,23 @@ public class Slider : TemplatedControl
     protected override void ArrangeOverride(Size finalSize)
     {
         base.ArrangeOverride(finalSize);
-        ArrangeTemplateParts(finalSize);
+        ArrangeTemplateParts(finalSize, refreshTrack: true);
     }
 
-    private void ArrangeTemplateParts(SizeF finalSize)
+    private void ArrangeTemplateParts(SizeF finalSize, bool refreshTrack)
     {
         if (!IsTemplated)
         {
             return;
         }
 
-        var track = GetTrackRect();
+        ResolveParts();
+        var track = refreshTrack || !_trackRectValid ? GetTrackRect() : _trackRect;
+        _trackRect = track;
+        _trackRectValid = true;
+
         var thumbX = track.Left + (track.Width * (float)Fraction);
-        if (GetTemplateChild<VisualElement>("PART_Fill") is { } fill)
+        if (_fillPart is { } fill)
         {
             RangeParts.Arrange(
                 this,
@@ -291,21 +352,48 @@ public class Slider : TemplatedControl
         }
 
         var center = new PointF(thumbX, track.Top + (track.Height / 2f));
-        if (GetTemplateChild<VisualElement>("PART_Thumb") is { } thumb)
+        if (_thumbPart is { } thumb)
         {
             RangeParts.ArrangeCentered(this, thumb, center);
         }
 
-        if (GetTemplateChild<VisualElement>("PART_FocusRing") is { } focusRing)
+        if (_focusRingPart is { } focusRing)
         {
             RangeParts.ArrangeCentered(this, focusRing, center);
         }
+    }
+
+    private void ResolveParts()
+    {
+        if (_partsResolved)
+        {
+            return;
+        }
+
+        _trackPart = GetTemplateChild<VisualElement>("PART_Track");
+        _fillPart = GetTemplateChild<VisualElement>("PART_Fill");
+        _thumbPart = GetTemplateChild<VisualElement>("PART_Thumb");
+        _focusRingPart = GetTemplateChild<VisualElement>("PART_FocusRing");
+        _partsResolved = true;
+    }
+
+    /// <inheritdoc />
+    protected override void OnTemplateChanging()
+    {
+        base.OnTemplateChanging();
+        _trackPart = null;
+        _fillPart = null;
+        _thumbPart = null;
+        _focusRingPart = null;
+        _trackRectValid = false;
+        _partsResolved = false;
     }
 
     /// <inheritdoc />
     protected override void OnTemplateChanged()
     {
         base.OnTemplateChanged();
+        ResolveParts();
         InvalidateArrange();
     }
 
@@ -424,10 +512,11 @@ public class Slider : TemplatedControl
                 || ReferenceEquals(e.Property, MinimumProperty)
                 || ReferenceEquals(e.Property, MaximumProperty)))
         {
+            // 值变化只移动模板部件，不让整棵模板重排；拖动时每帧一次 Arrange 会放大到整页布局。
+            // Value/Minimum/Maximum 的元数据已经是 AffectsRender，基础类已经报过脏区，这里不再重复失效。
             if (Bounds.Width > 0f && Bounds.Height > 0f)
             {
-                ArrangeTemplateParts(Bounds.Size);
-                InvalidateVisual();
+                ArrangeTemplateParts(Bounds.Size, refreshTrack: false);
             }
             else
             {
@@ -439,7 +528,7 @@ public class Slider : TemplatedControl
     // 模板轨道的已排矩形是拖动的行程；没有 PART_Track 时退回自绘轨道的内缩矩形。
     private RectangleF GetTrackRect()
     {
-        if (IsTemplated && GetTemplateChild<VisualElement>("PART_Track") is { } trackPart)
+        if (IsTemplated && _trackPart is { } trackPart)
         {
             var arranged = RangeParts.ToControlBounds(this, trackPart);
             if (arranged.Width > 0f)
