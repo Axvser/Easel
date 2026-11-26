@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 
 namespace Easel.Visuals;
@@ -54,23 +53,6 @@ internal static class VisualText
         }
 
         return MeasureContext(dpi).MeasureString(text, font, PointF.Empty, TightFormat()).Width;
-    }
-
-    // 字符串的排版宽度包含最后一个字形的右侧 bearing；密码掩码圆点很宽，插入符会停在
-    // 最后一个点之后的一整段空白上。用字形路径的墨水右边界，让插入符贴住最后的点。
-    internal static float MeasureInkRight(string text, Font font, int dpi)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return 0f;
-        }
-
-        var emSize = font.Unit == GraphicsUnit.Pixel
-            ? font.Size
-            : font.Size * dpi / 72f;
-        using var path = new GraphicsPath();
-        path.AddString(text, font.FontFamily, (int)font.Style, emSize, PointF.Empty, TightFormat());
-        return path.GetBounds().Right;
     }
 
     public static void Draw(

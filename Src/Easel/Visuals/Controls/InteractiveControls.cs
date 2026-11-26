@@ -724,6 +724,10 @@ public class TextBox : TemplatedControl
 
     private string DisplayText => IsPassword ? new string('●', Text.Length) : Text;
 
+    // 密码字段按固定单元绘制掩码点：整串 MeasureString/DrawString 在 150% DPI 下会把
+    // 最后一个点之后的侧边距算进插入符位置，看起来隔了一格。逐点定位让绘制与插入符共用同一推进量。
+    private float PasswordCellWidth => VisualText.MeasureWidthTight("●", Font, RenderDpi);
+
     /// <inheritdoc />
     protected override Size MeasureOverride(Size availableSize)
         => IsTemplated ? MeasureTemplate(availableSize) : MeasureEditor(availableSize);
@@ -1390,6 +1394,11 @@ public class TextBox : TemplatedControl
             return 0f;
         }
 
+        if (IsPassword && !MultiLine)
+        {
+            return PasswordCellWidth * clamped;
+        }
+
         return VisualText.MeasureWidthTight(DisplayText.Substring(line.Start, clamped), Font, RenderDpi);
     }
 
@@ -1445,6 +1454,23 @@ public class TextBox : TemplatedControl
             return;
         }
 
+        if (IsPassword && !MultiLine)
+        {
+            // 每个掩码点落在自己的单元里；插入符、选区与绘制使用同一个 PasswordCellWidth。
+            var cell = PasswordCellWidth;
+            for (var i = 0; i < length; i++)
+            {
+                var cellBounds = new RectangleF(
+                    content.Left - offset + ((line.Start + start + i) * cell),
+                    textTop + (lineIndex * _lineHeight),
+                    Math.Max(1f, cell + 1f),
+                    _lineHeight);
+                VisualText.DrawTight(this, graphics, "●", Font, brush, cellBounds);
+            }
+
+            return;
+        }
+
         var text = display.Substring(line.Start + start, length);
         var width = (float)Math.Ceiling(VisualText.MeasureWidthTight(text, Font, RenderDpi));
         var destination = new RectangleF(
@@ -1493,12 +1519,9 @@ public class TextBox : TemplatedControl
         var thickness = (float)CaretThickness;
         var lineIndex = FindLineIndex(CaretIndex);
         var line = _lines[lineIndex];
-        // 密码圆点的排版宽度带 trailing bearing；用墨水右边界让插入符贴住最后一个点。
+        // 密码字段的 MeasurePrefix 使用固定掩码单元，和逐点绘制共用同一推进量。
         var caretLength = CaretIndex - line.Start;
-        var caretPrefix = IsPassword && caretLength > 0
-            ? VisualText.MeasureInkRight(DisplayText.Substring(line.Start, caretLength), Font, RenderDpi)
-            : MeasurePrefix(line, caretLength);
-        var caretX = content.Left - offset + caretPrefix;
+        var caretX = content.Left - offset + MeasurePrefix(line, caretLength);
         var top = textTop + (lineIndex * _lineHeight) + 2f;
         var height = Math.Max(1f, _lineHeight - 4f);
         if (IsOverwriteMode)
@@ -1506,7 +1529,7 @@ public class TextBox : TemplatedControl
             // 覆盖模式的方块占住下一个字符的推进宽度；到行尾没有下一个字符时给一个可见的默认宽度。
             var width = CaretIndex < line.Start + line.Length
                 ? MeasurePrefix(line, CaretIndex - line.Start + 1) - MeasurePrefix(line, CaretIndex - line.Start)
-                : Math.Max(6f, thickness * 4f);
+                : Math.Max(6f, IsPassword && !MultiLine ? PasswordCellWidth : thickness * 4f);
             var rect = new RectangleF(caretX, top, Math.Max(1f, width), height);
             var alpha = (int)Math.Round(color.A * CaretBlockOpacity);
             if (alpha > 0)
