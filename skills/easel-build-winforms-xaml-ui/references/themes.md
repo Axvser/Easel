@@ -2,8 +2,8 @@
 
 Easel controls have a default palette; an application can switch it, follow Windows, or provide its own
 `ResourceDictionary`. Two surfaces read the theme: the host's theme resource dictionary (the built-in styles use
-`{DynamicResource}` keys) and `Theme.Current` (self-drawn chrome and control metrics). A complete custom theme
-usually sets both.
+`{DynamicResource}` keys) and `Theme.Current` (self-drawn chrome and control metrics). The normal customization is
+a partial resource overlay plus, when needed, `Style.BasedOn`; a complete palette is only for replacing every token.
 
 ## Modes and the active palette
 
@@ -115,6 +115,34 @@ surface.Resources.MergedDictionaries.Add(overrides); // appended after the theme
   control chrome follows the overlay. Most control metrics and self-drawn chrome read `Theme.Current`, not the
   resource dictionary; call `Theme.ApplyPalette` (or assign `Theme.Current`) as well when those should change.
 
+### Deriving styles with BasedOn
+
+`Style.BasedOn` is the preferred way to specialize an existing style instead of copying its setters:
+
+```xml
+<!-- in a view's Resources, or in a dictionary that contains BaseText -->
+<Style x:Key="BaseText" TargetType="TextBlock">
+  <Style.Setters>
+    <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
+    <Setter Property="FontSize" Value="10" />
+  </Style.Setters>
+</Style>
+<Style x:Key="BrandHeading" TargetType="TextBlock" BasedOn="{StaticResource BaseText}">
+  <Style.Setters>
+    <Setter Property="FontSize" Value="19" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style.Setters>
+</Style>
+```
+
+The built-in `Heading`, `Subheading`, `Body` and `Caption` themselves form a `BasedOn` chain rooted at `Body`.
+`BasedOn` accepts only `{StaticResource Key}`. In a standalone `ResourceDictionary` it resolves against that
+dictionary and its own `MergedDictionaries` at load time, not the host theme; to derive from a built-in style,
+declare the derived style in the view's `Resources` (the owner chain reaches `VisualHost.Resources`), or put
+both styles in the same dictionary. A derived style that references a key which has not resolved yet throws
+`No resource named …` on the eager `BasedOn` read.
+
 ### Full palette
 
 `ThemePalette.FromResourceDictionary(dictionary)` reads the standard keys directly. Unlike a merged overlay, a key
@@ -141,8 +169,8 @@ high-contrast theme and gradient brushes), and refresh that copy yourself when t
 
 `ThemePalette` carries font family, size and weight, scroll-bar thumb colors/radius, shape stroke and
 shadow defaults, control border/focus thicknesses and the existing layout metrics. The built-in dictionaries
-define `Heading`/`Subheading`/`Body`/`Caption` styles. A control's default text reads the palette's font
-tokens; a `Style` setter reads explicit values. `x:String`, `x:Double`, `x:FontWeight`, `x:Thickness`,
+define `Heading`/`Subheading`/`Body`/`Caption` styles; `Subheading`/`Heading`/`Caption` derive from `Body` with
+`BasedOn`. A control's default text reads the palette's font tokens; a `Style` setter reads explicit values. `x:String`, `x:Double`, `x:FontWeight`, `x:Thickness`,
 `x:PointF` and the other scalar resource types can carry those tokens in a custom dictionary. Use styles for
 authored headings and body text, and set `FontFamily`/`FontSize`/`FontWeight` locally only when a card
 intentionally departs from the theme.
