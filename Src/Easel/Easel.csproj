@@ -19,7 +19,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>WinForms.Easel</PackageId>
 		<Title>Easel</Title>
-		<Version>1.4.0</Version>
+		<Version>2.0.0</Version>
 		<Authors>Axvser</Authors>
 		<Description>A XAML-first UI runtime for WinForms: dependency properties, a Roslyn XAML compiler, a WPF/Avalonia-shaped visual control library over a single HWND, and a built-in property-animation engine.</Description>
 		<PackageIcon>easel-logo.png</PackageIcon>
@@ -48,7 +48,7 @@
 		                  OutputItemType="Analyzer"
 		                  ReferenceOutputAssembly="false"
 		                  Condition="'$(Configuration)' == 'Debug'" />
-		<PackageReference Include="WinForms.Easel.Generator" Version="1.4.0"
+		<PackageReference Include="WinForms.Easel.Generator" Version="2.0.0"
 		                  Condition="'$(Configuration)' != 'Debug'" />
 	</ItemGroup>
 

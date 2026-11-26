@@ -10,7 +10,7 @@
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageId>WinForms.Easel.Generator</PackageId>
 		<Title>Easel.Generator</Title>
-		<Version>1.4.0</Version>
+		<Version>2.0.0</Version>
 		<Authors>Axvser</Authors>
 		<Description>XAML compiler and dependency-property source generators for Easel.</Description>
 		<PackageIcon>easel-logo.png</PackageIcon>
