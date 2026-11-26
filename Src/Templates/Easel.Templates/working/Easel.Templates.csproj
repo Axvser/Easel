@@ -3,13 +3,14 @@
 	<PropertyGroup>
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<PackageId>WinForms.Easel.Templates</PackageId>
-		<Version>1.4.0</Version>
+		<Version>2.0.0</Version>
 		<Title>Easel templates</Title>
 		<Authors>Axvser</Authors>
-		<Description>Item templates for Easel XAML views and resource dictionaries.</Description>
+		<Description>Item templates for Easel XAML views, resource dictionaries, themes, styles, control templates and data templates.</Description>
 		<PackageTags>dotnet-new;templates;easel;winforms;xaml</PackageTags>
 		<PackageType>Template</PackageType>
 		<PackageIcon>easel-logo.png</PackageIcon>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/Axvser/Easel</RepositoryUrl>
@@ -23,6 +24,7 @@
 
 	<ItemGroup>
 		<None Include="content\**\*" Pack="true" PackagePath="content" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
 		<None Include="..\..\..\..\Assets\easel-logo.png" Pack="true" PackagePath="\" Visible="false" />
 	</ItemGroup>
 

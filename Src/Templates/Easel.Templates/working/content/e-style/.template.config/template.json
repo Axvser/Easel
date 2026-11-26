@@ -13,6 +13,7 @@
   "shortName": "e-style",
   "sourceName": "TemplateClass",
   "defaultName": "AppStyles",
+  "preferDefaultName": true,
   "preferNameDirectory": false,
   "tags": {
     "language": "C#",

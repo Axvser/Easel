@@ -13,6 +13,7 @@
   "shortName": "e-datatemplate",
   "sourceName": "TemplateClass",
   "defaultName": "ItemTemplates",
+  "preferDefaultName": true,
   "preferNameDirectory": false,
   "tags": {
     "language": "C#",

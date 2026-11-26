@@ -13,6 +13,7 @@
   "shortName": "e-usercontrol",
   "sourceName": "TemplateClass",
   "defaultName": "MyView",
+  "preferDefaultName": true,
   "preferNameDirectory": false,
   "tags": {
     "language": "C#",

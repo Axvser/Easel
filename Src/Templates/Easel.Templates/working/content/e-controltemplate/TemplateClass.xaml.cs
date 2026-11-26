@@ -1,6 +1,6 @@
 using Easel;
 
-// Easel customization: add keyed ControlTemplates; parts are read with GetTemplateChild.
+// Easel customization: add keyed ControlTemplates; parts are read with GetTemplateChild<T>.
 
 namespace TemplateNamespace;
 

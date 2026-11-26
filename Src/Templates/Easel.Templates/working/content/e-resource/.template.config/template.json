@@ -13,6 +13,7 @@
   "shortName": "e-resource",
   "sourceName": "TemplateClass",
   "defaultName": "AppResources",
+  "preferDefaultName": true,
   "preferNameDirectory": false,
   "tags": {
     "language": "C#",
