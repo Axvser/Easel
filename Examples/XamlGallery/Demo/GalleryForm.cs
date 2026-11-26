@@ -6,8 +6,8 @@ using Easel.Visuals;
 
 namespace Demo;
 
-/// <summary>The native window that hosts the visual-backend gallery surface.</summary>
-public sealed class GalleryForm : Form
+/// <summary>The XAML window that hosts the visual-backend gallery surface.</summary>
+public sealed partial class GalleryForm : Window
 {
     private readonly GalleryModel _model;
     private readonly IThemeService _theme;
@@ -26,7 +26,8 @@ public sealed class GalleryForm : Form
         _catalog = new GalleryCardCatalog(_model, _theme);
         _vm = new GalleryShellViewModel(_catalog.Infos, _theme);
 
-        Text = "Easel Demos";
+        InitializeComponent();
+
         var work = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1440, 900);
         ClientSize = new Size(
             Math.Max(1100, work.Width - 80),
@@ -34,22 +35,11 @@ public sealed class GalleryForm : Form
         MinimumSize = new Size(1100, 640);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = Theme.Current.WindowBackground;
-        AutoScaleMode = AutoScaleMode.None;
-
-        Surface = new VisualHost
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Theme.Current.WindowBackground,
-        };
-        Controls.Add(Surface);
 
         _shell = new GalleryVisualShell(_model, _vm, _catalog);
-        Surface.Root = _shell.Root;
+        Content = _shell.Root;
         _theme.Changed += OnThemeChanged;
     }
-
-    /// <summary>The single visual surface hosted by this window.</summary>
-    public VisualHost Surface { get; }
 
     /// <summary>The visual shell (catalog, preview, inspector).</summary>
     internal GalleryVisualShell Shell => _shell;
@@ -169,7 +159,7 @@ public sealed class GalleryForm : Form
         var previousRoot = Surface.Root;
         var previousShell = _shell;
         _shell = new GalleryVisualShell(_model, _vm, _catalog);
-        Surface.Root = _shell.Root;
+        Content = _shell.Root;
         if (IsHandleCreated)
         {
             // 事件处理器可能就在被替换的树里；等这一手返回后再释放旧根和旧壳。
