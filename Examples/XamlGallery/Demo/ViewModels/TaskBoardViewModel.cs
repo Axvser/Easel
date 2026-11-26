@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using VeloxDev.MVVM;
+using Demo.Mvvm;
 
 namespace Demo.ViewModels;
 
@@ -18,18 +18,20 @@ public sealed class TaskBoardItem
 }
 
 /// <summary>
-/// The MVVM card's view model. <c>[VeloxProperty]</c> promotes the fields to notifying properties;
-/// <c>[VeloxCommand]</c> turns the methods into commands the XAML binds to.
+/// The MVVM card's view model: a draft, a selected row and commands the XAML binds to.
 /// </summary>
-public sealed partial class TaskBoardViewModel
+public sealed class TaskBoardViewModel : ObservableObject
 {
-    [VeloxProperty] private string _draft = string.Empty;
-    [VeloxProperty] private TaskBoardItem? _selected;
-    [VeloxProperty] private string _status = "Ready";
+    private string _draft = string.Empty;
+    private TaskBoardItem? _selected;
+    private string _status = "Ready";
 
     /// <summary>Creates the sample rows and selects the first one.</summary>
     public TaskBoardViewModel()
     {
+        AddCommand = new RelayCommand(_ => Add(), _ => CanExecuteAddCommand(_));
+        RemoveCommand = new RelayCommand(_ => Remove(), _ => CanExecuteRemoveCommand(_));
+        ClearCommand = new RelayCommand(_ => Clear());
         Tasks.Add(new TaskBoardItem("Bind Text to Draft"));
         Tasks.Add(new TaskBoardItem("Run AddCommand"));
         Tasks.Add(new TaskBoardItem("Remove drops the selected row"));
@@ -37,10 +39,51 @@ public sealed partial class TaskBoardViewModel
         Status = $"{Tasks.Count} tasks · select one, then Remove";
     }
 
+    /// <summary>The draft title for a new task.</summary>
+    public string Draft
+    {
+        get => _draft;
+        set
+        {
+            if (SetProperty(ref _draft, value))
+            {
+                AddCommand.Notify();
+            }
+        }
+    }
+
+    /// <summary>The selected row.</summary>
+    public TaskBoardItem? Selected
+    {
+        get => _selected;
+        set
+        {
+            if (SetProperty(ref _selected, value))
+            {
+                RemoveCommand.Notify();
+            }
+        }
+    }
+
+    /// <summary>The status line.</summary>
+    public string Status
+    {
+        get => _status;
+        set => SetProperty(ref _status, value);
+    }
+
     /// <summary>The rows; the list box tracks this observable collection.</summary>
     public ObservableCollection<TaskBoardItem> Tasks { get; } = [];
 
-    [VeloxCommand(canValidate: true)]
+    /// <summary>Adds the draft as a task.</summary>
+    public RelayCommand AddCommand { get; }
+
+    /// <summary>Removes the selected task.</summary>
+    public RelayCommand RemoveCommand { get; }
+
+    /// <summary>Clears every task.</summary>
+    public RelayCommand ClearCommand { get; }
+
     private void Add()
     {
         var title = Draft.Trim();
@@ -57,11 +100,8 @@ public sealed partial class TaskBoardViewModel
         Status = $"Added '{title}' · {Tasks.Count} tasks";
     }
 
-    private partial bool CanExecuteAddCommand(object? parameter) => !string.IsNullOrWhiteSpace(_draft);
+    private bool CanExecuteAddCommand(object? parameter) => !string.IsNullOrWhiteSpace(_draft);
 
-    partial void OnDraftChanged(string oldValue, string newValue) => AddCommand.Notify();
-
-    [VeloxCommand(canValidate: true)]
     private void Remove()
     {
         if (Selected is null)
@@ -76,11 +116,8 @@ public sealed partial class TaskBoardViewModel
         Status = $"Removed '{title}' · {Tasks.Count} tasks";
     }
 
-    private partial bool CanExecuteRemoveCommand(object? parameter) => _selected is not null;
+    private bool CanExecuteRemoveCommand(object? parameter) => _selected is not null;
 
-    partial void OnSelectedChanged(TaskBoardItem? oldValue, TaskBoardItem? newValue) => RemoveCommand.Notify();
-
-    [VeloxCommand]
     private void Clear()
     {
         Tasks.Clear();

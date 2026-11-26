@@ -1,4 +1,4 @@
-using VeloxDev.MVVM;
+using Demo.Mvvm;
 
 namespace Demo;
 
@@ -7,7 +7,7 @@ namespace Demo;
 /// The view model owns only catalog metadata and strings. The visual factory, tree-item construction, preview
 /// disposal and inspector rows stay in the view; switching the palette rebuilds the view with this same instance.
 /// </remarks>
-internal sealed partial class GalleryShellViewModel : IDisposable
+internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
 {
     private readonly IReadOnlyList<GalleryCardInfo> _cards;
     private readonly IThemeService _theme;
@@ -15,9 +15,51 @@ internal sealed partial class GalleryShellViewModel : IDisposable
     private readonly List<GalleryCardGroup> _groups = [];
     private bool _hadMatches;
 
-    [VeloxProperty] private string _filterText = string.Empty;
-    [VeloxProperty] private GalleryCardInfo? _selectedCard;
-    [VeloxProperty] private int _themeIndex;
+    private string _filterText = string.Empty;
+    private GalleryCardInfo? _selectedCard;
+    private int _themeIndex;
+
+    /// <summary>Text used to filter the catalog.</summary>
+    public string FilterText
+    {
+        get => _filterText;
+        set
+        {
+            var oldValue = _filterText;
+            if (SetProperty(ref _filterText, value))
+            {
+                OnFilterTextChanged(oldValue, value);
+            }
+        }
+    }
+
+    /// <summary>The card currently shown in the preview.</summary>
+    public GalleryCardInfo? SelectedCard
+    {
+        get => _selectedCard;
+        set
+        {
+            var oldValue = _selectedCard;
+            if (SetProperty(ref _selectedCard, value))
+            {
+                OnSelectedCardChanged(oldValue, value);
+            }
+        }
+    }
+
+    /// <summary>The selected palette index.</summary>
+    public int ThemeIndex
+    {
+        get => _themeIndex;
+        set
+        {
+            var oldValue = _themeIndex;
+            if (SetProperty(ref _themeIndex, value))
+            {
+                OnThemeIndexChanged(oldValue, value);
+            }
+        }
+    }
 
     /// <summary>Creates the shell state and selects the initial card without raising events for a not-yet-created view.</summary>
     /// <param name="cards">The catalog metadata, in catalog order.</param>
@@ -121,10 +163,10 @@ internal sealed partial class GalleryShellViewModel : IDisposable
     /// <inheritdoc />
     public void Dispose() => _theme.Changed -= OnThemeChanged;
 
-    partial void OnThemeIndexChanged(int oldValue, int newValue)
+    private void OnThemeIndexChanged(int oldValue, int newValue)
         => _theme.SelectIndex(newValue);
 
-    partial void OnFilterTextChanged(string oldValue, string newValue)
+    private void OnFilterTextChanged(string oldValue, string newValue)
     {
         ApplyFilterCore();
         RaiseComputed();
@@ -149,7 +191,7 @@ internal sealed partial class GalleryShellViewModel : IDisposable
         CatalogChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    partial void OnSelectedCardChanged(GalleryCardInfo? oldValue, GalleryCardInfo? newValue)
+    private void OnSelectedCardChanged(GalleryCardInfo? oldValue, GalleryCardInfo? newValue)
     {
         RaiseComputed();
         PreviewChanged?.Invoke(this, newValue);

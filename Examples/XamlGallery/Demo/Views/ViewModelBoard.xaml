@@ -6,12 +6,12 @@
     Width="250"
     Spacing="10">
 
-  <TextBlock Text="MVVM · [VeloxProperty] + [VeloxCommand]"
+  <TextBlock Text="MVVM · INotifyPropertyChanged + ICommand"
              Foreground="{StaticResource Text}"
              FontSize="15"
              Wrap="True" />
 
-  <TextBlock Text="The fields become notifying properties and the methods become commands on this partial class."
+  <TextBlock Text="The properties notify through INotifyPropertyChanged; the methods are RelayCommand instances."
              Foreground="{StaticResource Muted}"
              Wrap="True" />
 

@@ -41,8 +41,8 @@ internal static class BindingCards
             "binding.mvvm",
             "Binding",
             "MVVM view model",
-            "A [VeloxProperty]/[VeloxCommand] view model bound from visual XAML.",
-            "[VeloxProperty] · [VeloxCommand]",
+            "An INotifyPropertyChanged view model with ICommand bindings from visual XAML.",
+            "[ObservableObject] · [RelayCommand]",
             _ => new ViewModelBoard()),
     ];
 

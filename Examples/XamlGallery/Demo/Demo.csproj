@@ -29,16 +29,12 @@
   <ItemGroup>
     <!-- The gallery always builds against the Easel source projects in this repository. -->
     <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj" />
+    <!-- Debug uses the generator source; Release receives the packaged analyzer through Easel. Referencing
+         both in Release makes every XAML class generate InitializeComponent twice. -->
     <ProjectReference Include="..\..\..\Src\Generators\Easel.Generator\Easel.Generator.csproj"
                       OutputItemType="Analyzer"
-                      ReferenceOutputAssembly="false" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- The gallery is a demo: the MVVM helpers track the latest published VeloxDev packages. Animation is
-         Easel's own engine, so no VeloxDev adapter package is referenced. -->
-    <PackageReference Include="VeloxDev.Core" Version="*" />
-    <PackageReference Include="VeloxDev.Core.Generator" Version="*" />
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(Configuration)' == 'Debug'" />
   </ItemGroup>
 
   <ItemGroup>

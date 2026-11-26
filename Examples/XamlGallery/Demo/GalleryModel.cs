@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Easel;
-using VeloxDev.MVVM;
+using Demo.Mvvm;
 
 namespace Demo;
 
@@ -142,7 +142,7 @@ public sealed class GalleryModel : INotifyPropertyChanged, INotifyDataErrorInfo
             },
         ];
 
-        SaveCommand = new VeloxCommand(_ => SaveCount++);
+        SaveCommand = new RelayCommand(_ => SaveCount++);
         RowsView = new CollectionView(Rows);
 
         var random = new Random(20261124);
