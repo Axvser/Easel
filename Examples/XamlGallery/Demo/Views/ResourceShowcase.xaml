@@ -27,7 +27,7 @@
         <Trigger Property="IsEnabled" Value="False">
           <Trigger.Setters>
             <Setter Property="Background" Value="{StaticResource Disabled}" />
-            <Setter Property="Foreground" Value="{StaticResource MutedText}" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
           </Trigger.Setters>
         </Trigger>
       </Style.Triggers>
@@ -35,8 +35,8 @@
 
     <ControlTemplate x:Key="CardChrome" TargetType="ContentControl">
       <Border x:Name="PART_Frame"
-              Background="{StaticResource CardBackground}"
-              BorderBrush="{StaticResource CardBorder}"
+              Background="{StaticResource Surface}"
+              BorderBrush="{StaticResource Border}"
               BorderThickness="1"
               CornerRadius="8"
               Padding="12">
@@ -48,8 +48,8 @@
     </ControlTemplate>
 
     <DataTemplate x:Key="RowTemplate">
-      <Border Background="{StaticResource CardBackground}"
-              BorderBrush="{StaticResource CardBorder}"
+      <Border Background="{StaticResource Surface}"
+              BorderBrush="{StaticResource Border}"
               BorderThickness="1"
               CornerRadius="4"
               Padding="8,4"
@@ -75,7 +75,7 @@
     <CheckBox x:Name="enableSwitch" IsChecked="True" />
   </StackPanel>
   <TextBlock Text="The trigger follows IsEnabled."
-             Foreground="{StaticResource MutedText}"
+             Foreground="{StaticResource Muted}"
              Wrap="True" />
 
   <ContentControl Template="{StaticResource CardChrome}">
@@ -86,6 +86,6 @@
 
   <ItemsControl x:Name="rows" ItemTemplate="{StaticResource RowTemplate}" />
   <TextBlock Text="Each row comes from the keyed DataTemplate in the same dictionary."
-             Foreground="{StaticResource MutedText}"
+             Foreground="{StaticResource Muted}"
              Wrap="True" />
 </local:ThemedStackPanel>

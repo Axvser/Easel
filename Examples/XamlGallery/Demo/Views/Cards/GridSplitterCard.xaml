@@ -18,7 +18,7 @@
   <GridSplitter x:Name="splitter" Width="6" Height="120" Orientation="Vertical" />
 
   <Border Width="220" Height="120" Background="{StaticResource Surface}">
-    <TextBlock Text="Fill pane" Foreground="{StaticResource MutedText}" />
+    <TextBlock Text="Fill pane" Foreground="{StaticResource Muted}" />
   </Border>
 
 </local:ThemedStackPanel>

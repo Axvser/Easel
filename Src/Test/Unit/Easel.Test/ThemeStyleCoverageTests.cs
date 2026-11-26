@@ -108,6 +108,39 @@ public sealed class ThemeStyleCoverageTests
     }
 
     [TestMethod]
+    public void DefaultItemsControl_PaintsNoContainerBackgroundOrBorder()
+    {
+        // The container must be content-driven: paint over a distinct backdrop and every pixel the list itself
+        // would own (corners, edges, centre with no items) must still be the backdrop.
+        using var host = new VisualHost { Size = new Size(120, 80), DpiScaleOverride = 1f };
+        host.Root = new ItemsControl { Width = 120d, Height = 80d };
+
+        using var bitmap = new Bitmap(120, 80, PixelFormat.Format32bppPArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(Color.Magenta);
+            host.RenderTo(graphics, new Size(120, 80));
+        }
+
+        var probes = new[]
+        {
+            new Point(2, 2),
+            new Point(118, 2),
+            new Point(2, 78),
+            new Point(118, 78),
+            new Point(60, 2),
+            new Point(2, 40),
+        };
+        foreach (var point in probes)
+        {
+            Assert.AreEqual(
+                Color.Magenta.ToArgb(),
+                bitmap.GetPixel(point.X, point.Y).ToArgb(),
+                $"a default ItemsControl painted its own chrome at {point}");
+        }
+    }
+
+    [TestMethod]
     public void ScrollBarThumb_FollowsTheActivePalette()
     {
         var original = Theme.Current;

@@ -23,10 +23,7 @@
     <SolidColorBrush x:Key="Disabled" Color="#FF1F1F1F" />
     <SolidColorBrush x:Key="DisabledText" Color="#FF585858" />
 
-    <SolidColorBrush x:Key="CardBackground" Color="#FF252526" />
-    <SolidColorBrush x:Key="CardBorder" Color="#FF333333" />
     <SolidColorBrush x:Key="SurfaceAlt" Color="#FF2D2D2D" />
-    <SolidColorBrush x:Key="MutedText" Color="#FFA0A0A0" />
 
     <SolidColorBrush x:Key="ScrollBarThumb" Color="#66A0A0A0" />
     <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#CCE7E7E7" />

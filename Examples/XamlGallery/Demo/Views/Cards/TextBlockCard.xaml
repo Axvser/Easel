@@ -9,7 +9,7 @@
   <TextBlock Text="Body text uses the theme foreground colour." Foreground="{StaticResource Text}" />
   <TextBlock Text="A wrapped paragraph keeps flowing inside the available width, and the desired height includes every line."
              Width="420"
-             Foreground="{StaticResource MutedText}"
+             Foreground="{StaticResource Muted}"
              Wrap="True" />
 
 </local:ThemedStackPanel>

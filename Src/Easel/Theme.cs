@@ -693,10 +693,7 @@ public static class Theme
         Brush("SelectedText", palette.Foreground);
         Brush("Disabled", palette.DisabledBackground);
         Brush("DisabledText", palette.DisabledForeground);
-        Brush("CardBackground", palette.Surface);
-        Brush("CardBorder", palette.ControlBorder);
         Brush("SurfaceAlt", palette.SurfaceAlt);
-        Brush("MutedText", palette.MutedForeground);
         Brush("ScrollBarThumb", palette.ScrollBarThumb);
         Brush("ScrollBarThumbHover", palette.ScrollBarThumbHover);
         Brush("ShapeStroke", palette.ShapeStroke);

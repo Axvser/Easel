@@ -6,7 +6,7 @@
 
   <Expander Width="340" IsExpanded="True" Header="Advanced options">
     <TextBlock Text="The content is measured only while the expander is open."
-               Foreground="{StaticResource MutedText}"
+               Foreground="{StaticResource Muted}"
                Wrap="True" />
   </Expander>
 

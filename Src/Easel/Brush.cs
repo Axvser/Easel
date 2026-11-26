@@ -29,18 +29,6 @@ public abstract class Brush
     /// <summary>The colour that best stands for this brush where GDI+ needs a single colour.</summary>
     public virtual Color ApproximateColor => Color.Transparent;
 
-    /// <summary>The representative alpha channel; a compatibility shorthand for <c>ApproximateColor.A</c>.</summary>
-    public byte A => ApproximateColor.A;
-
-    /// <summary>The representative red channel; a compatibility shorthand for <c>ApproximateColor.R</c>.</summary>
-    public byte R => ApproximateColor.R;
-
-    /// <summary>The representative green channel; a compatibility shorthand for <c>ApproximateColor.G</c>.</summary>
-    public byte G => ApproximateColor.G;
-
-    /// <summary>The representative blue channel; a compatibility shorthand for <c>ApproximateColor.B</c>.</summary>
-    public byte B => ApproximateColor.B;
-
     /// <summary>Paints this brush across <paramref name="bounds"/>.</summary>
     /// <param name="graphics">The target surface.</param>
     /// <param name="bounds">The rectangle to paint.</param>
