@@ -273,7 +273,7 @@ Data-context paths can be compiled into direct property access. Enable it at the
 - Compiled bindings still use `INotifyPropertyChanged`, converters, `StringFormat`, fallback values and
   validation. The generated reader walks the path through typed accessors, not `TypeDescriptor`.
 - The generator checks a path when the member is visible in its input compilation. Members added by another
-  source generator (for example `[VeloxProperty]`) defer to the C# compiler, which still fails the build on a typo.
+  source generator (for example `[XamlProperty]`) defer to the C# compiler, which still fails the build on a typo.
 - `Source`, `ElementName`, `RelativeSource` and `TemplateBinding` stay runtime bindings; they are not compiled
   against `x:DataType`.
 - Simple indexers compile through runtime helpers: arrays, `IList<T>` and `IDictionary<TKey, TValue>`. A

@@ -196,7 +196,7 @@ with a clear `NotSupportedException` at the call site.
 | Build a layout, scroll, focus chain, keyboard/pointer handling | [references/layout-input.md](references/layout-input.md) |
 | Use brushes, gradients, Visual trees, masks, effects, 3D, shapes | [references/visuals.md](references/visuals.md) |
 | Theme an app, author a custom ResourceDictionary, follow Windows | [references/themes.md](references/themes.md) |
-| Bind a view model, use `[VeloxProperty]`/`[VeloxCommand]`, validate | [references/mvvm.md](references/mvvm.md) |
+| Bind a view model, notify with `INotifyPropertyChanged`, validate | [references/mvvm.md](references/mvvm.md) |
 | Animate a property, trigger actions, keyframes | [references/animation.md](references/animation.md) |
 | Copy a complete form/list/settings/menu/popup/custom-theme recipe | [references/recipes.md](references/recipes.md) |
 | Diagnose a blank view, wrong bounds, focus/airspace, resource or 3D issue | [references/pitfalls.md](references/pitfalls.md) |

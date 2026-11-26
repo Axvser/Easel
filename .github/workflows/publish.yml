@@ -197,7 +197,7 @@ jobs:
       # Source-level gate. Debug resolves the generator through its ProjectReference, so this can
       # run before the generator is published. The Release graph resolves the published generator
       # and is restored, built and tested in the publish job once NuGet serves it.
-      # The gallery demo is not built either: it tracks the latest VeloxDev packages from NuGet.
+      # The gallery demo is not built either: it is self-contained and not published.
       - name: Restore
         run: dotnet restore Src/Test/Unit/Easel.Test/Easel.Test.csproj
 

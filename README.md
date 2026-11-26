@@ -237,10 +237,10 @@ dotnet add package WinForms.Easel
 | --- | --- |
 | `WinForms.Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
 
-The runtime does not reference VeloxDev. The gallery alone uses `VeloxDev.Core` for its
-`[VeloxProperty]` / `[VeloxCommand]` view models, taken from NuGet at the latest published version; it
-also opts into WPF for the real `MediaPlayer` / `MediaElement` audio and video pages. Animation is Easel's
-own engine, so no VeloxDev adapter package is referenced. The Easel runtime still has no WPF dependency.
+The runtime and the gallery do not reference VeloxDev. The gallery carries its own minimal
+`ObservableObject` / `RelayCommand` in `Examples/XamlGallery/Demo/Mvvm`; it also opts into WPF for the real
+`MediaPlayer` / `MediaElement` audio and video pages. Animation is Easel's own engine. The Easel runtime
+still has no WPF dependency.
 
 ## Build and test
 
@@ -252,9 +252,8 @@ dotnet run --project Examples/XamlGallery/Demo/Demo.csproj
 
 ### Gallery references
 
-The gallery always builds against the Easel source projects in this repository. Its MVVM helpers use
-VeloxDev.Core with floating `*` versions, so a demo build tracks the latest published packages; animation
-is Easel's own engine and needs no VeloxDev package.
+The gallery builds against the Easel source projects in this repository. Its MVVM helpers are local demo
+code (`Demo.Mvvm`), so the demo has no package or source dependency on VeloxDev.
 
 ## Animation engine
 

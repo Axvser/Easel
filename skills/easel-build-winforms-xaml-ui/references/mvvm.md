@@ -2,8 +2,9 @@
 
 Easel has no MVVM framework of its own. It provides:
 `DataContext` inheritance, `{Binding}` / `{TemplateBinding}`, `ICommand` on buttons, dependency properties, and
-the `[XamlProperty]` / `[XamlAttachedProperty]` generators. You may write view models by hand, or use
-VeloxDev.Core's `[VeloxProperty]` / `[VeloxCommand]` generators as the gallery does.
+the `[XamlProperty]` / `[XamlAttachedProperty]` generators. Write view models by hand; the gallery's
+`Examples/XamlGallery/Demo/Mvvm/DemoMvvm.cs` is a minimal `ObservableObject` / `RelayCommand` implementation
+with no framework package.
 
 ## DataContext
 
@@ -48,7 +49,7 @@ data-context path into direct property access:
 
 - Both directives are inherited by the subtree; `x:CompileBindings="False"` opts a subtree out.
 - A `DataTemplate` sets the item type for its body: `<DataTemplate x:DataType="local:Row">`.
-- Paths get checked at compile time; source-generated properties (`[VeloxProperty]`) are checked by the C#
+- Paths get checked at compile time; handwritten or source-generated properties are checked by the C#
   compiler at the same point. Converters, `StringFormat`, fallback values, validation and
   `INotifyPropertyChanged` behave exactly like runtime bindings.
 - `Source`, `ElementName`, `RelativeSource` and `TemplateBinding` remain runtime bindings.
@@ -60,34 +61,35 @@ data-context path into direct property access:
 ## Bindable view models
 
 A hand-written view model must implement `INotifyPropertyChanged`; a view can also bind an `IObservable`
-through `element.Bind(dp, observable)`. The generator path from VeloxDev.Core is the one the gallery uses:
+through `element.Bind(dp, observable)`. The gallery's `Demo.Mvvm` base keeps this small:
 
 ```csharp
-using VeloxDev.MVVM;
+using Demo.Mvvm;
 
-public sealed partial class SettingsViewModel
+public sealed class SettingsViewModel : ObservableObject
 {
-    [VeloxProperty] private bool? _notifications = true;
-    [VeloxProperty] private double _volume = 62;
-    [VeloxProperty] private string _status = "No changes saved";
+    private string _status = "No changes saved";
 
-    [VeloxCommand]
-    private void Save()
-        => Status = $"Saved · notifications {(Notifications == true ? "on" : "off")} · volume {Volume:F0}%";
+    public SettingsViewModel() => SaveCommand = new RelayCommand(_ => Save());
+
+    public string Status
+    {
+        get => _status;
+        set => SetProperty(ref _status, value);
+    }
+
+    public RelayCommand SaveCommand { get; }
+
+    private void Save() => Status = "Saved";
 }
 ```
 
-- `[VeloxProperty]` on a private field generates a public notifying property (`Notifications`, `Volume`, …).
-  The field name loses the leading underscore.
-- `[VeloxCommand]` on a method generates `XxxCommand` (`SaveCommand`). `canValidate: true` +
-  `CanExecuteXxxCommand` controls enablement.
-- The class must be `partial`. Call `AddCommand.Notify()` (or the generated command's `Notify`) when a
-  `CanExecute` dependency changes.
-- The XAML binds by the generated property name; path resolution goes through `TypeDescriptor`, so a renamed
-  property breaks the binding.
-
-Easel itself never takes a dependency on VeloxDev.Core. A project that does not use that generator can write
-`INotifyPropertyChanged` and `ICommand` manually; the binding and button paths are identical.
+- `SetProperty` assigns the field and raises `PropertyChanged` only when the value changed.
+- `RelayCommand` implements `ICommand`; call `Notify()` when a `CanExecute` dependency changes.
+- The XAML binds by the property name; path resolution goes through `TypeDescriptor`, so a renamed property
+  breaks the binding.
+- Easel itself takes no MVVM dependency; the binding and button paths work with any `INotifyPropertyChanged`
+  and `ICommand` implementation.
 
 ## Bindings in XAML
 
