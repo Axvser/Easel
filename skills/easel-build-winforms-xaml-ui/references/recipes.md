@@ -23,14 +23,15 @@ private static void Main()
 `ShellView` is a XAML `UserControl` with a `DockPanel`: title bar (Top), status bar (Bottom), side panes and a
 fill. A `VisualHost` is the only child control.
 
-To rebuild on theme change, recreate the root (views read `Theme.Current` and their merged dictionary at
-construction) and dispose the previous root.
+A `Theme.Mode` switch mutates the host's theme brushes in place and repaints; no root rebuild is needed. Recreate
+(or refresh) a view only when it captured `Theme.Current` colors at construction or merged its own snapshot
+dictionary.
 
 ## 2. Form page
 
 ```xml
-<local:ThemedDockPanel xmlns="…" xmlns:x="…" xmlns:local="clr-namespace:MyApp.Views"
-                       x:Class="MyApp.Views.SettingsView" LastChildFill="True">
+<DockPanel xmlns="…" xmlns:x="…"
+           x:Class="MyApp.Views.SettingsView" LastChildFill="True">
   <Border DockPanel.Dock="Top" Padding="18,12" Background="{StaticResource Surface}">
     <Grid>
       <Grid.ColumnDefinitions>
@@ -66,11 +67,12 @@ construction) and dispose the previous root.
       </Border>
     </StackPanel>
   </ScrollViewer>
-</local:ThemedDockPanel>
+</DockPanel>
 ```
 
-Code-behind assigns the view model before `InitializeComponent` (or passes it through the constructor). Each
-`Themed*` base merges the current theme dictionary before the XAML runs.
+Code-behind assigns the view model before `InitializeComponent` (or passes it through the constructor). The theme
+keys resolve from `VisualHost.Resources` when the view is parented; the gallery's `Themed*` bases merge a dictionary
+only to add view-local palette overrides and decoration brushes.
 
 ## 3. List + detail
 
@@ -148,11 +150,11 @@ overlay and are not clipped by ancestor scroll viewers.
   </Border>
 </ControlTemplate>
 
-<TextBox Width="360" UseNativeEditor="False" Template="{StaticResource PillField}" />
+<TextBox Width="360" Template="{StaticResource PillField}" />
 ```
 
-`PART_ContentHost` is required for a TextBox template. With `UseNativeEditor=false`, the caret, selection,
-clipboard, undo, DPs and bindings stay visual; only IME/accessibility peers are lost.
+`PART_ContentHost` (or `PART_EditorHost`) is required for a TextBox template. The visual path is the default;
+the caret, selection, clipboard, undo, DPs and bindings stay visual, and only IME/accessibility peers are lost.
 
 For a custom control:
 
@@ -176,26 +178,40 @@ Better: make the control's markup a XAML `UserControl` and expose data through D
 
 ## 6. Custom theme and dynamic resources
 
-1. Copy the key set from `Src/Easel/Themes/DarkTheme.xaml` into a standalone `<ResourceDictionary x:Class>`.
-2. Set the palette and merge the dictionary for views:
+For a few overrides, append a partial dictionary after the host's built-in theme dictionary (`surface` from
+recipe 1):
+
+```csharp
+var overrides = new ResourceDictionary
+{
+    ["Accent"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x8A, 0x00)),
+    ["Focus"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x8A, 0x00)),
+};
+surface.Resources.MergedDictionaries.Add(overrides);
+```
+
+Omitted keys keep resolving from the active Dark+/Light+ theme; overridden keys stay fixed across a theme switch
+until you replace the overlay. Most control metrics and self-drawn chrome read `Theme.Current`, so call
+`Theme.ApplyPalette` as well when those should change. For a complete palette, start from `DarkTheme.xaml`:
 
 ```csharp
 var custom = new MyApp.Themes.MyTheme();
 Theme.ApplyPalette(ThemeMode.Dark, ThemePalette.FromResourceDictionary(custom));
 ```
 
-3. For a live key:
+For a live key:
 
 ```xml
 <Border Background="{DynamicResource Accent}" />
 ```
 
 ```csharp
-Resources["Accent"] = new SolidColorBrush(Color.Magenta); // this view updates
+surface.Resources["Accent"] = new SolidColorBrush(Color.Magenta); // dynamic targets update
 ```
 
 A later `{StaticResource}` applied to the same property supersedes the dynamic reference; see
-[xaml.md](xaml.md#static-vs-dynamic).
+[xaml.md](xaml.md#static-vs-dynamic). A theme switch mutates the host's theme brushes in place, so an ordinary
+switch needs no root rebuild.
 
 ## 7. Gradient and 3D card
 
@@ -235,8 +251,8 @@ for (var i = 0; i < points.Count - 1; i++)
 var host = new VisualPresenter { Content = chart, Height = 160 };
 ```
 
-For polylines use a `CurveBatchVisual` or a custom `Visual` overriding `RenderContent`; call
-`InvalidateCache()` after changing points.
+For curves use a `CurveBatchVisual` (cubic segments), or a custom `Visual` overriding `RenderContent` for
+polylines; call `InvalidateCache()` after changing points.
 
 ## 9. Workflow node view (VeloxDev)
 

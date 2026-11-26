@@ -62,8 +62,8 @@ remaining height; give it a size when it is chrome, or use a `Grid` with `Auto` 
 </Grid>
 ```
 
-- `Auto` measures the largest child on the axis; `*` shares remaining space after Auto/pixel tracks and
-  `Spacing`/padding; pixel tracks are fixed.
+- `Auto` measures the largest child on the axis; `*` shares remaining space after Auto/pixel tracks and padding;
+  pixel tracks are fixed (use a `StackPanel` or margins for gaps; `Grid` has no `Spacing`).
 - A child may span with `Grid.RowSpan`/`Grid.ColumnSpan`.
 - Grid measures Auto tracks first, then re-measures children inside their resolved cells. Do not depend on
   `*` tracks having their final size during `Measure`.
@@ -144,7 +144,7 @@ centers. `Margin` is outside the element; `Padding` is inside its chrome.
 - `Tab`/`Shift+Tab` walk the chain; arrow keys inside a `TabControl`/list/tree move within the control.
 - A focused native TextBox editor keeps the native focus on the island; the host still reports the logical
   `FocusedElement`. Do not call `FocusElement(null)` on every `LostFocus` — check `ContainsFocus`.
-- `TextBox` with `UseNativeEditor=false` gets all focus behavior on the visual path.
+- The default visual `TextBox` (or `UseNativeEditor=false`) gets all focus behavior on the visual path.
 
 ## Pointer
 
@@ -169,8 +169,8 @@ centers. `Margin` is outside the element; `Padding` is inside its chrome.
 - Start a drag with `VisualDragDrop.StartDrag(source, data, allowedEffects, ghostText)`. It is the blocking native
   loop; call it from a pointer handler. `VisualDragDrop.CreateData(payload, text, files)` builds a data object and
   `GetFiles`/`GetText`/`TryGetData` read one back.
-- `DropZone` is a ready dashed target: it accepts files, text and `Easel.DataGrid.Rows`, raises one `Dropped`
-  event and paints its own hot state.
+- `DropZone` is a ready dashed target: it accepts files, text and the `Easel.DataGrid.Rows` payload format,
+  raises one `Dropped` event and paints its own hot state.
 - A drag started inside the app paints a floating label through `GiveFeedback`; Escape cancels it through
   `QueryContinueDrag`. `DataGrid` uses the same path for row moves and accepts a CSV/text drop on its body.
 - Use `args.GetPosition(target)` after a hit test; the host converts `DragEventArgs.X/Y` (screen coordinates)
@@ -178,9 +178,10 @@ centers. `Margin` is outside the element; `Padding` is inside its chrome.
 
 ## Keyboard
 
-`KeyDown`, `KeyUp`, `TextInput` are delivered to the focused element and bubble. `TextInput` is where printable
-characters and IME composition reach a `TextBox`/`RichTextBox`. `VisualKeyEventArgs` carries `KeyCode`,
-`Modifiers`, `IsRepeat`. Handle `Tab`/arrows only when the control's own behavior should not consume them.
+`KeyDown`, `KeyUp`, `TextInput` are delivered to the focused element and bubble. `TextInput` carries printable
+characters to a `TextBox`/`RichTextBox`; IME composition belongs to the native editor island when
+`UseNativeEditor=true`. `VisualKeyEventArgs` carries `KeyCode`, `Modifiers`, `IsRepeat`. Handle `Tab`/arrows only
+when the control's own behavior should not consume them.
 
 ## DPI and coordinates
 

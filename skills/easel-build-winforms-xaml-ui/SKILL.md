@@ -97,24 +97,20 @@ Everything below it is a retained visual.
 `Views/HelloView.xaml.cs`:
 
 ```csharp
-using Easel;
 using Easel.Visuals.Controls;
 
 namespace MyApp.Views;
 
 public sealed partial class HelloView : UserControl
 {
-    public HelloView()
-    {
-        // StaticResource resolves during InitializeComponent, so the theme keys must already be in this view.
-        Resources.MergedDictionaries.Add(Theme.CreateResourceDictionary(Theme.EffectiveMode));
-        InitializeComponent();
-    }
+    public HelloView() => InitializeComponent();
 }
 ```
 
 The generator emits `InitializeComponent` into the partial class. **Do not declare it yourself**; an existing
-member is `EASEL_XAML015`.
+member is `EASEL_XAML015`. Theme keys resolve through `VisualHost.Resources` after the view is parented; the host
+already merges the active built-in dictionary, so a view does not need its own copy. Merge a dictionary into the
+view only for view-local overrides (see [references/themes.md](references/themes.md)).
 
 ## Hard rules
 
@@ -125,7 +121,8 @@ renders twice as large. Details in [references/runtime.md](references/runtime.md
 
 ⚙ **One HWND for the visual tree.** A WinForms control never joins the visual paint pass; it is always an HWND
 island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElement<Button>`), or assign
-`NativeControlHost.Child` in code-behind. The focused `TextBox` uses the same island for IME/accessibility.
+`NativeControlHost.Child` in code-behind. A `TextBox` with `UseNativeEditor=true` adds one private island for
+IME/accessibility; the default field is fully visual.
 
 ⚙ **Native layout is the same layout.** `Margin`, `Width`/`Height`, `Min`/`Max`, alignment, `Grid.Row`,
 `DockPanel.Dock`, `Canvas.Left`, `Panel.ZIndex` and `Visibility` on a `native:` element are routed to the
@@ -147,9 +144,18 @@ live window's region, and popups cut rectangular holes in that region.
 ⚙ **A XAML root derives from `VisualElement` or is a standalone `ResourceDictionary`.** The root tag and the
 `x:Class` base must agree (owner derives from the root type). `x:Class` types must be `partial`.
 
-⚙ **Every `{StaticResource}` must be declared before the point that uses it.** Static resources resolve during
-`InitializeComponent`, before the view joins the surface. `{DynamicResource}` stays subscribed and follows
-dictionary changes; a later resource reference on the same target property supersedes an earlier one.
+⚙ **Static references bind lazily; dynamic references stay live.** A generated `{StaticResource}` on a visual
+property applies as soon as the element's resource chain contains the key; the chain grows when the view is
+parented, so a key from `VisualHost.Resources` (including the built-in theme) resolves without copying it into the
+view. An eager read — a style `BasedOn` or setter value, a non-visual object property, a trigger-action property,
+or a dictionary-internal reference — throws `No resource named …` when the key is absent. `{DynamicResource}` stays
+subscribed and follows dictionary changes; a later resource reference on the same target property supersedes an
+earlier one.
+
+⚙ **A partial theme overlay wins by merge order.** The host merges its built-in theme dictionary first; append a
+partial `ResourceDictionary` to `VisualHost.Resources.MergedDictionaries` to override only the keys it defines
+(omitted keys fall back to the active theme; keys stored directly on the host or a view win over every merged
+dictionary). See [references/themes.md](references/themes.md#custom-themes).
 
 ⚙ **Do not write layout in a code callback.** Use `PropertyMetadata.AffectsMeasure` /
 `AffectsArrange` / `AffectsRender` on DPs. `VisualElement.Width`/`Height`/`Margin`/`Padding` and panel attached
@@ -172,8 +178,10 @@ replace the style or change a local DP value.
 a shape; popups cover it only through the window-region holes. Keep live native islands rectangular and axis-aligned;
 use `IsSnapshot` when composition is required. A nested content surface is still bounded by the same island.
 
-⚙ **A focused native TextBox is an island too.** `TextBox.UseNativeEditor = false` keeps the whole field visual
-(templates, DPs, caret, selection, undo) and loses only IME composition and the native accessibility peer.
+⚙ **A `UseNativeEditor` TextBox adds one island.** The visual path is the default: templates, DPs, caret,
+selection and undo stay visual. Set `TextBox.UseNativeEditor = true` only when IME composition or the native
+accessibility peer is required; the focused field then hosts a private native editor island that paints above the
+tree and cannot be transformed. The visual path loses only IME composition and that peer.
 
 ⚙ **3D is a bitmap warp.** Content is composed once and projected; `CacheAsBitmap` reuses the pre-warp layer
 for transform-only frames. Very large projections fall back to a coarse grid. Do not animate 3D content without
@@ -212,10 +220,10 @@ switches. Use it as the reference composition for a new app.
 
 - [ ] The app has exactly one `VisualHost`; no WinForms control is a visual child.
 - [ ] Every `x:Class` is `partial` and its base matches the root tag.
-- [ ] Every static resource key is declared before use; dynamic keys resolve in the view's chain.
+- [ ] Static keys resolve through the view → ancestors → host chain; dynamic keys follow later changes.
 - [ ] The app starts with `Theme.Mode` set before the first view is built (or uses `Theme.Current` defaults).
 - [ ] The primary path works at 150% DPI and after a theme switch.
-- [ ] Native islands stay rectangular; no popup is expected to cover one.
+- [ ] Native islands stay rectangular; a popup covers one only through the window-region hole.
 - [ ] Any animated property has a CLR type the engine can interpolate (see `references/animation.md`).
 - [ ] The gallery's `--smoke`/`--capture` pattern is used for visual verification when changing the runtime.
 

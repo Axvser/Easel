@@ -10,9 +10,10 @@ tag's type. A misspelled namespace still compiles the C# class but produces no `
 **`EASEL_XAML019` on a local type.** Unprefixed names resolve only to Easel namespaces. Write
 `xmlns:local="clr-namespace:MyApp.Views"` and `local:MyView`.
 
-**A `{StaticResource}` throws at construction.** Static references resolve while `InitializeComponent` runs,
-before the view is parented. The key must be in the view/ancestor dictionary at that moment, and declared
-before use in the same file. Merge the theme dictionary in the base constructor, before `InitializeComponent`.
+**A `{StaticResource}` stays unset.** A static reference on a visual property applies when its chain resolves and
+retries as the view is parented, so a key in `VisualHost.Resources` (including the built-in theme) needs no per-view
+copy. An eager read — a style `BasedOn` or setter value, a non-visual object property, a trigger-action property,
+a dictionary-internal reference — throws `No resource named …` if the key is absent at that point.
 
 **`EASEL_XAML015`.** The generator emits `private void InitializeComponent()`; do not declare your own.
 
@@ -73,16 +74,17 @@ the sash; right/below targets grow toward it (delta inverted). Auto-sized target
 
 **A WinForms control disappears or paints over everything.** Declare it as `<native:Foo>` (or assign
 `NativeControlHost.Child`); never add the `Control` itself to a visual parent. A native island is an airspace
-rectangle above the tree: it cannot be transformed, clipped, blended or covered by a popup. Visual content inside
-a native element is painted by a nested surface and is still bounded by that island.
+rectangle above the tree: it cannot be transformed, clipped or blended, and a popup covers it only by cutting its
+rectangle out of the island's window region. Visual content inside a native element is painted by a nested surface
+and is still bounded by that island.
 
-**A focused TextBox editor floats over a scrollbar.** The native editor is clipped to the scroll viewport by the
-host; if you place it in a transformed/clipped subtree, it cannot follow the transform. Use
-`UseNativeEditor=false` for a fully visual field.
+**A focused TextBox editor floats over a scrollbar.** With `UseNativeEditor=true`, the native editor is clipped to
+the scroll viewport by the host; if you place it in a transformed/clipped subtree, it cannot follow the transform.
+The default visual path has no island.
 
-**The native editor disappears after a layout pass.** A host that skips `ArrangeOverride` for an unchanged size
-still re-places visible islands by absolute bounds; if a custom host re-implements this, keep the
-`NativeElement` placement scan.
+**The native editor disappears after a layout pass.** With `UseNativeEditor=true`, a host that skips
+`ArrangeOverride` for an unchanged size still re-places visible islands by absolute bounds; if a custom host
+re-implements this, keep the `NativeElement` placement scan.
 
 **Opacity or a transform on a live native element does nothing.** A child HWND rejects `WS_EX_LAYERED` and
 `SetLayeredWindowAttributes` fails with `ERROR_INVALID_PARAMETER`; its affine transform is ignored. Set
@@ -131,12 +133,15 @@ chain grows. Set `DataContext` before `InitializeComponent` for immediate resolu
 after `InitializeComponent` appear immediately, and a `SelectedIndex` set earlier resolves once the items reach
 it. The gallery fills combo items in code-behind.
 
-**A resource dictionary key is missing in a custom theme.** Copy the exact key set from
-[`Src/Easel/Themes/DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml); missing keys become transparent in
-`ThemePalette.FromResourceDictionary`, producing invisible or unthemed controls.
+**A resource dictionary key is missing in a custom theme.** A dictionary merged after the host theme may be
+partial: omitted keys fall back to the active theme. `ThemePalette.FromResourceDictionary` is the all-or-nothing
+path — missing keys become transparent/fallback metrics there, so pass it a complete dictionary (start from
+[`Src/Easel/Themes/DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml)) or merge a partial overlay instead.
 
-**Theme switch leaves old colors.** Controls read `Theme.Current`/their merged dictionary at construction.
-Rebuild the visual root after changing the mode; update the host `BackColor` too.
+**Theme switch leaves old colors.** A normal switch mutates the host's theme brushes in place and repaints; it does
+not need a root rebuild. Old colors remain only in a view that merged its own snapshot dictionary
+(`Theme.CreateResourceDictionary`) or captured `Theme.Current` colors at construction — refresh or recreate that
+view. Update the host `BackColor` too.
 
 ## Verification
 

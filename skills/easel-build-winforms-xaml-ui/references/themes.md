@@ -1,7 +1,9 @@
 ﻿# Themes and resource dictionaries
 
 Easel controls have a default palette; an application can switch it, follow Windows, or provide its own
-`ResourceDictionary`. The same values drive self-drawn chrome and XAML `{StaticResource}` lookups.
+`ResourceDictionary`. Two surfaces read the theme: the host's theme resource dictionary (the built-in styles use
+`{DynamicResource}` keys) and `Theme.Current` (self-drawn chrome and control metrics). A complete custom theme
+usually sets both.
 
 ## Modes and the active palette
 
@@ -15,14 +17,15 @@ var palette = Theme.Current;        // the palette controls read now
 ```
 
 - `Theme.Changed` is raised when the mode, palette or followed system theme changes.
-- `Theme.Current` can be assigned a `ThemePalette` directly.
+- `Theme.Current` can be assigned a `ThemePalette` directly; like `ApplyPalette`, that changes palette reads, not
+  the host's resource dictionary.
 - `Theme.ApplyPalette(ThemeMode mode, ThemePalette palette)` activates a host-defined palette and reports the
-  given mode. Use it for custom themes.
+  given mode. It changes `Theme.Current`, not the host's resource dictionary.
 - `Theme.RefreshSystemTheme()` re-reads Windows when `Mode == System`;
   `Theme.SystemThemeResolver` is internal test seam.
 - `Theme.Mode = ThemeMode.System` attaches a `SystemEvents.UserPreferenceChanged` listener once. The event is
-  posted to the `SynchronizationContext` captured when the mode was selected, so a UI host rebuilds on its UI
-  thread.
+  posted to the `SynchronizationContext` captured when the mode was selected, so a UI host receives the change on
+  its UI thread.
 
 `ThemeMode.System` reads
 `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme` (with
@@ -38,9 +41,11 @@ The built-in Dark+ and Light+ palettes are **XAML `ResourceDictionary` files in 
 
 `Caret` is the default text-field caret colour; a dictionary that omits it falls back to `Focus`.
 
-The host merges the active theme dictionary into its `Resources`, so a control template can use `{DynamicResource Accent}`
-and other theme keys directly. Built-in fallback control styles live in `Src/Easel/Themes/DefaultStyles.xaml`; an
-implicit style keyed by control type applies when the control has no explicit style.
+The host merges the active theme dictionary into `VisualHost.Resources` in its constructor (it is the first entry of
+`MergedDictionaries`), so a control template can use `{DynamicResource Accent}` and other theme keys directly. On a
+theme switch the host syncs that dictionary's brushes and metrics in place. Built-in fallback control styles live in
+`Src/Easel/Themes/DefaultStyles.xaml`; they are template-based defaults keyed by control type and apply when the
+control has no explicit style.
 
 They are the source of truth for the current role names and values. They carry palette brushes, metrics
 (`CornerRadius`, `ControlHeight`, typography tokens where present) and keyed typography styles
@@ -51,27 +56,19 @@ They are the source of truth for the current role names and values. They carry p
 generated from the palette when an app asks for it. A custom high-contrast theme is a good demo of authoring
 your own dictionary.
 
-Get a copy for an application's resources:
+Get a copy when an application wants its own dictionary to edit or merge:
 
 ```csharp
 ResourceDictionary resources = Theme.CreateResourceDictionary(Theme.EffectiveMode);
 ```
 
-The copy contains the palette brushes, metrics and typography styles. `Theme.CreateResourceDictionary` for
-`ThemeMode.System` uses `EffectiveMode`.
+The copy contains the palette brushes, metrics and typography styles. It is a snapshot with new brush instances: it
+does not follow later theme switches. `Theme.CreateResourceDictionary` for `ThemeMode.System` uses `EffectiveMode`.
 
 ## Using theme resources in XAML
 
-A themed base class merges the dictionary into each view before `InitializeComponent` (the gallery's
-`Themed*` bases do this through `GalleryTheme.Fill`):
-
-```csharp
-protected ThemedStackPanel()
-{
-    var theme = Theme.CreateResourceDictionary(Theme.EffectiveMode);
-    Resources.MergedDictionaries.Add(theme);
-}
-```
+The host merges the active built-in dictionary into `VisualHost.Resources` in its constructor, and a view resolves
+through that dictionary once it is parented. A view does not need to copy the theme into its own `Resources`:
 
 ```xml
 <Border Background="{StaticResource Surface}"
@@ -80,89 +77,65 @@ protected ThemedStackPanel()
 </Border>
 ```
 
-- `{StaticResource}` resolves at construction through the view's resources, ancestors and
-  `VisualHost.Resources`. Add the theme dictionary before the view's XAML runs.
+- `{StaticResource}` on a visual property resolves once, as soon as the view's resource chain contains the key;
+  the generated code retries as the chain grows. Keys on the view or an ancestor win over the host; the host's own
+  keys win over its merged dictionaries.
 - `{DynamicResource}` stays live; see [xaml.md](xaml.md#static-vs-dynamic).
 - Do not use a theme brush on a property that expects a `Color` CLR value unless the DP is brush-backed. The
   common text properties (`TextBlock.Foreground`, `Button.Foreground`, etc.) are brush-backed and accept a
   theme brush or gradient.
 
-## Authoring a custom theme
+## Custom themes
 
-A standalone dictionary with `x:Class`:
+### Partial overlay on the built-in dictionary
 
-```xml
-<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    x:Class="MyApp.Themes.MyTheme">
-
-  <SolidColorBrush x:Key="Window" Color="#FF101418" />
-  <SolidColorBrush x:Key="Surface" Color="#FF182028" />
-  <SolidColorBrush x:Key="Raised" Color="#FF202A34" />
-  <SolidColorBrush x:Key="Input" Color="#FF182028" />
-  <SolidColorBrush x:Key="Border" Color="#FF30404C" />
-  <SolidColorBrush x:Key="Hover" Color="#FF25313C" />
-  <SolidColorBrush x:Key="Pressed" Color="#FF30404C" />
-  <SolidColorBrush x:Key="Text" Color="#FFEAF2F6" />
-  <SolidColorBrush x:Key="Muted" Color="#FF9FB0BA" />
-  <SolidColorBrush x:Key="Accent" Color="#FF29B6F6" />
-  <SolidColorBrush x:Key="AccentText" Color="#FF06121A" />
-  <SolidColorBrush x:Key="Focus" Color="#FF29B6F6" />
-  <SolidColorBrush x:Key="Caret" Color="#FF29B6F6" />
-  <SolidColorBrush x:Key="Selection" Color="#FF0D3A50" />
-  <SolidColorBrush x:Key="SelectedText" Color="#FFFFFFFF" />
-  <SolidColorBrush x:Key="Disabled" Color="#FF141A1F" />
-  <SolidColorBrush x:Key="DisabledText" Color="#FF5A6A74" />
-  <SolidColorBrush x:Key="ScrollBarThumb" Color="#66A0A0A0" />
-  <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#CCE7E7E7" />
-  <SolidColorBrush x:Key="ShapeStroke" Color="#885B8CFF" />
-  <SolidColorBrush x:Key="ShadowColor" Color="#FF000000" />
-  <SolidColorBrush x:Key="TextVisualForeground" Color="#FFFFFFFF" />
-
-  <x:String x:Key="FontFamily">Segoe UI</x:String>
-  <x:Double x:Key="FontSize">9.5</x:Double>
-  <x:FontWeight x:Key="FontWeight">Normal</x:FontWeight>
-  <x:String x:Key="TextVisualFontFamily">Segoe UI</x:String>
-  <x:Double x:Key="TextVisualFontSize">9</x:Double>
-  <x:FontWeight x:Key="TextVisualFontWeight">Normal</x:FontWeight>
-  <x:Double x:Key="CornerRadius">6</x:Double>
-  <x:Int32 x:Key="ControlHeight">30</x:Int32>
-  <x:Thickness x:Key="ControlBorderThickness">1</x:Thickness>
-  <x:Double x:Key="FocusThickness">1.6</x:Double>
-  <x:Double x:Key="FocusThicknessMedium">1.4</x:Double>
-  <x:Double x:Key="FocusThicknessThin">1</x:Double>
-  <x:Double x:Key="ScrollBarThumbRadius">3</x:Double>
-  <x:Double x:Key="ShapeStrokeThickness">1.5</x:Double>
-  <x:PointF x:Key="ShadowOffset">4,6</x:PointF>
-  <x:Double x:Key="ShadowBlur">6</x:Double>
-  <x:Double x:Key="ShadowOpacity">0.45</x:Double>
-
-  <Style x:Key="Heading" TargetType="TextBlock">
-    <Style.Setters>
-      <Setter Property="FontFamily" Value="Segoe UI" />
-      <Setter Property="FontSize" Value="19" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource Text}" />
-    </Style.Setters>
-  </Style>
-</ResourceDictionary>
-```
-
-Apply it to the whole app:
+The host's theme dictionary is `MergedDictionaries[0]` on `VisualHost.Resources`. A custom theme can be **partial**:
+append a dictionary after it and define only the keys you change. Missing keys fall back to the active theme.
 
 ```csharp
-var custom = new MyApp.Themes.MyTheme();
-Theme.ApplyPalette(ThemeMode.Dark, ThemePalette.FromResourceDictionary(custom));
-// views built after this merge/copy the dictionary; rebuild the root if it is already on screen
+var overrides = new ResourceDictionary
+{
+    ["Accent"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x8A, 0x00)),
+    ["Focus"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x8A, 0x00)),
+    ["Surface"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x1A, 0x1F, 0x24)),
+};
+surface.Resources.MergedDictionaries.Add(overrides); // appended after the theme dictionary
 ```
 
-`ThemePalette.FromResourceDictionary(dictionary)` reads the standard theme keys. To use a custom dictionary for
-view resources, merge it (as the gallery's high-contrast demo does) or copy it into each view.
+- Lookup checks a dictionary's own keys first, then its `MergedDictionaries` last-added first. Keys stored directly
+  on `surface.Resources` (or on a view's `Resources`) win over every merge; an overlay appended after the host's
+  theme wins over the theme, while one inserted before it loses.
+- A key the overlay omits keeps resolving from the active built-in theme, so a partial dictionary is enough.
+- The host syncs its theme dictionary in place on a `Theme.Mode` change. Overridden keys stay at the overlay's
+  value; to make them follow the mode, replace or update the overlay's values (or swap the dictionary) from
+  `Theme.Changed`.
+- `{StaticResource}` on a visual resolves once, so add the overlay before building views that read it, or use
+  `{DynamicResource}` for keys that must change later.
+- The overlay changes resource lookups. Built-in styles read theme keys with `{DynamicResource}`, so default
+  control chrome follows the overlay. Most control metrics and self-drawn chrome read `Theme.Current`, not the
+  resource dictionary; call `Theme.ApplyPalette` (or assign `Theme.Current`) as well when those should change.
 
-**Required keys** are the ones the current built-in dictionaries define. Copy the exact key set from
-[`DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml) when starting a custom theme; missing keys resolve to
-transparent/fallback metrics in `FromResourceDictionary` and will make some controls look wrong.
+### Full palette
+
+`ThemePalette.FromResourceDictionary(dictionary)` reads the standard keys directly. Unlike a merged overlay, a key
+missing from that dictionary becomes `Color.Empty` or the palette's fallback metric, not the built-in value; start
+from [`DarkTheme.xaml`](../../../Src/Easel/Themes/DarkTheme.xaml) when building a complete palette this way.
+
+```csharp
+var custom = new MyApp.Themes.MyTheme(); // complete standalone dictionary
+Theme.ApplyPalette(ThemeMode.Dark, ThemePalette.FromResourceDictionary(custom));
+```
+
+`Theme.ApplyPalette` changes `Theme.Current` immediately, so existing controls re-read its colors and metrics, but
+it does not rewrite `VisualHost.Resources`. Merge a dictionary as above when templates and `{DynamicResource}` keys
+should use the custom colors too.
+
+### Per-view copies
+
+A view does not need its own theme copy. `Theme.CreateResourceDictionary(...)` returns a snapshot whose brushes are
+new instances; a copy merged into a view outranks the host and is not updated by a theme switch. Merge a dictionary
+into a view only for view-local overrides or decoration (the gallery's `Themed*` bases do this for its custom
+high-contrast theme and gradient brushes), and refresh that copy yourself when the palette changes.
 
 ## Typography
 
@@ -176,31 +149,31 @@ intentionally departs from the theme.
 
 ## Switching at runtime
 
-Controls read `Theme.Current` when they paint/construct; a live theme switch should rebuild the visual root:
+`Theme.Mode`, assigning `Theme.Current` and `Theme.ApplyPalette(...)` raise `Theme.Changed`. The host syncs its theme
+dictionary brushes in place and invalidates the surface, so an ordinary switch needs no root rebuild:
 
 ```csharp
-Theme.Changed += (_, _) =>
-{
-    surface.BackColor = Theme.Current.WindowBackground;
-    surface.Root = new MyShellView(); // or rebuild the current view
-};
+Theme.Changed += (_, _) => surface.BackColor = Theme.Current.WindowBackground;
 ```
 
-- Apply the theme to the host and rebuild views so every control reads the new palette.
-- Native islands (focused `TextBox` editor, `NativeElement`/`NativeControlHost`) choose their native color mode when handles
-  are created. Call `Application.SetColorMode` for new handles; changing it late does not repaint existing
-  islands.
+- Existing controls re-read `Theme.Current`; templates that bound the host's theme brushes change with them.
+- Recreate (or refresh) a view only when it captured `Theme.Current` colors at construction or merged its own
+  cloned theme dictionary. The gallery does this for a few previews and its `GalleryTheme` copies.
+- Native islands (`NativeElement`/`NativeControlHost`, and a `TextBox` with `UseNativeEditor=true`) choose their
+  native color mode when handles are created. Call `Application.SetColorMode` for new handles; changing it late
+  does not repaint existing islands.
 - `Theme.Changed` can arrive on the UI context for system-follow; still marshal if your host mutates controls
   from another thread.
-- `Theme.Current` is a shared mutable palette object. Treat it as read-only in views; replace the palette (or
-  rebuild) rather than mutating a color in place.
+- `Theme.Current` is a shared mutable palette object. Treat it as read-only in views; replace the palette rather
+  than mutating a color in place (an in-place color edit raises no change notification).
 
 ## Diagnostics
 
-- A missing `{StaticResource}` throws at `InitializeComponent` (`No resource named …`). Add the key to the
-  theme dictionary or the view's resources before that point.
-- `ThemePalette.FromResourceDictionary` with a dictionary missing keys yields transparent colors; copy the
-  built-in key set.
+- A missing `{StaticResource}` on a visual property leaves the value unset and the binding waits for the chain; it
+  does not throw. An eager read (style `BasedOn` or setter value, a non-visual object property, a trigger-action
+  property, a dictionary-internal reference) throws `No resource named …`.
+- `ThemePalette.FromResourceDictionary` with a dictionary missing keys yields transparent colors/fallback metrics;
+  a merged partial overlay instead falls back to the active theme.
 - A custom dictionary with an implicit `<Style TargetType="…">` and no `x:Key` is stored by type in the
   dictionary but is not automatically applied; declare implicit styles on a visual element's resources/styles.
 - `MergedDictionaries` has no file-URI `Source`; merge a compiled `ResourceDictionary` type or inline dictionary.

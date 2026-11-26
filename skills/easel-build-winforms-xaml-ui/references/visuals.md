@@ -2,7 +2,8 @@
 
 Two layers exist:
 
-1. **Controls** (`VisualElement`) have layout, input and self-drawn chrome. Use them for anything interactive.
+1. **Controls** (`VisualElement`) have layout, input, and a built-in template or self-drawn chrome. Use them for
+   anything interactive.
 2. **Visuals** (`Visual`, `ContainerVisual`, `ShapeVisual`, `TextVisual`, `CurveBatchVisual`) are a retained,
    layout-free decoration tree. They are cheap for bulk shapes/text and are hosted by `VisualPresenter`.
    They have no input, focus or measure.

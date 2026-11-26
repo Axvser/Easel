@@ -22,8 +22,8 @@ bitmap in the visual pass when composition is required. In a Form it pairs the s
 (`Opacity=1/255`) owned proxy window, so real mouse/keyboard/IME keep working: opacity/translation are exact, scale
 re-lays the control out at the scaled size, and rotation keeps the transformed polygon interactive. Popups cover
 an island by cutting their rectangle out of its window region; `CornerRadius` rounds that region. `NativeControlHost` is the code-behind
-equivalent. The focused visual `TextBox` uses a private host for IME/accessibility; set `UseNativeEditor="False"`
-to keep the field entirely visual.
+equivalent. The visual `TextBox` is the default; set `UseNativeEditor="True"` to give the focused field a private
+native editor for IME/accessibility.
 
 ## Custom window chrome
 
@@ -52,7 +52,7 @@ UIA peers on the self-drawn buttons, per-monitor chrome details.
 | Member | Use |
 | --- | --- |
 | `Root` | Assign the shell view; replacing it tears down old popups/native islands and focus. |
-| `Resources` | Dictionary consulted after the element and its ancestors. |
+| `Resources` | Dictionary consulted after the element and its ancestors; the host merges the active theme dictionary into it. |
 | `Styles` | Implicit styles for the whole tree (element/ancestor styles win). |
 | `DpiScale` / `DpiScaleOverride` | Physical pixels per logical DIP. Layout/input/paint are logical; only painting and native islands scale. `DpiScaleOverride` pins a test scale. |
 | `LogicalClientSize` | Client size in DIPs. |
@@ -114,8 +114,8 @@ myButton.Focus();
 if (myTextBox.IsFocused) { /* caret/IME path */ }
 ```
 
-`TextBox` owns its caret, selection, clipboard and undo. With the native editor it also handles IME, but the
-editor is a child HWND clipped to the scroll viewport; it cannot be transformed.
+`TextBox` owns its caret, selection, clipboard and undo on the visual path. With `UseNativeEditor=true` it also
+handles IME, but the editor is a child HWND clipped to the scroll viewport; it cannot be transformed.
 
 ## Scroll and overlays
 

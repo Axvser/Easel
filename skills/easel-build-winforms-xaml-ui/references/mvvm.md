@@ -221,4 +221,4 @@ static/global service locator; the gallery shares one `GalleryModel` only as sam
   bound to the tree (or use a `SynchronizationContext` captured at construction).
 - Dispose a replaced preview/tree; dispose native popups; dispose resource subscriptions through the element's
   own `Dispose` (it disposes children, caches and bindings).
-- A view model with a `Theme.Changed`, `Tickable` or command subscription must unsubscribe in `Dispose`.
+- A view model with a `Theme.Changed`, timer or command subscription must unsubscribe in `Dispose`.

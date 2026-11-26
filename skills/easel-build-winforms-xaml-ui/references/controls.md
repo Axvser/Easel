@@ -44,7 +44,7 @@ This page lists each control's own properties and behaviour.
 | --- | --- | --- |
 | `TextBlock` | `Text`, `Font`, `Foreground` (Brush-backed), `Wrap`, `TextAlignment` | Single line by default; `Wrap` measures wrapped height. `Foreground` accepts a Brush, including gradients. |
 | `TextBox` | `Text`, `Placeholder`, `Font`, `Foreground`, `IsReadOnly`, `UseNativeEditor`, `IsPassword`, `AcceptsReturn`, `Wrap`, `SelectionStart`, `SelectionLength`, `CaretIndex`, `SelectionBrush`, `SelectionForeground`, `CaretBrush`, `CaretThickness`, `CaretBlinkInterval`, `IsOverwriteMode`, `CaretBlockOpacity` | Self-drawn editing on the visual path by default. Set `UseNativeEditor=true` to fall back to the private native editor for IME/accessibility; the island draws the OS selection and caret, so the selection/caret properties apply only to the visual path. An unset `CaretBrush` uses the theme's `Caret` colour. Insert toggles `IsOverwriteMode`, which draws a translucent outlined block caret (`CaretBlockOpacity`, 0.35 by default) and replaces the next character. |
-| `TextBoxContentHost` | — | The `PART_ContentHost` for a custom `ControlTemplate` on `TextBox`. |
+| `TextBoxContentHost` | — | The `PART_ContentHost` (or `PART_EditorHost`) for a custom `ControlTemplate` on `TextBox`. |
 | `RichTextBox` | `Text`, `Font`, `Foreground`, `IsReadOnly`, `Wrap`, `SelectionStart`, `SelectionLength`, `SetPlainText`, `Select`, `ToggleBold/Italic/Underline`, `DocumentChanged`, `SelectionBrush`, `SelectionForeground`, `CaretBrush`, `CaretThickness`, `CaretBlinkInterval` | Styled runs in a flat character buffer; draws via the visual text pipeline. `RichTextContentHost` is the template content part. |
 | `Image` | `Source` (`System.Drawing.Image?`), `Stretch` | Draws a bitmap in the tree. `BitmapImage`/`DrawingImage` also implement `ImageSource` for brushes/hosts. |
 
@@ -62,7 +62,7 @@ Decorative template parts must set `IsHitTestVisible="False"`; that skips the pa
 | `RepeatButton` | as `Button`, repeats while held | Delay/interval is built into the control. |
 | `ToggleButton` | `IsChecked` (`bool`), `Command`, `Checked` | Checked pipe shared by all toggles. |
 | `CheckBox` | `IsChecked` (`bool?`), `Command`, `Checked` | Writes `true`/`false`; a `null` state is not produced by input. |
-| `RadioButton` | `IsChecked` (`bool?`), `GroupName`, `Command`, `Checked` | Group is scoped by `GroupName`; activating one clears its group siblings. |
+| `RadioButton` | `IsChecked` (`bool?`), `GroupName`, `Command`, `Checked` | Group is scoped by `GroupName`; activating one clears its group siblings, and clicking the checked one again clears it. |
 | `Slider` | `Minimum`, `Maximum`, `Value`, `ValueChanged` | Pointer drag and arrow keys; bounded. |
 | `ProgressBar` | `Minimum`, `Maximum`, `Value` | Track and fill; bind `Value` from a slider/model. |
 | `ScrollBar` | see layout table | Range control with a template and scroll events. |
@@ -88,8 +88,8 @@ Decorative template parts must set `IsHitTestVisible="False"`; that skips the pa
 
 | Control | Key members | Notes |
 | --- | --- | --- |
-| `VisualMenu` | `Items` (`IList<VisualMenuItem>`), `Foreground`, `Click`, `Template` | Menu bar; top-level items open drop-downs in the overlay. |
-| `VisualMenuItem` | `Header`, `InputGestureText`, `IsEnabled`, `IsChecked`, `IsSeparator`, `Command` (`Action?`), `CommandPath`, `Items` | Data item, not a visual child. Use `IsSeparator` for rules. |
+| `VisualMenu` | `Items` (`IList<VisualMenuItem>`), `Foreground`, `OpenedMenu`, `Refresh()` | Menu bar; top-level items open drop-downs in the overlay. Call `Refresh()` after mutating `Items` while a template is applied. |
+| `VisualMenuItem` | `Header`, `InputGestureText`, `IsEnabled`, `IsChecked`, `IsSeparator`, `Command` (`Action?`), `CommandPath`, `Click`, `Items` | Data item, not a visual child. Use `IsSeparator` for rules. |
 | `VisualMenuItemContainer` | `Item`, `IsHighlighted`, `IsPressed`, `IsTopLevel`, `Foreground` | Realized row/template part. |
 | `VisualContextMenu` | inherits `VisualPopup`; `OpenAt(target, surfacePoint)`, `Items` | Detached menu opened at a surface point. |
 | `VisualPopup` | `IsOpen`, `Child`, `PlacementTarget`, `Placement` (`VisualPlacement`), `HorizontalOffset`, `VerticalOffset`, `StaysOpen`, `MatchTargetWidth`, `Opened`, `Closed` | Hosted in the overlay above the root tree; not clipped by ancestor scroll viewers. `PlacementTarget` is set in code (no `ElementName` requirement). |
@@ -129,8 +129,10 @@ shapes, and `VisualPresenter`/`Visual` for large decorative batches.
 
 ## Control defaults and state
 
-All default chrome is painted from `Theme.Current` (see [themes.md](themes.md)). Do not hard-code colors in an
-app that should follow the palette. Controls expose hover/pressed/selected/focused state as DPs or template
+The built-in appearance is the template set in `Src/Easel/Themes/DefaultStyles.xaml`; its `{DynamicResource}`
+keys come from the host theme dictionary, which updates in place on a theme switch. A control without a template
+falls back to self-drawn chrome that reads `Theme.Current` (see [themes.md](themes.md)). Do not hard-code colors in
+an app that should follow the palette. Controls expose hover/pressed/selected/focused state as DPs or template
 triggers; `ButtonBase` exposes `IsPointerOver`/`IsPressed`, `ToggleButtonBase` `IsChecked`, list/tree items
 selected state.
 

@@ -28,9 +28,10 @@ public sealed class AnimationSpec
 | `LoopTime` | Additional full passes; 0 once, `int.MaxValue` forever. |
 | `IsAutoReverse` | Each pass also runs backwards. |
 
-The engine writes at `BindingPriority.Animation` while running, supersedes an animation on the same
-property, and holds the final value at local precedence when it completes, is superseded or is stopped. The
-value is converted to the DP type before it reaches the engine.
+The engine writes at `BindingPriority.Animation` while running and supersedes an animation on the same property.
+When it completes or is stopped, it holds the reached value at local precedence and clears the animation layer; a
+superseded animation simply ends and the newer one takes over. The value is converted to the DP type before it
+reaches the engine.
 
 ## Markup actions
 
@@ -98,11 +99,12 @@ same property supersedes the older one; animations on different properties run i
 - Frames are computed on a timer at `FPS` and written at `BindingPriority.Animation`.
 - When the element is hosted, frame writes and the final hold are marshalled to its `VisualHost` handle
   thread; an unparented element is written in place.
-- When the animation completes, is superseded or is stopped, the reached value is written at
-  `BindingPriority.LocalValue` and the animation layer is cleared.
+- When the animation completes or is stopped, the reached value is written at `BindingPriority.LocalValue` and the
+  animation layer is cleared. A superseded animation ends without a hold; the newer run owns the property.
 - Key frames form one chain: each adjacent pair is a segment whose duration is proportional to its offset
   slice, and `LoopTime`/`IsAutoReverse` apply to each segment.
-- Native islands (the focused `TextBox` editor, `NativeElement`/`NativeControlHost`) are not part of the visual animation.
+- Native islands (`NativeElement`/`NativeControlHost`, and a focused `TextBox` with `UseNativeEditor=true`) are
+  not part of the visual animation.
 
 ## Animatable properties
 

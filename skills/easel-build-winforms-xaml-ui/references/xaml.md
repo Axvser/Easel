@@ -126,8 +126,11 @@ Markup extensions: `{StaticResource Key}`, `{DynamicResource Key}`, `{Binding �
 </UserControl.Resources>
 ```
 
-The `<ResourceDictionary>` wrapper is optional; direct resources under `X.Resources` work too. Keys must be
-declared before use in the same file. Resolution walks the element, its ancestors, then `VisualHost.Resources`.
+The `<ResourceDictionary>` wrapper is optional; direct resources under `X.Resources` work too. A generated static
+reference on a visual property binds lazily: it resolves as soon as the element's chain (element, ancestors, then
+`VisualHost.Resources`) contains the key, so a host key — including the built-in theme — resolves after the view is
+parented. Eager reads (a style `BasedOn` or setter value, a non-visual object property, a trigger-action property,
+a dictionary-internal reference) still need the key at the point they run.
 
 ### Standalone dictionary
 
@@ -156,7 +159,10 @@ styles on a visual element's `Resources` or `Styles`.
 
 ### Static vs dynamic
 
-- `{StaticResource Key}` resolves once. A key declared later in the same file is still missing at that point.
+- `{StaticResource Key}` resolves once, when the key first becomes reachable; a visual property retries until its
+  ancestor/host chain resolves it, then stops following. An eager reference (a style `BasedOn` or setter value, a
+  non-visual object property, a trigger-action property, a dictionary-internal reference) reads at construction and
+  throws `No resource named …` when the key is absent.
 - `{DynamicResource Key}` stays subscribed to reachable dictionaries. Add/replace/remove updates the target; a
   removed key clears a DP back to its default (or stops a CLR-only write).
 - A later resource reference for the same target property **supersedes** an earlier one, regardless of
@@ -324,7 +330,7 @@ The handler must be unambiguous and match the event's delegate signature. Pointe
 | `EASEL_XAML022` | compiled binding leaf cannot be written |
 | `EASEL_XAML023` | invalid `x:DataType` / `x:CompileBindings` value |
 | `EASEL_XAML024` | compiled binding path is unsupported and falls back to reflection |
-| `EASEL_XAMLP001`–`005` | property generator: non-partial, wrong owner, invalid attached accessors, name conflict, missing default value |
+| `EASEL_XAMLP001`–`006` | property generator: non-partial, wrong owner, invalid attached accessors, name conflict, missing default value, invalid changed callback |
 
 `EASEL_XAML003/004/007/008/010/011/013/016/017/024` are warnings: the element/attribute is skipped and the build
 continues. Every other `EASEL_XAML*` ID and `EASEL_XAMLP*` is an error. Treat the warning IDs as errors in
