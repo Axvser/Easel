@@ -56,24 +56,28 @@ When consuming a checkout instead of NuGet, reference `Src/Easel/Easel.csproj` a
 
 ## Bootstrap
 
-Create the single surface and run the ordinary WinForms message loop:
+The recommended path is `VisualForm`; it hosts the single surface and accepts any visual root:
 
 ```csharp
 [STAThread]
 private static void Main()
 {
     ApplicationConfiguration.Initialize();
-
-    var surface = new VisualHost { Dock = DockStyle.Fill, BackColor = Theme.Current.WindowBackground };
-    var form = new Form { Text = "My app", ClientSize = new Size(1200, 800) };
-    form.Controls.Add(surface);
-    surface.Root = new MyShellView();
-    Application.Run(form);
+    Application.Run(new VisualForm { Text = "My app", ClientSize = new Size(1200, 800), Root = new MyShellView() });
 }
 ```
 
-`VisualHost` is the only WinForms `Control`. `Root` is a `VisualElement` (or a plain `ContainerVisual`).
-Everything below it is a retained visual.
+With an existing native form, the `Control.ControlCollection` extensions create and remove the host:
+
+```csharp
+var form = new Form { Text = "My app", ClientSize = new Size(1200, 800) };
+form.Controls.Add(new MyShellView()); // creates a dock-filled VisualHost
+Application.Run(form);
+```
+
+Both forms host exactly one `VisualHost`; a second `Add` on the same collection throws. `Remove(view)` removes
+and disposes the host created by `Add`. `VisualHost` remains the only WinForms `Control` inside the visual tree,
+and `Root` is a `VisualElement` (or a plain `ContainerVisual`). Everything below it is a retained visual.
 
 ## First XAML view
 

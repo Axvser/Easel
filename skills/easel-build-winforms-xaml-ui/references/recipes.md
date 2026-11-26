@@ -12,16 +12,18 @@ private static void Main()
     ApplicationConfiguration.Initialize();
     Theme.Mode = ThemeMode.Dark;
 
-    var surface = new VisualHost { Dock = DockStyle.Fill, BackColor = Theme.Current.WindowBackground };
-    var form = new Form { Text = "My app", ClientSize = new Size(1280, 800) };
-    form.Controls.Add(surface);
-    surface.Root = new ShellView();
-    Application.Run(form);
+    Application.Run(new VisualForm
+    {
+        Text = "My app",
+        ClientSize = new Size(1280, 800),
+        Root = new ShellView(),
+    });
 }
 ```
 
 `ShellView` is a XAML `UserControl` with a `DockPanel`: title bar (Top), status bar (Bottom), side panes and a
-fill. A `VisualHost` is the only child control.
+fill. `VisualForm` owns the single `VisualHost`; for an existing `Form`, `form.Controls.Add(new ShellView())`
+creates the same host and `form.Controls.Remove(view)` tears it down.
 
 A `Theme.Mode` switch mutates the host's theme brushes in place and repaints; no root rebuild is needed. Recreate
 (or refresh) a view only when it captured `Theme.Current` colors at construction or merged its own snapshot

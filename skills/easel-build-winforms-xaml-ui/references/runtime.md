@@ -7,13 +7,15 @@
 the deepest hit element. No visual element creates a window.
 
 ```csharp
-var surface = new VisualHost { Dock = DockStyle.Fill, BackColor = Theme.Current.WindowBackground };
-form.Controls.Add(surface);
-surface.Root = new MyShellView();
+Application.Run(new VisualForm { Root = new MyShellView() });
+
+// or, with an existing native form:
+// form.Controls.Add(new MyShellView());
 ```
 
-`VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement` gets layout and
-input; a `ContainerVisual` is painted as lightweight decoration.
+`VisualForm` creates the dock-filled `VisualHost`; the `Control.ControlCollection` extension does the same for a
+plain `Form`. `VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement`
+gets layout and input; a `ContainerVisual` is painted as lightweight decoration.
 
 `NativeElement` (written `<native:Foo>` in XAML, no `xmlns:native` needed) measures with the native
 `GetPreferredSize`, arranges into one child HWND, and can host visual content through a nested `VisualHost` over
