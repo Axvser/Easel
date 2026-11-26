@@ -169,7 +169,7 @@ public sealed class DataGridResidualTests
         using var bitmap = Render(host, 300, 120);
 
         Assert.AreEqual(badge.ToArgb(), bitmap.GetPixel(13, 45).ToArgb(), "the badge kind cell fills the pill");
-        Assert.AreEqual(check.ToArgb(), bitmap.GetPixel(113, 45).ToArgb(), "the check kind cell fills the box");
+        Assert.AreEqual(check.ToArgb(), bitmap.GetPixel(112, 45).ToArgb(), "the check kind cell fills the box");
         Assert.AreEqual(progress.ToArgb(), bitmap.GetPixel(220, 45).ToArgb(), "the progress kind cell fills the track");
         Assert.AreEqual(selection.ToArgb(), bitmap.GetPixel(180, 45).ToArgb(), "the selected row still shows around the kind cells");
     }

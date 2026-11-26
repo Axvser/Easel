@@ -7,18 +7,12 @@
        A shell template hosts one ItemsPresenter; row appearance lives in the container styles so a host can replace
        the row look without retemplating the list. -->
 
+  <!-- A bare container owns no surface and no scroll host: its shell is just the realization host, so an
+       ItemsControl never clips content at its own bounds. A host that needs scrolling wraps it in a ScrollViewer. -->
   <Style TargetType="ItemsControl">
     <Style.Template>
       <ControlTemplate TargetType="ItemsControl">
-        <Border Background="{DynamicResource Input}"
-                BorderBrush="{DynamicResource Border}"
-                BorderThickness="1"
-                CornerRadius="{TemplateBinding CornerRadius}"
-                Padding="{TemplateBinding Padding}">
-          <ScrollViewer x:Name="PART_ScrollViewer" HorizontalScrollBarVisibility="Disabled">
-            <ItemsPresenter x:Name="PART_ItemsPresenter" />
-          </ScrollViewer>
-        </Border>
+        <ItemsPresenter x:Name="PART_ItemsPresenter" />
       </ControlTemplate>
     </Style.Template>
   </Style>
@@ -27,9 +21,9 @@
     <Style.Template>
       <ControlTemplate TargetType="ListBox">
         <Grid x:Name="Root">
-          <Border Background="{DynamicResource Input}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+          <!-- No carrying surface: Transparent keeps empty-area hit-testing while the host supplies the fill. -->
+          <Border Background="Transparent"
+                  BorderThickness="0"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
@@ -127,9 +121,8 @@
     <Style.Template>
       <ControlTemplate TargetType="TreeView">
         <Grid>
-          <Border Background="{DynamicResource Surface}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+          <Border Background="Transparent"
+                  BorderThickness="0"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"

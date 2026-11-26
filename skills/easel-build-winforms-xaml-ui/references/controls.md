@@ -130,8 +130,16 @@ shapes, and `VisualPresenter`/`Visual` for large decorative batches.
 ## Control defaults and state
 
 The built-in appearance is the template set in `Src/Easel/Themes/DefaultStyles.xaml`; its `{DynamicResource}`
-keys come from the host theme dictionary, which updates in place on a theme switch. A control without a template
-falls back to self-drawn chrome that reads `Theme.Current` (see [themes.md](themes.md)). Do not hard-code colors in
+keys come from the host theme dictionary, which updates in place on a theme switch. The 3.0.0 audit of which
+default styles paint a container is in [default-style-audit.md](default-style-audit.md). In 3.0 a content-only
+container stays transparent, and so does the carrying surface of a selectable container (`ListBox`, `TreeView`,
+`DataGrid`, `Calendar`, the `VisualMenu` bar): state rows, headers, text and focus rings keep their colours, while
+the host supplies the fill behind them. Input chrome (`Button`, `TextBox`, `ComboBox`/`DatePicker`, scrollbars,
+dialogs) keeps its colours; so does the `VisualContextMenu` popup card, because it floats without a host and its
+submenus share only the template. A bare `ItemsControl` also has no inner `ScrollViewer`, so it never clips
+content at its own bounds; wrap it yourself to scroll. A control without a template falls back to self-drawn
+appearance that reads `Theme.Current` (see [themes.md](themes.md)), and that fallback is transparent too for the
+carrying-surface controls. Do not hard-code colors in
 an app that should follow the palette. Controls expose hover/pressed/selected/focused state as DPs or template
 triggers; `ButtonBase` exposes `IsPointerOver`/`IsPressed`, `ToggleButtonBase` `IsChecked`, list/tree items
 selected state.

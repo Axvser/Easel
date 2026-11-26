@@ -638,9 +638,6 @@ public class Calendar : TemplatedControl
         Focusable = true;
         IsHitTestVisible = true;
         Padding = new XamlThickness(6f);
-        Background = Theme.Current.Surface;
-        BorderBrush = Theme.Current.ControlBorder;
-        BorderThickness = new XamlThickness(1f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         DisplayMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
     }

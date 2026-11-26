@@ -69,9 +69,8 @@
     <Style.Template>
       <ControlTemplate TargetType="VisualMenu">
         <Border x:Name="Chrome"
-                Background="{DynamicResource Raised}"
-                BorderBrush="{DynamicResource Border}"
-                BorderThickness="0,0,0,1"
+                Background="Transparent"
+                BorderThickness="0"
                 CornerRadius="{TemplateBinding CornerRadius}"
                 Padding="{TemplateBinding Padding}"
                 IsHitTestVisible="False">

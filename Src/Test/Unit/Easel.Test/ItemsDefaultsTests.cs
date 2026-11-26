@@ -11,7 +11,7 @@ namespace Easel.Test;
 public sealed class ItemsDefaultsTests
 {
     [TestMethod]
-    public void ItemsControl_DefaultShellHostsItemsInAPresenterInsideAScrollViewer()
+    public void ItemsControl_DefaultShellIsABarePresenterWithoutScrollChrome()
     {
         using var surface = new VisualHost { Size = new Size(200, 120), DpiScaleOverride = 1f };
         using var control = new VC.ItemsControl { ItemsSource = new[] { "a", "b" } };
@@ -19,14 +19,42 @@ public sealed class ItemsDefaultsTests
         Layout(surface, 200, 120);
 
         Assert.IsNotNull(control.TemplateRoot, "the built-in shell applies when the control is hosted");
-        Assert.IsNotNull(
+        Assert.IsNull(
             control.GetTemplateChild<VC.ScrollViewer>("PART_ScrollViewer"),
-            "the shell provides the scroll chrome");
+            "a bare ItemsControl does not host its own ScrollViewer");
+        Assert.IsNull(
+            FindDescendant<VC.ScrollViewer>(control.TemplateRoot),
+            "no inner ScrollViewer may clip content at the ItemsControl bounds");
 
         var host = control.GetTemplateChild<VC.ItemsPresenter>("PART_ItemsPresenter");
         Assert.IsNotNull(host, "the shell declares one items presenter");
+        Assert.AreSame(control.TemplateRoot, host, "the bare shell is the presenter itself");
         Assert.IsTrue(host!.Children.Contains(control.Items[0]), "realized items live in the shell presenter");
         Assert.IsInstanceOfType<VC.TextBlock>(control.Items[0], "a plain ItemsControl keeps its data projection");
+    }
+
+    private static T? FindDescendant<T>(VisualElement? root)
+        where T : VisualElement
+    {
+        if (root is null)
+        {
+            return null;
+        }
+
+        if (root is T match)
+        {
+            return match;
+        }
+
+        foreach (var child in root.Children)
+        {
+            if (child is VisualElement element && FindDescendant<T>(element) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     [TestMethod]

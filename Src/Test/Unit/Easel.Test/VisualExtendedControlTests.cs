@@ -136,7 +136,15 @@ public sealed class VisualExtendedControlTests
 
         using var surface = new VisualHost { Size = new Size(250, 226) };
         using var calendar = new VC.Calendar { Width = 250f, Height = 226f, SelectedDate = today };
-        surface.Root = calendar;
+        // 默认日历不再自带表面；宿主用一层 Grid 铺底色，悬停洗色才有可比较的基准像素。
+        using var backdrop = new VC.Grid
+        {
+            Width = 250f,
+            Height = 226f,
+            Background = new SolidColorBrush(Theme.Current.Surface),
+        };
+        backdrop.Add(calendar);
+        surface.Root = backdrop;
 
         using var before = Render(surface, 250, 226);
         surface.ProcessPointerMove(new PointF(hoverX + 6f, hoverY + 6f));

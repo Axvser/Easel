@@ -12,7 +12,6 @@ using Easel;
 using XamlBrush = Easel.Brush;
 using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlTextAlignment = Easel.Controls.TextAlignment;
-using XamlThickness = Easel.Controls.Thickness;
 using XamlVisibility = Easel.Controls.Visibility;
 
 namespace Easel.Visuals.Controls;
@@ -650,15 +649,12 @@ public class DataGrid : TemplatedControl
     private Font? _headerFontBase;
     private FontStyle _headerFontStyle;
 
-    /// <summary>Creates an empty table with the theme's surface, border and corner radius.</summary>
+    /// <summary>Creates an empty table with theme metrics; the grid paints no surface of its own.</summary>
     public DataGrid()
     {
         Focusable = true;
         IsHitTestVisible = true;
         AllowDrop = true;
-        Background = Theme.Current.Surface;
-        BorderBrush = Theme.Current.ControlBorder;
-        BorderThickness = new XamlThickness(1f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
 
         _columns.CollectionChanged += OnColumnsChanged;
@@ -1434,7 +1430,7 @@ public class DataGrid : TemplatedControl
             return;
         }
 
-        // 模板只负责分区；底色与边框仍和自绘路径一致，避免模板里的不透明块盖住行内容。
+        // 模板只负责分区；只有宿主显式设置了底色/边框才补一层，默认表格不带表面。
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var bounds = new Rectangle(
             0,

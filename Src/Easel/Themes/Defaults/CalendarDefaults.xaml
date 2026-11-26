@@ -12,9 +12,8 @@
       <ControlTemplate TargetType="Calendar">
         <Grid ClipToBounds="True">
           <Border IsHitTestVisible="False"
-                  Background="{DynamicResource Surface}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  Background="Transparent"
+                  BorderThickness="0"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <CalendarItem x:Name="PART_CalendarItem" />
         </Grid>

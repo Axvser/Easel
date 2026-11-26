@@ -472,6 +472,7 @@ public class VisualContextMenu : VisualPopup
         MatchTargetWidth = false;
         Focusable = true;
         Padding = new XamlThickness(4f);
+        // 弹层没有宿主可依托；子菜单/Dropdown 又是内部新建的实例，只共享模板，所以表面必须随默认样式一起到。
         Background = Theme.Current.SurfaceAlt;
         BorderBrush = Theme.Current.ControlBorder;
         BorderThickness = new XamlThickness(1f);
