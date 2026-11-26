@@ -126,10 +126,11 @@ view only for view-local overrides (see [references/themes.md](references/themes
 
 ## Hard rules
 
-⚙ **DPI takes two settings.** Per-monitor v2 awareness (`<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>`
-or `Application.SetHighDpiMode` before the first window) **and** `AutoScaleMode = AutoScaleMode.None` on the form
-that hosts `VisualHost`. Miss the second and WinForms scales the form while the host scales the tree, so everything
-renders twice as large. Details in [references/runtime.md](references/runtime.md#dpi).
+⚙ **DPI is process-wide.** The package's build props set `<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>`
+for .NET 6+ apps; without the generated `ApplicationConfiguration.Initialize()`, call `EaselApplication.Initialize()`
+before the first window. `Window` and `VisualForm` already set `AutoScaleMode.None`; a hand-written form that hosts
+`VisualHost` must do the same. WinForms gates `DeviceDpi` and DPI messages on the process mode, so a per-window
+thread context is not enough. Details in [references/runtime.md](references/runtime.md#dpi).
 
 ⚙ **One HWND for the visual tree.** A WinForms control never joins the visual paint pass; it is always an HWND
 island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElement<Button>`), or assign
@@ -234,7 +235,7 @@ switches. Use it as the reference composition for a new app.
 - [ ] Every `x:Class` is `partial` and its base matches the root tag.
 - [ ] Static keys resolve through the view → ancestors → host chain; dynamic keys follow later changes.
 - [ ] The app starts with `Theme.Mode` set before the first view is built (or uses `Theme.Current` defaults).
-- [ ] The primary path works at 150% DPI and after a theme switch.
+- [ ] The primary path works at 150% DPI, across a monitor DPI change and after a theme switch.
 - [ ] Native islands stay rectangular; a popup covers one only through the window-region hole.
 - [ ] Any animated property has a CLR type the engine can interpolate (see `references/animation.md`).
 - [ ] The gallery's `--smoke`/`--capture` pattern is used for visual verification when changing the runtime.

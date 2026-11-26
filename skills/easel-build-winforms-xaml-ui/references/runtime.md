@@ -177,18 +177,27 @@ All layout, bounds, pointer coordinates and fonts are logical DIPs. The host app
 painting and when placing native islands. Authored sizes/font sizes therefore stay identical at 100%, 150% and
 per-monitor DPI. Native HWNDs are placed in physical pixels from logical bounds.
 
-Two settings are required:
+DPI awareness is process-wide, and WinForms only follows monitor changes when the **process** is per-monitor v2
+aware. `Control.DeviceDpi` and `WM_DPICHANGED` are gated on the process awareness; `VisualForm` checks it on handle
+creation through `EaselApplication` and warns once when the process is not per-monitor v2. A per-window
+`SetThreadDpiAwarenessContext` call does not make Easel follow monitors.
 
-1. **Per-monitor v2 awareness** — `<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>` in the csproj,
-   read by `ApplicationConfiguration.Initialize()`, or `Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)`
-   before the first window. Without it Windows bitmap-stretches the window.
-2. **`AutoScaleMode.None` on the hosting form** — otherwise WinForms scales the form by its font factor and
-   `VisualHost` then scales the visual tree by `DpiScale` as well, so everything renders at double size.
+The package supplies the process mode:
+
+- .NET 6+ apps that call `ApplicationConfiguration.Initialize()`: the package's build props set
+  `<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>` unless the project sets it. Opt out with
+  `<EaselDisableDefaultHighDpiMode>true</EaselDisableDefaultHighDpiMode>`.
+- Other starts: call `EaselApplication.Initialize()` before the first window instead of
+  `ApplicationConfiguration.Initialize()`.
+- .NET Framework: DPI awareness comes from an application manifest that declares `PerMonitorV2`;
+  `EaselApplication.Initialize()` cannot change it at runtime.
+
+`Window` and `VisualForm` set `AutoScaleMode.None` themselves. A hand-written form that hosts a `VisualHost`
+must do the same; otherwise WinForms scales the form while `VisualHost` scales the tree.
 
 ```csharp
-ApplicationConfiguration.Initialize();              // reads ApplicationHighDpiMode
-var form = new Form { AutoScaleMode = AutoScaleMode.None };
-form.Controls.Add(new VisualHost { Dock = DockStyle.Fill });
+EaselApplication.Initialize();              // or ApplicationConfiguration.Initialize()
+Application.Run(new MainWindow());          // Window : VisualForm
 ```
 
 - `DpiScale` re-reads the device DPI on a resize and on `OnDpiChangedAfterParent`; that override is not compiled

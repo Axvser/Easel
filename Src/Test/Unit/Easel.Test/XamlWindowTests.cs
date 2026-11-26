@@ -18,6 +18,7 @@ public sealed class XamlWindowTests
         Assert.IsNotNull(window.Content);
         Assert.AreSame(window.Content, window.Root);
         Assert.AreSame(window.Content, window.Surface.Root);
+        Assert.AreEqual(AutoScaleMode.None, window.AutoScaleMode);
     }
 
     [TestMethod]

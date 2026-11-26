@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    Defaults consumer WinForms apps to per-monitor v2 DPI awareness. The generated
+    ApplicationConfiguration.Initialize() reads ApplicationHighDpiMode on .NET 6+.
+    Set ApplicationHighDpiMode explicitly, or EaselDisableDefaultHighDpiMode to true, to opt out.
+  -->
+  <PropertyGroup Condition="'$(ApplicationHighDpiMode)' == '' and '$(EaselDisableDefaultHighDpiMode)' != 'true'">
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+</Project>

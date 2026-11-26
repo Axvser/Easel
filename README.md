@@ -26,10 +26,15 @@ host visual content; `NativeControlHost` is the code-behind equivalent.
 ```csharp
 ApplicationConfiguration.Initialize();
 
+AutoScaleMode = AutoScaleMode.None;  // VisualForm and Window set this already
 var host = new VisualHost { Dock = DockStyle.Fill };
 host.Root = new DashboardView();     // a partial class compiled from visual XAML
 Controls.Add(host);
 ```
+
+The package defaults `<ApplicationHighDpiMode>` to `PerMonitorV2` for consumer projects, so
+`ApplicationConfiguration.Initialize()` selects it. If the app does not use the generated bootstrap, call
+`EaselApplication.Initialize()` before the first window instead.
 
 That gives you dependency properties, measure/arrange, styles, templates, triggers, bindings, commands,
 resource dictionaries and a retained visual layer without giving up the WinForms application model.

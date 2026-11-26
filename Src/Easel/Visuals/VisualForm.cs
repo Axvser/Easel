@@ -84,6 +84,17 @@ public class VisualForm : Form
     }
 
     /// <inheritdoc />
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        // 设计器里没有真实的宿主进程，诊断只会误报。
+        if (!DesignMode)
+        {
+            EaselApplication.WarnIfNotPerMonitorV2();
+        }
+    }
+
+    /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         if (disposing)

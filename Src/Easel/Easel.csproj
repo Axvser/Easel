@@ -42,6 +42,12 @@
 		<AdditionalFiles Include="**/*.xaml" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- NuGet imports build/<PackageId>.props; buildTransitive also reaches apps that reference Easel indirectly. -->
+		<None Remove="build\WinForms.Easel.props" />
+		<None Include="build\WinForms.Easel.props" Pack="true" PackagePath="build;buildTransitive" Visible="false" />
+	</ItemGroup>
+
 	<!-- Debug 用本地生成器源码，Release 用 NuGet 上的包。 -->
 	<ItemGroup>
 		<ProjectReference Include="..\Generators\Easel.Generator\Easel.Generator.csproj"
