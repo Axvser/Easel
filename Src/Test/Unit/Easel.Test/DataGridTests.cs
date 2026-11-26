@@ -283,6 +283,59 @@ public sealed class DataGridTests
     }
 
     [TestMethod]
+    public void WideningAColumnShowsTheHorizontalScrollBarAndOffsetsHitTesting()
+    {
+        var grid = new DataGrid
+        {
+            Width = 252,
+            Height = 140,
+            RowHeight = 30d,
+            HeaderHeight = 30d,
+            ItemsSource = Array.Empty<object>(),
+        };
+        grid.Columns.Add(new DataGridColumn { Header = "A", BindingPath = "Name", Width = 100d });
+        grid.Columns.Add(new DataGridColumn { Header = "B", BindingPath = "Value", Width = 100d });
+        grid.ShowRowNumbers = false;
+        using var host = BuildHost(grid, 252, 140);
+
+        var bar = grid.Children.OfType<Easel.Visuals.Controls.ScrollBar>()
+            .Single(item => item.Orientation == Orientation.Horizontal);
+        var rowsPart = grid.GetTemplateChild<VisualElement>(DataGrid.RowsPartName)!;
+        Assert.AreEqual(Easel.Controls.Visibility.Collapsed, bar.Visibility, "columns that fit show no horizontal bar");
+        Assert.AreEqual(1, grid.GetColumnIndexAt(new PointF(150f, 10f)), "the second column sits under x=150");
+
+        // 拖动第一列的表头边缘，把列宽从 100 拉到 200，列总宽就超过行区。
+        host.ProcessPointerDown(new PointF(99f, 15f), MouseButtons.Left);
+        host.ProcessPointerMove(new PointF(199f, 15f));
+        host.ProcessPointerUp(new PointF(199f, 15f), MouseButtons.Left);
+        Assert.AreEqual(200d, grid.Columns[0].Width, 0.6d, "the header drag sets the column width");
+        Render(host, 252, 140);
+        Assert.AreEqual(Easel.Controls.Visibility.Visible, bar.Visibility, "the widened columns no longer fit");
+        Assert.AreEqual(300d, bar.Maximum, 0.6d, "the extent includes both columns");
+        Assert.AreEqual(rowsPart.Bounds.Width, bar.ViewportSize, 0.6d,
+            "the viewport is the rows part, excluding the vertical-bar column");
+        Assert.AreEqual(0, grid.GetColumnIndexAt(new PointF(150f, 10f)), "the widened first column covers x=150");
+
+        bar.Value = 60d;
+        Render(host, 252, 140);
+        Assert.AreEqual(60d, bar.Value, 0.6d);
+        Assert.AreEqual(1, grid.GetColumnIndexAt(new PointF(150f, 10f)), "hit testing follows the horizontal offset");
+
+        grid.Columns[0].Width = 100d;
+        Render(host, 252, 140);
+        Assert.AreEqual(Easel.Controls.Visibility.Collapsed, bar.Visibility, "shrinking the columns hides the bar");
+        Assert.AreEqual(0d, bar.Value, 0.6d, "hiding the bar resets the offset");
+        Assert.AreEqual(1, grid.GetColumnIndexAt(new PointF(150f, 10f)), "hit testing returns to the unshifted columns");
+    }
+
+    private static void Render(VisualHost host, int width, int height)
+    {
+        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        host.RenderTo(graphics, new Size(width, height));
+    }
+
+    [TestMethod]
     public void DropZoneAcceptsTextAndReportsCopy()
     {
         var zone = new DropZone { Width = 320, Height = 120, Title = "Drop", Detail = "Anything" };

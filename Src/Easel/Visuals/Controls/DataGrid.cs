@@ -617,6 +617,7 @@ public class DataGrid : TemplatedControl
     private readonly List<int> _view = [];
     private readonly DataGridCellHost _cellHost;
     private readonly ScrollBar _scrollBar;
+    private readonly ScrollBar _horizontalScrollBar;
     private readonly HashSet<DataGridColumn> _observedColumns = [];
     private INotifyCollectionChanged? _observedSource;
     private bool _syncingSelection;
@@ -633,6 +634,7 @@ public class DataGrid : TemplatedControl
     private float _resizeStartWidth;
     private int _dropIndex = -1;
     private float _verticalOffset;
+    private float _horizontalOffset;
     private float _bodyLeft;
     private float _bodyTop;
     private float _bodyRight;
@@ -642,6 +644,8 @@ public class DataGrid : TemplatedControl
     private float _headerRight;
     private float _headerBottom;
     private float _contentWidth;
+    private float _extentWidth;
+    private float _viewportHeightValue;
     private float[] _widths = [];
     private readonly Dictionary<DataGridColumnKind, DataTemplate?> _cellTemplates = [];
     private bool[] _cellVisual = [];
@@ -671,6 +675,18 @@ public class DataGrid : TemplatedControl
         };
         _scrollBar.ValueChanged += OnScrollBarValueChanged;
         Add(_scrollBar);
+
+        // 水平条铺在行区底部，纵向条止于其上缘；只改列宽超宽时才出现。
+        _horizontalScrollBar = new ScrollBar
+        {
+            Orientation = Orientation.Horizontal,
+            Height = ScrollBarWidth,
+            Visibility = XamlVisibility.Collapsed,
+            Focusable = false,
+            IsTabStop = false,
+        };
+        _horizontalScrollBar.ValueChanged += OnHorizontalScrollBarValueChanged;
+        Add(_horizontalScrollBar);
     }
 
     /// <summary>The columns, in painting order.</summary>
@@ -1088,13 +1104,13 @@ public class DataGrid : TemplatedControl
         }
     }
 
-    private float _viewportHeight => Math.Max(0f, _bodyBottom - _bodyTop);
+    private float _viewportHeight => _viewportHeightValue;
 
     /// <summary>Returns the row index under a point in the grid's local coordinates, or -1.</summary>
     /// <param name="point">The local point.</param>
     public int GetRowIndexAt(PointF point)
     {
-        if (point.Y < _bodyTop || point.Y >= _bodyBottom || _view.Count == 0)
+        if (point.Y < _bodyTop || point.Y >= _bodyTop + _viewportHeight || _view.Count == 0)
         {
             return -1;
         }
@@ -1108,17 +1124,15 @@ public class DataGrid : TemplatedControl
     /// <param name="point">The local point.</param>
     public int GetColumnIndexAt(PointF point)
     {
-        if (point.X < _bodyLeft || point.X >= _bodyRight)
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
+        var columnLeft = _bodyLeft + gutter;
+        var columnRight = _bodyLeft + _contentWidth;
+        if (point.X < columnLeft || point.X >= columnRight)
         {
             return -1;
         }
 
-        var x = _bodyLeft + (ShowRowNumbers ? (float)RowNumberWidth : 0f);
-        if (point.X < x)
-        {
-            return -1;
-        }
-
+        var x = columnLeft - _horizontalOffset;
         for (var index = 0; index < _widths.Length; index++)
         {
             if (point.X < x + _widths[index])
@@ -1175,6 +1189,7 @@ public class DataGrid : TemplatedControl
             : Math.Max(0, availableSize.Height);
         var barHeight = Math.Max(0, height - (int)Math.Ceiling(HeaderHeight) - (int)Math.Ceiling(Padding.Vertical));
         _scrollBar.Measure(new Size((int)Math.Ceiling(ScrollBarWidth), barHeight));
+        _horizontalScrollBar.Measure(new Size(width, (int)Math.Ceiling(ScrollBarWidth)));
         return new Size(width, height);
     }
 
@@ -1251,31 +1266,80 @@ public class DataGrid : TemplatedControl
     private void ArrangeBody(Size finalSize, RectangleF? scrollBarPart)
     {
         var rowHeight = (float)Math.Max(1d, RowHeight);
-        var extent = _view.Count * rowHeight;
-        var viewport = _viewportHeight;
-        var needsBar = extent > viewport + 0.5f;
-        _scrollBar.Visibility = needsBar ? XamlVisibility.Visible : XamlVisibility.Collapsed;
+        var rowExtent = _view.Count * rowHeight;
+        var bodyWidth = Math.Max(0f, _bodyRight - _bodyLeft);
+        var bodyHeight = Math.Max(0f, _bodyBottom - _bodyTop);
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
 
         // 模板把滚动条放在单独的列里时，行区宽度已经让出了滚动条，不能再减一次。
         var barOutsideBody = scrollBarPart is { } outside && outside.X >= _bodyRight - 0.5f;
-        var contentWidth = Math.Max(0f, _bodyRight - _bodyLeft);
-        if (needsBar && !barOutsideBody)
+
+        // 两条滚动条互相影响：纵条吃掉宽度，横条吃掉高度，横条出现又可能让纵条消失。
+        // 两个布尔值只有四种组合，迭代到稳定即可，避免出现“横条出现了、视口却没缩”的中间态。
+        var vertical = rowExtent > bodyHeight + 0.5f;
+        var horizontal = false;
+        var contentWidth = bodyWidth;
+        var viewportHeight = bodyHeight;
+        float[] widths = [];
+        for (var pass = 0; pass < 3; pass++)
         {
-            contentWidth = Math.Max(0f, contentWidth - ScrollBarWidth);
+            var availableWidth = Math.Max(0f, bodyWidth - (vertical && !barOutsideBody ? ScrollBarWidth : 0f));
+            widths = ResolveWidths(availableWidth);
+            var extentWidth = ExtentWidth(widths, gutter);
+            var nextHorizontal = extentWidth > availableWidth + 0.5f;
+            var nextViewportHeight = Math.Max(0f, bodyHeight - (nextHorizontal ? ScrollBarWidth : 0f));
+            var nextVertical = rowExtent > nextViewportHeight + 0.5f;
+
+            contentWidth = availableWidth;
+            viewportHeight = nextViewportHeight;
+            horizontal = nextHorizontal;
+            if (nextVertical == vertical)
+            {
+                vertical = nextVertical;
+                break;
+            }
+
+            vertical = nextVertical;
         }
 
         _contentWidth = contentWidth;
-        _widths = ResolveWidths(contentWidth);
-        UpdateScrollBar(needsBar);
+        _widths = widths;
+        _extentWidth = ExtentWidth(widths, gutter);
+        _viewportHeightValue = viewportHeight;
+        var maxHorizontal = Math.Max(0f, _extentWidth - _contentWidth);
+        _horizontalOffset = horizontal ? XamlMath.Clamp(_horizontalOffset, 0f, maxHorizontal) : 0f;
 
-        if (!needsBar)
+        _scrollBar.Visibility = vertical ? XamlVisibility.Visible : XamlVisibility.Collapsed;
+        _horizontalScrollBar.Visibility = horizontal ? XamlVisibility.Visible : XamlVisibility.Collapsed;
+        UpdateScrollBar(vertical);
+        SyncHorizontalScrollBar();
+
+        if (vertical)
         {
-            return;
+            var barRect = scrollBarPart is { } part
+                ? new RectangleF(part.X, part.Y, part.Width, Math.Min(part.Height, viewportHeight))
+                : new RectangleF(_bodyRight - ScrollBarWidth, _bodyTop, ScrollBarWidth, viewportHeight);
+            _scrollBar.Measure(new Size((int)Math.Ceiling(barRect.Width), (int)Math.Ceiling(barRect.Height)));
+            _scrollBar.Arrange(barRect);
         }
 
-        var barRect = scrollBarPart ?? new RectangleF(_bodyRight - ScrollBarWidth, _bodyTop, ScrollBarWidth, viewport);
-        _scrollBar.Measure(new Size((int)Math.Ceiling(barRect.Width), (int)Math.Ceiling(barRect.Height)));
-        _scrollBar.Arrange(barRect);
+        if (horizontal)
+        {
+            var barRect = new RectangleF(_bodyLeft, _bodyBottom - ScrollBarWidth, _contentWidth, ScrollBarWidth);
+            _horizontalScrollBar.Measure(new Size((int)Math.Ceiling(barRect.Width), (int)Math.Ceiling(barRect.Height)));
+            _horizontalScrollBar.Arrange(barRect);
+        }
+    }
+
+    private static float ExtentWidth(float[] widths, float gutter)
+    {
+        var extent = gutter;
+        foreach (var width in widths)
+        {
+            extent += width;
+        }
+
+        return extent;
     }
 
     // 模板部件坐标换回本控件局部坐标；部件缺失时返回 null，布局回退到自绘路径。
@@ -1294,12 +1358,13 @@ public class DataGrid : TemplatedControl
     // 单元格宿主铺满控件，靠 Clip 裁到表头下方；元素坐标因此与自绘行是同一套。
     private void ArrangeCellHost(Size finalSize)
     {
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
         _cellHost.Visibility = XamlVisibility.Visible;
         _cellHost.Clip = new RectangleF(
-            _bodyLeft,
+            _bodyLeft + gutter,
             _bodyTop,
-            Math.Max(0f, _bodyRight - _bodyLeft),
-            Math.Max(0f, _bodyBottom - _bodyTop));
+            Math.Max(0f, _contentWidth - gutter),
+            _viewportHeight);
         _cellHost.Measure(finalSize);
         _cellHost.Arrange(new RectangleF(0f, 0f, finalSize.Width, finalSize.Height));
         UpdateCellElements();
@@ -1334,6 +1399,8 @@ public class DataGrid : TemplatedControl
             _bodyTop,
             _bodyLeft,
             gutter,
+            _horizontalOffset,
+            _contentWidth,
             _columns,
             _widths,
             _cellVisual,
@@ -1494,7 +1561,7 @@ public class DataGrid : TemplatedControl
                 _bodyLeft,
                 _bodyTop,
                 Math.Max(0f, _bodyRight - _bodyLeft),
-                Math.Max(0f, _bodyBottom - _bodyTop)),
+                _viewportHeight),
             CombineMode.Intersect);
         DrawRows(graphics, font, theme, foreground);
         DrawDropIndicator(graphics, theme);
@@ -1812,6 +1879,7 @@ public class DataGrid : TemplatedControl
             }
 
             _scrollBar.ValueChanged -= OnScrollBarValueChanged;
+            _horizontalScrollBar.ValueChanged -= OnHorizontalScrollBarValueChanged;
             _headerFont?.Dispose();
             _headerFont = null;
         }
@@ -2066,6 +2134,40 @@ public class DataGrid : TemplatedControl
         InvalidateVisual();
     }
 
+    private void SyncHorizontalScrollBar()
+    {
+        var max = Math.Max(0f, _extentWidth - _contentWidth);
+        _horizontalOffset = XamlMath.Clamp(_horizontalOffset, 0f, max);
+
+        _syncingScroll = true;
+        try
+        {
+            _horizontalScrollBar.Minimum = 0d;
+            _horizontalScrollBar.Maximum = _extentWidth;
+            _horizontalScrollBar.ViewportSize = _contentWidth;
+            _horizontalScrollBar.SmallChange = 16d;
+            _horizontalScrollBar.LargeChange = Math.Max(1d, _contentWidth);
+            _horizontalScrollBar.Value = _horizontalOffset;
+        }
+        finally
+        {
+            _syncingScroll = false;
+        }
+    }
+
+    private void OnHorizontalScrollBarValueChanged(object? sender, EventArgs e)
+    {
+        if (_syncingScroll)
+        {
+            return;
+        }
+
+        var max = Math.Max(0f, _extentWidth - _contentWidth);
+        _horizontalOffset = XamlMath.Clamp((float)_horizontalScrollBar.Value, 0f, max);
+        InvalidateArrange();
+        InvalidateVisual();
+    }
+
     private void UpdateScrollBar(bool visible)
     {
         SyncScrollBar();
@@ -2112,16 +2214,19 @@ public class DataGrid : TemplatedControl
 
     private int ColumnEdgeAt(PointF point)
     {
-        if (point.Y >= _bodyTop || point.X < _bodyLeft || point.X > _bodyRight)
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
+        var columnLeft = _bodyLeft + gutter;
+        var columnRight = _bodyLeft + _contentWidth;
+        if (point.Y >= _bodyTop || point.X < columnLeft || point.X > columnRight)
         {
             return -1;
         }
 
-        var x = _bodyLeft + (ShowRowNumbers ? (float)RowNumberWidth : 0f);
+        var x = columnLeft - _horizontalOffset;
         for (var index = 0; index < _widths.Length; index++)
         {
             x += _widths[index];
-            if (Math.Abs(point.X - x) <= 4f)
+            if (x >= columnLeft - 4f && x <= columnRight + 4f && Math.Abs(point.X - x) <= 4f)
             {
                 return index;
             }
@@ -2151,17 +2256,9 @@ public class DataGrid : TemplatedControl
             graphics.FillRectangle(fill, header);
         }
 
-        if (_hoverHeader >= 0 && _hoverHeader < _widths.Length)
-        {
-            var x = _bodyLeft + (ShowRowNumbers ? (float)RowNumberWidth : 0f);
-            for (var index = 0; index < _hoverHeader; index++)
-            {
-                x += _widths[index];
-            }
-
-            using var hover = new SolidBrush(ResolveColor(ColumnHeaderHoverBackground, WithAlpha(foreground, 16)));
-            graphics.FillRectangle(hover, new RectangleF(x, header.Y, _widths[_hoverHeader], header.Height));
-        }
+        var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
+        var columnLeft = _bodyLeft + gutter;
+        var columnWidth = Math.Max(0f, _contentWidth - gutter);
 
         var xPos = _bodyLeft;
         if (ShowRowNumbers)
@@ -2172,45 +2269,68 @@ public class DataGrid : TemplatedControl
                 "#",
                 headerFont,
                 ResolveColor(RowNumberForeground, theme.MutedForeground),
-                new RectangleF(xPos, header.Y, (float)RowNumberWidth, header.Height),
+                new RectangleF(xPos, header.Y, gutter, header.Height),
                 wrap: false,
                 StringAlignment.Center,
                 StringAlignment.Center);
-            xPos += (float)RowNumberWidth;
         }
 
-        for (var index = 0; index < _columns.Count && index < _widths.Length; index++)
+        var columns = graphics.Save();
+        graphics.SetClip(
+            new RectangleF(columnLeft, header.Y, columnWidth, header.Height),
+            CombineMode.Intersect);
+        try
         {
-            var column = _columns[index];
-            var width = _widths[index];
-            if (width <= 0f)
+            if (_hoverHeader >= 0 && _hoverHeader < _widths.Length)
             {
-                continue;
+                var x = columnLeft - _horizontalOffset;
+                for (var index = 0; index < _hoverHeader; index++)
+                {
+                    x += _widths[index];
+                }
+
+                using var hover = new SolidBrush(ResolveColor(ColumnHeaderHoverBackground, WithAlpha(foreground, 16)));
+                graphics.FillRectangle(hover, new RectangleF(x, header.Y, _widths[_hoverHeader], header.Height));
             }
 
-            var cell = new RectangleF(xPos + padding, header.Y, Math.Max(0f, width - (padding * 2f)), header.Height);
-            VisualText.Draw(
-                this,
-                graphics,
-                column.Header,
-                headerFont,
-                headerForeground,
-                cell,
-                wrap: false,
-                ToStringAlignment(column.TextAlignment),
-                StringAlignment.Center);
-
-            if (_sortColumn == index)
+            xPos = columnLeft - _horizontalOffset;
+            for (var index = 0; index < _columns.Count && index < _widths.Length; index++)
             {
-                DrawSortChevron(
+                var column = _columns[index];
+                var width = _widths[index];
+                if (width <= 0f)
+                {
+                    continue;
+                }
+
+                var cell = new RectangleF(xPos + padding, header.Y, Math.Max(0f, width - (padding * 2f)), header.Height);
+                VisualText.Draw(
+                    this,
                     graphics,
-                    ResolveColor(SortIndicatorBrush, theme.Accent),
-                    xPos + width - 12f,
-                    header.Y + (header.Height / 2f),
-                    _sortDirection);
-            }
+                    column.Header,
+                    headerFont,
+                    headerForeground,
+                    cell,
+                    wrap: false,
+                    ToStringAlignment(column.TextAlignment),
+                    StringAlignment.Center);
 
-            xPos += width;
+                if (_sortColumn == index)
+                {
+                    DrawSortChevron(
+                        graphics,
+                        ResolveColor(SortIndicatorBrush, theme.Accent),
+                        xPos + width - 12f,
+                        header.Y + (header.Height / 2f),
+                        _sortDirection);
+                }
+
+                xPos += width;
+            }
+        }
+        finally
+        {
+            graphics.Restore(columns);
         }
 
         using var line = new System.Drawing.Pen(ResolveColor(ColumnHeaderBorderBrush, theme.ControlBorder), 1f);
@@ -2221,7 +2341,7 @@ public class DataGrid : TemplatedControl
     {
         var rowHeight = (float)Math.Max(1d, RowHeight);
         var bodyTop = _bodyTop;
-        var bodyBottom = _bodyBottom;
+        var bodyBottom = _bodyTop + _viewportHeight;
         if (bodyBottom <= bodyTop)
         {
             return;
@@ -2234,7 +2354,7 @@ public class DataGrid : TemplatedControl
         }
 
         var first = Math.Max(0, (int)Math.Floor(_verticalOffset / rowHeight));
-        var last = Math.Min(_view.Count - 1, (int)Math.Ceiling((_verticalOffset + (bodyBottom - bodyTop)) / rowHeight));
+        var last = Math.Min(_view.Count - 1, (int)Math.Ceiling((_verticalOffset + _viewportHeight) / rowHeight));
         var gutter = ShowRowNumbers ? (float)Math.Max(0d, RowNumberWidth) : 0f;
         var rowForeground = foreground;
 
@@ -2294,26 +2414,39 @@ public class DataGrid : TemplatedControl
             }
 
             var cellPadding = (float)Math.Max(0d, CellPadding);
-            var x = row.X + gutter;
-            for (var columnIndex = 0; columnIndex < _columns.Count && columnIndex < _widths.Length; columnIndex++)
+            var columnLeft = row.X + gutter;
+            var columnWidth = Math.Max(0f, _contentWidth - gutter);
+            var columnState = graphics.Save();
+            graphics.SetClip(
+                new RectangleF(columnLeft, row.Y, columnWidth, row.Height),
+                CombineMode.Intersect);
+            try
             {
-                var width = _widths[columnIndex];
-                if (width <= 0f)
+                var x = columnLeft - _horizontalOffset;
+                for (var columnIndex = 0; columnIndex < _columns.Count && columnIndex < _widths.Length; columnIndex++)
                 {
-                    continue;
-                }
+                    var width = _widths[columnIndex];
+                    if (width <= 0f)
+                    {
+                        continue;
+                    }
 
-                var cell = new RectangleF(
-                    x + cellPadding,
-                    row.Y,
-                    Math.Max(0f, width - (cellPadding * 2f)),
-                    row.Height);
-                if (columnIndex >= _cellVisual.Length || !_cellVisual[columnIndex])
-                {
-                    DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, rowForeground);
-                }
+                    var cell = new RectangleF(
+                        x + cellPadding,
+                        row.Y,
+                        Math.Max(0f, width - (cellPadding * 2f)),
+                        row.Height);
+                    if (columnIndex >= _cellVisual.Length || !_cellVisual[columnIndex])
+                    {
+                        DrawCell(graphics, _columns[columnIndex], _rows[_view[index]], cell, font, rowForeground);
+                    }
 
-                x += width;
+                    x += width;
+                }
+            }
+            finally
+            {
+                graphics.Restore(columnState);
             }
 
             if (ShowGridLines)
@@ -2326,13 +2459,15 @@ public class DataGrid : TemplatedControl
         if (ShowGridLines)
         {
             using var line = new System.Drawing.Pen(ResolveColor(GridLineBrush, WithAlpha(foreground, 18)), 1f);
-            var x = _bodyLeft + gutter;
+            var columnLeft = _bodyLeft + gutter;
+            var columnRight = _bodyLeft + _contentWidth;
+            var x = columnLeft - _horizontalOffset;
             for (var index = 0; index < _widths.Length; index++)
             {
                 x += _widths[index];
-                if (x < _bodyLeft + _contentWidth - 1f)
+                if (x >= columnLeft - 0.5f && x < columnRight - 1f)
                 {
-                    graphics.DrawLine(line, x - 0.5f, _bodyTop, x - 0.5f, _bodyBottom);
+                    graphics.DrawLine(line, x - 0.5f, _bodyTop, x - 0.5f, _bodyTop + _viewportHeight);
                 }
             }
         }
@@ -2440,7 +2575,7 @@ public class DataGrid : TemplatedControl
 
         var rowHeight = (float)Math.Max(1d, RowHeight);
         var y = _bodyTop + (_dropIndex * rowHeight) - _verticalOffset;
-        y = XamlMath.Clamp(y, _bodyTop, _bodyBottom);
+        y = XamlMath.Clamp(y, _bodyTop, _bodyTop + _viewportHeight);
         using var pen = new System.Drawing.Pen(theme.Accent, 2f);
         graphics.DrawLine(pen, _bodyLeft, y, _bodyLeft + _contentWidth, y);
         using var head = new SolidBrush(theme.Accent);
@@ -3136,21 +3271,26 @@ internal sealed class DataGridCellHost : Panel
         float bodyTop,
         float bodyLeft,
         float gutter,
+        float horizontalOffset,
+        float contentWidth,
         IReadOnlyList<DataGridColumn> columns,
         float[] widths,
         bool[] cellVisual,
         DataGrid owner)
     {
         _desired.Clear();
+        var columnLeft = bodyLeft + gutter;
+        var columnRight = bodyLeft + contentWidth;
         var y = bodyTop + (firstRow * rowHeight) - verticalOffset;
         for (var row = firstRow; row <= lastRow; row++)
         {
             var item = rows[view[row]];
-            var x = bodyLeft + gutter;
+            var x = columnLeft - horizontalOffset;
             for (var column = 0; column < columns.Count && column < widths.Length; column++)
             {
                 var width = widths[column];
-                if (width <= 0f || column >= cellVisual.Length || !cellVisual[column])
+                if (width <= 0f || column >= cellVisual.Length || !cellVisual[column]
+                    || x + width <= columnLeft || x >= columnRight)
                 {
                     x += width;
                     continue;
