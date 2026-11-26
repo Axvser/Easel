@@ -706,11 +706,43 @@ public class ListBoxItem : ContentControl
 
     private bool _templateDeferred;
     private VisualControlTemplate? _deferredTemplate;
+    private Func<VisualElement>? _contentFactory;
 
     /// <summary>Creates a row container that leaves pointer hits to its list.</summary>
     public ListBoxItem()
     {
         IsHitTestVisible = false;
+    }
+
+    // 默认行内容也推迟到行进入视口（或有人读取 Content）才建；容器本身仍按索引常驻。
+    internal bool IsContentDeferred => _contentFactory is not null;
+
+    internal void DeferContent(Func<VisualElement> factory) => _contentFactory = factory;
+
+    internal void RealizeContent()
+    {
+        if (_contentFactory is not { } factory)
+        {
+            return;
+        }
+
+        _contentFactory = null;
+        base.Content = factory();
+    }
+
+    /// <inheritdoc />
+    public override object? Content
+    {
+        get
+        {
+            RealizeContent();
+            return base.Content;
+        }
+        set
+        {
+            _contentFactory = null;
+            base.Content = value;
+        }
     }
 
     // 列表把行模板的创建推迟到行进入视口；这里只记下样式给的模板，不建模板根。
@@ -726,6 +758,7 @@ public class ListBoxItem : ContentControl
         }
 
         _templateDeferred = false;
+        RealizeContent();
         base.ApplyStyleTemplate(_deferredTemplate);
     }
 
@@ -764,6 +797,17 @@ public class ListBoxItem : ContentControl
     public new bool IsPointerOver => (bool)GetValue(IsPointerOverProperty)!;
 
     internal void SetIsPointerOver(bool value) => SetValue(IsPointerOverProperty, value);
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _contentFactory = null;
+        }
+
+        base.Dispose(disposing);
+    }
 }
 
 /// <summary>A vertical list whose items can be selected by pointer or keyboard.</summary>
@@ -809,6 +853,10 @@ public class ListBox : ItemsControl
     private int _windowLast = -1;
     private bool _updatingWindow;
 
+    // ComboBox popup rows need eager content: its item factory reuses one visual and the popup can be measured
+    // while closed. Standard ListBox rows keep content lazy until the viewport realizes them.
+    internal bool DeferItemContent { get; set; } = true;
+
     /// <summary>Creates a focusable list with theme metrics.</summary>
     public ListBox()
     {
@@ -840,8 +888,22 @@ public class ListBox : ItemsControl
     /// <inheritdoc />
     protected override VisualElement CreateItemVisual(object? item)
     {
-        var container = CreateItemContainer(item, CreateItemContent(item));
-        // 源先全部建行（Items 保持逐项对应），行模板等进入视口再建。
+        if (!DeferItemContent)
+        {
+            return CreateItemContainer(item, CreateItemContent(item));
+        }
+
+        // 容器先全部建出来，保证 Items 逐项对应；内容和行模板都等进入视口（或读取 Content）再建。
+        var container = new ListBoxItem
+        {
+            CornerRadius = Theme.Current.CornerRadius,
+        };
+        if (item is not null)
+        {
+            container.DataContext = item;
+        }
+
+        container.DeferContent(() => CreateItemContent(item));
         container.DeferTemplateRealization();
         return container;
     }

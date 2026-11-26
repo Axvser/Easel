@@ -137,6 +137,7 @@ public class ComboBox : TemplatedControl
         _items.CollectionChanged += OnItemsCollectionChanged;
 
         _list.Focusable = false;
+        _list.DeferItemContent = false;
         _list.ItemFactory = CreateItemVisual;
         _list.ItemsSource = _items;
         _list.SelectionChanged += OnListSelectionChanged;

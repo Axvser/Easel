@@ -29,6 +29,7 @@ public sealed class ListBoxVirtualizationTests
 
         Assert.IsNotNull(Row(list, 0).TemplateRoot, "the first visible row has its template");
         Assert.IsNull(Row(list, RowCount - 1).TemplateRoot, "a far row has no template yet");
+        Assert.IsTrue(Row(list, RowCount - 1).IsContentDeferred, "a far row also defers its content visual");
         Assert.AreEqual(
             "Row 0",
             ((VC.TextBlock)Row(list, 0).Content!).Text,
@@ -36,7 +37,8 @@ public sealed class ListBoxVirtualizationTests
         Assert.AreEqual(
             $"Row {RowCount - 1}",
             ((VC.TextBlock)Row(list, RowCount - 1).Content!).Text,
-            "a deferred row still carries its content visual");
+            "reading a deferred row still materializes its content");
+        Assert.IsFalse(Row(list, RowCount - 1).IsContentDeferred, "reading Content realizes it");
     }
 
     [TestMethod]

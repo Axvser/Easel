@@ -61,7 +61,7 @@ public class ContentControl : VisualElement
     private readonly List<ContentPresenter> _presenters = [];
 
     /// <summary>The object shown by this control or by its content presenters.</summary>
-    public object? Content
+    public virtual object? Content
     {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
