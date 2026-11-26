@@ -30,6 +30,7 @@ public class VisualHost : System.Windows.Forms.Control
 
     private ContainerVisual? _root;
     private VisualElement? _rootElement;
+    private object? _dataContextSnapshot;
     private VisualElement? _focused;
     private VisualElement? _capture;
     private bool _focusVisible = true;
@@ -111,6 +112,10 @@ public class VisualHost : System.Windows.Forms.Control
         }
 
         Root = new ContainerVisual();
+        // .NET 8 的 Control 自带 DataContext/DataContextChanged；旧目标框架在这里补上同名成员，
+        // 下面这条订阅在四个 TFM 上走同一个入口。
+        DataContextChanged += OnHostDataContextChanged;
+        _dataContextSnapshot = DataContext;
         _styles.Changed += (_, _) => RefreshStyles();
         _overlay.SetSurfaceRoot(this);
         _resources.MergedDictionaries.Add(_themeResources);
@@ -134,6 +139,26 @@ public class VisualHost : System.Windows.Forms.Control
 
     /// <summary>Marks the next paint as an animation tick, so a drag paint and a clock paint can be told apart.</summary>
     public void MarkNextPaintAsClockDriven() => nextPaintClockDriven = true;
+
+    /// <summary>Runs <paramref name="action"/> on the control's UI thread.</summary>
+    /// <param name="action">The action to run.</param>
+    /// <remarks>
+    /// Use this to marshal work back to the host after an asynchronous operation. When the control has a window
+    /// handle the action is posted with <see cref="System.Windows.Forms.Control.BeginInvoke(Delegate)"/>; otherwise
+    /// it runs synchronously on the calling thread so headless hosts and tests still observe it.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="action"/> is <see langword="null"/>.</exception>
+    public void Post(Action action)
+    {
+        if (action is null) throw new ArgumentNullException(nameof(action));
+        if (IsHandleCreated && !IsDisposed)
+        {
+            BeginInvoke(action);
+            return;
+        }
+
+        action();
+    }
 
     /// <summary>
     /// The render scale used for frames painted while a pointer gesture is in progress; <c>1</c> disables it.
@@ -181,6 +206,34 @@ public class VisualHost : System.Windows.Forms.Control
     /// <summary>Resources offered to every element in this surface's tree after its own and its ancestors' dictionaries.</summary>
     public ResourceDictionary Resources => _resources;
 
+#if !NET8_0_OR_GREATER
+    private object? _dataContext;
+
+    /// <summary>The data context inherited by the visual tree rooted at <see cref="Root"/>.</summary>
+    /// <remarks>
+    /// On .NET 8 and later this is <see cref="System.Windows.Forms.Control.DataContext"/>. The older target
+    /// frameworks expose the same property, event and get/set behaviour here, so XAML and bindings are portable
+    /// across every target framework.
+    /// </remarks>
+    public object? DataContext
+    {
+        get => _dataContext;
+        set
+        {
+            if (ReferenceEquals(_dataContext, value))
+            {
+                return;
+            }
+
+            _dataContext = value;
+            DataContextChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Raised when <see cref="DataContext"/> changes.</summary>
+    public event EventHandler? DataContextChanged;
+#endif
+
     /// <summary>The root visual painted by this host; a <see cref="VisualElement"/> also receives layout and input.</summary>
     public ContainerVisual? Root
     {
@@ -203,8 +256,11 @@ public class VisualHost : System.Windows.Forms.Control
             _rootElement?.RefreshImplicitStyles();
             _root = value;
             _rootElement = value as VisualElement;
+            // 换根前先记下它当时有效的上下文；挂上本宿主后再补一次 inherited 通知。
+            var inheritedBeforeHosting = _rootElement?.GetValue(VisualElement.DataContextProperty);
             _rootElement?.SetSurfaceRoot(this);
             RefreshStyles();
+            _rootElement?.RaiseHostDataContextChanged(inheritedBeforeHosting, DataContext);
             InvalidateSurface();
         }
     }
@@ -2119,6 +2175,7 @@ public class VisualHost : System.Windows.Forms.Control
         {
             // 主题是静态状态；不摘订阅，静态事件会把宿主钉在内存里。
             Theme.Changed -= OnThemeChanged;
+            DataContextChanged -= OnHostDataContextChanged;
             CloseAllDialogs();
             CloseAllPopups();
             ClearNativeChildren();
@@ -2152,6 +2209,16 @@ public class VisualHost : System.Windows.Forms.Control
     {
         _rootElement?.RefreshImplicitStyles();
         _overlay.RefreshImplicitStyles();
+    }
+
+    // 宿主 DataContext 是树的继承源：把变化转给根与覆盖层，由它们通知没有本地值的后代。
+    private void OnHostDataContextChanged(object? sender, EventArgs e)
+    {
+        var oldValue = _dataContextSnapshot;
+        var newValue = DataContext;
+        _dataContextSnapshot = newValue;
+        _rootElement?.RaiseHostDataContextChanged(oldValue, newValue);
+        _overlay.RaiseHostDataContextChanged(oldValue, newValue);
     }
 
     // 主题色由控件在绘制时读取，切换 Theme.Mode 失效表面即可；资源同步会原地改色。

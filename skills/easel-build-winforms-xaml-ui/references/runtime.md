@@ -49,6 +49,41 @@ Template it with `PART_Icon`, `PART_Title`, `PART_Minimize`, `PART_Maximize`, `P
 `PART_DragArea`; a template may put menus between the title and the buttons. Not covered: system menu/Alt+Space,
 UIA peers on the self-drawn buttons, per-monitor chrome details.
 
+## Host behaviors
+
+A visual element that needs the HWND side (native input, window styles, DPI) can register a host behavior
+instead of searching the tree for the `VisualHost`:
+
+```csharp
+sealed class SurfaceController : IVisualHostBehavior
+{
+    public void Attach(VisualHost host) { /* hook host events, parts, camera */ }
+    public void Detach() { /* release everything Attach installed */ }
+}
+
+root.AddHostBehavior(new SurfaceController());
+```
+
+The element calls `Attach` as soon as it resolves a `Surface` (including when it is parented later) and
+`Detach` when that surface changes or the element is disposed. Adding the same instance twice attaches it once;
+`RemoveHostBehavior` detaches immediately. Attached properties whose configuration lives on a visual element can
+use this to hand the host to a controller without reading `element.Surface` themselves.
+
+## Host DataContext
+
+`VisualHost.DataContext` is the root of the visual tree's context inheritance, like a WPF Window or UserControl.
+An element without a local `DataContext` resolves it from its parent, then from the hosting `VisualHost`; a local
+value (including a local `null`) stops inheritance for that subtree. Changing the host context or replacing
+`Root` re-raises the inherited value, so bindings on context-free descendants refresh.
+
+```csharp
+var host = new VisualHost { DataContext = new ShellViewModel() };
+host.Root = new ShellView();   // ShellView and its descendants bind to ShellViewModel
+```
+
+`VisualHost.Post(Action)` marshals work to the host's UI thread: `BeginInvoke` when the control has a handle,
+otherwise the action runs inline (headless hosts and tests).
+
 ## Surface API
 
 | Member | Use |
@@ -85,7 +120,7 @@ release. `ProcessPointerDown` returns whether the element handled the event.
 | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` | Self-drawn chrome on `VisualElement`. |
 | `Opacity`, `Transform`, `Transform3D`, `Clip`, `ClipToBounds`, `OpacityMask`, `OpacityMaskMode`, `Effect`, `CacheAsBitmap` | Visual composition (see [visuals.md](visuals.md)). |
 | `FontSize`, `FontFamily`, `FontWeight` | Inherited typography; derived into `Font`. |
-| `DataContext` | Inherited binding source. |
+| `DataContext` | Inherited binding source; falls back to the hosting `VisualHost.DataContext`. |
 | `Focusable`, `IsTabStop`, `TabIndex` | Logical focus chain. |
 
 The layout pass:

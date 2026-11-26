@@ -718,10 +718,50 @@ public abstract class VisualElement : ContainerVisual, IDisposable
                 RaisePropertyChanged(DataContextProperty, oldContext, newContext, BindingPriority.Inherited);
             }
         }
+
+        // 只有前后父级解析出的宿主不同才需要走整棵子树；同宿主内换父级是常见路径，不做无谓遍历。
+        var oldSurface = (oldParent as VisualElement)?.Surface;
+        var newSurface = (newParent as VisualElement)?.Surface;
+        if (!ReferenceEquals(oldSurface, newSurface))
+        {
+            SyncHostBehaviorsRecursive();
+        }
     }
 
     /// <summary>The surface that hosts this element, resolved through the parent chain.</summary>
     public VisualHost? Surface => _surface ?? ParentElement?.Surface;
+
+    /// <summary>Registers a behavior that needs the hosting <see cref="VisualHost"/>.</summary>
+    /// <param name="behavior">The behavior to attach when this element resolves a surface.</param>
+    /// <remarks>
+    /// A behavior added before the element is parented is attached as soon as <see cref="Surface"/> becomes
+    /// non-null. Adding the same instance twice has no effect.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="behavior"/> is <see langword="null"/>.</exception>
+    public void AddHostBehavior(IVisualHostBehavior behavior)
+    {
+        if (behavior is null) throw new ArgumentNullException(nameof(behavior));
+        _hostBehaviors ??= [];
+        if (_hostBehaviors.Contains(behavior))
+        {
+            return;
+        }
+
+        _hostBehaviors.Add(behavior);
+        SyncHostBehavior(behavior);
+    }
+
+    /// <summary>Unregisters a host behavior and detaches it if it was attached.</summary>
+    /// <param name="behavior">The behavior to remove.</param>
+    public void RemoveHostBehavior(IVisualHostBehavior behavior)
+    {
+        if (behavior is null || _hostBehaviors is null || !_hostBehaviors.Remove(behavior))
+        {
+            return;
+        }
+
+        DetachHostBehavior(behavior);
+    }
 
     /// <summary>The DPI used to measure text.</summary>
     /// <remarks>
@@ -1347,6 +1387,9 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             return;
         }
 
+        // 宿主行为先摘掉：它们握着宿主的事件与部件订阅，不能等到子元素释放完再断。
+        DetachHostBehaviors();
+
         // 元素被拆掉时动画必须停下并把层位落回本地层；否则调度器会继续往一个已释放的节点写值。
         if (VisualTransition.HasActive(this))
         {
@@ -1410,7 +1453,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     {
         if (ReferenceEquals(property, DataContextProperty))
         {
-            return ParentElement?.DataContext;
+            // 父链没有上下文时，把宿主（VisualHost）当成树的根；本地值仍然在自己的优先级层里胜出。
+            return ParentElement?.DataContext ?? Surface?.DataContext;
         }
 
         if (ReferenceEquals(property, IsEnabledProperty))
@@ -1548,6 +1592,18 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         }
     }
 
+    // 宿主 DataContext 变化时由 VisualHost 调用：根没有本地值时补一次 inherited 通知，
+    // 现有的 OnPropertyChanged → NotifyDataContextDescendants 会把它传遍整棵子树。
+    internal void RaiseHostDataContextChanged(object? oldValue, object? newValue)
+    {
+        if (IsSet(DataContextProperty) || ReferenceEquals(oldValue, newValue))
+        {
+            return;
+        }
+
+        RaisePropertyChanged(DataContextProperty, oldValue, newValue, BindingPriority.Inherited);
+    }
+
     // 子元素自己写了 DataContext 就截断继承；其余后代要收到 inherited 变更，绑定在祖先切换时才能重读。
     private static void NotifyDataContextDescendants(VisualElement parent, object? oldValue, object? newValue)
     {
@@ -1589,6 +1645,88 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         SurfaceChanged?.Invoke(this, EventArgs.Empty);
         RaiseSurfaceChangedObservers();
         NotifySurfaceRootChanged();
+        SyncHostBehaviors();
+    }
+
+    private List<IVisualHostBehavior>? _hostBehaviors;
+    private Dictionary<IVisualHostBehavior, VisualHost>? _hostBehaviorHosts;
+
+    // 宿主变更只做一次比较：已经挂在正确宿主上的行为不会被重复 Attach。
+    private void SyncHostBehavior(IVisualHostBehavior behavior)
+    {
+        var host = Surface;
+        _hostBehaviorHosts ??= [];
+        _hostBehaviorHosts.TryGetValue(behavior, out var current);
+        if (ReferenceEquals(current, host))
+        {
+            return;
+        }
+
+        if (current is not null)
+        {
+            _hostBehaviorHosts.Remove(behavior);
+            behavior.Detach();
+        }
+
+        if (host is not null)
+        {
+            _hostBehaviorHosts[behavior] = host;
+            behavior.Attach(host);
+        }
+    }
+
+    private void SyncHostBehaviors()
+    {
+        if (_hostBehaviors is not { Count: > 0 } behaviors)
+        {
+            return;
+        }
+
+        for (var index = behaviors.Count - 1; index >= 0; index--)
+        {
+            SyncHostBehavior(behaviors[index]);
+        }
+    }
+
+    // 换父级/换宿主会让整棵子树的 Surface 变化；没有行为的子树只多一次空检查。
+    private void SyncHostBehaviorsRecursive()
+    {
+        SyncHostBehaviors();
+        var children = Children;
+        for (var index = 0; index < children.Count; index++)
+        {
+            if (children[index] is VisualElement element)
+            {
+                element.SyncHostBehaviorsRecursive();
+            }
+        }
+    }
+
+    private void DetachHostBehavior(IVisualHostBehavior behavior)
+    {
+        if (_hostBehaviorHosts is null || !_hostBehaviorHosts.TryGetValue(behavior, out _))
+        {
+            return;
+        }
+
+        _hostBehaviorHosts.Remove(behavior);
+        behavior.Detach();
+    }
+
+    private void DetachHostBehaviors()
+    {
+        if (_hostBehaviors is not { Count: > 0 } behaviors)
+        {
+            return;
+        }
+
+        for (var index = behaviors.Count - 1; index >= 0; index--)
+        {
+            DetachHostBehavior(behaviors[index]);
+        }
+
+        behaviors.Clear();
+        _hostBehaviorHosts = null;
     }
 
     internal event EventHandler? SurfaceChanged;
@@ -1631,6 +1769,7 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             if (children[index] is VisualElement element)
             {
                 element.NotifySurfaceRootChanged();
+                element.SyncHostBehaviors();
             }
         }
     }
