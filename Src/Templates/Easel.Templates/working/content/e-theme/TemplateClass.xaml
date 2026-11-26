@@ -3,73 +3,18 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="TemplateNamespace.TemplateClass">
 
-  <!-- Easel customization: the palette keys below are read by ThemePalette.FromResourceDictionary and by the
-       visual theme; keep the names and change the colours. -->
-  <SolidColorBrush x:Key="Window" Color="#FF0B0B0F" />
-  <SolidColorBrush x:Key="Surface" Color="#FF15151B" />
-  <SolidColorBrush x:Key="Raised" Color="#FF1D1D25" />
-  <SolidColorBrush x:Key="Input" Color="#FF121218" />
-  <SolidColorBrush x:Key="Border" Color="#FF34343F" />
-  <SolidColorBrush x:Key="Hover" Color="#FF23232C" />
-  <SolidColorBrush x:Key="Pressed" Color="#FF2B2B36" />
-  <SolidColorBrush x:Key="Text" Color="#FFEDEDF2" />
-  <SolidColorBrush x:Key="Muted" Color="#FF9A9AA6" />
+  <!-- Partial theme overlay. Merge this dictionary AFTER the host's built-in Dark/Light dictionary:
+       only the keys below override it; every other palette/metric/style key keeps falling back to the theme.
+       There is no ResourceDictionary.BasedOn in Easel: append the dictionary to
+       VisualHost.Resources.MergedDictionaries (or a view's Resources) after the theme. -->
   <SolidColorBrush x:Key="Accent" Color="#FF4C8DFF" />
-  <SolidColorBrush x:Key="AccentText" Color="#FFFFFFFF" />
   <SolidColorBrush x:Key="Focus" Color="#FF7FB0FF" />
   <SolidColorBrush x:Key="Caret" Color="#FF7FB0FF" />
   <SolidColorBrush x:Key="Selection" Color="#FF1B355C" />
-  <SolidColorBrush x:Key="SelectedText" Color="#FFFFFFFF" />
-  <SolidColorBrush x:Key="Disabled" Color="#FF0E0E12" />
-  <SolidColorBrush x:Key="DisabledText" Color="#FF55555F" />
-
-  <SolidColorBrush x:Key="CardBackground" Color="#FF15151B" />
-  <SolidColorBrush x:Key="CardBorder" Color="#FF34343F" />
-  <SolidColorBrush x:Key="SurfaceAlt" Color="#FF1D1D25" />
-  <SolidColorBrush x:Key="MutedText" Color="#FF9A9AA6" />
-
-  <SolidColorBrush x:Key="ScrollBarThumb" Color="#668C8C99" />
-  <SolidColorBrush x:Key="ScrollBarThumbHover" Color="#CCEDEDF2" />
-  <SolidColorBrush x:Key="ShapeStroke" Color="#885B8CFF" />
-  <SolidColorBrush x:Key="ShadowColor" Color="#FF000000" />
 
   <x:String x:Key="FontFamily">Segoe UI</x:String>
-  <x:Double x:Key="FontSize">9.5</x:Double>
-  <x:FontWeight x:Key="FontWeight">Normal</x:FontWeight>
 
-  <x:Double x:Key="CornerRadius">4</x:Double>
-  <x:Int32 x:Key="ControlHeight">28</x:Int32>
-
-  <x:Thickness x:Key="ControlBorderThickness">1</x:Thickness>
-  <x:Double x:Key="FocusThickness">1.6</x:Double>
-  <x:Double x:Key="FocusThicknessMedium">1.4</x:Double>
-  <x:Double x:Key="FocusThicknessThin">1</x:Double>
-  <x:Double x:Key="ScrollBarThumbRadius">3</x:Double>
-  <x:Double x:Key="ShapeStrokeThickness">1.5</x:Double>
-  <x:PointF x:Key="ShadowOffset">4,6</x:PointF>
-  <x:Double x:Key="ShadowBlur">6</x:Double>
-  <x:Double x:Key="ShadowOpacity">0.45</x:Double>
-
-  <SolidColorBrush x:Key="TextVisualForeground" Color="#FFFFFFFF" />
-  <x:String x:Key="TextVisualFontFamily">Segoe UI</x:String>
-  <x:Double x:Key="TextVisualFontSize">9</x:Double>
-  <x:FontWeight x:Key="TextVisualFontWeight">Normal</x:FontWeight>
-
-  <!-- Easel customization: keyed text styles; request them with {StaticResource Heading}. -->
-  <Style x:Key="Heading" TargetType="TextBlock">
-    <Style.Setters>
-      <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
-      <Setter Property="FontSize" Value="19" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style.Setters>
-  </Style>
-  <Style x:Key="Subheading" TargetType="TextBlock">
-    <Style.Setters>
-      <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
-      <Setter Property="FontSize" Value="14" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style.Setters>
-  </Style>
+  <!-- Style inheritance uses BasedOn; the base and derived styles live in this dictionary. -->
   <Style x:Key="Body" TargetType="TextBlock">
     <Style.Setters>
       <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
@@ -77,11 +22,20 @@
       <Setter Property="FontWeight" Value="Normal" />
     </Style.Setters>
   </Style>
-  <Style x:Key="Caption" TargetType="TextBlock">
+  <Style x:Key="Subheading" TargetType="TextBlock" BasedOn="{StaticResource Body}">
     <Style.Setters>
-      <Setter Property="FontFamily" Value="{StaticResource FontFamily}" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style.Setters>
+  </Style>
+  <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource Subheading}">
+    <Style.Setters>
+      <Setter Property="FontSize" Value="19" />
+    </Style.Setters>
+  </Style>
+  <Style x:Key="Caption" TargetType="TextBlock" BasedOn="{StaticResource Body}">
+    <Style.Setters>
       <Setter Property="FontSize" Value="9" />
-      <Setter Property="FontWeight" Value="Normal" />
       <Setter Property="Opacity" Value="0.65" />
     </Style.Setters>
   </Style>

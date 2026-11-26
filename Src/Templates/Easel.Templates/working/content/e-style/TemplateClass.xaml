@@ -3,8 +3,14 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     x:Class="TemplateNamespace.TemplateClass">
 
-  <!-- Easel customization: one keyed style; request it with Style="{StaticResource Emphasized}". -->
-  <Style x:Key="Emphasized" TargetType="TextBlock">
+  <!-- Easel customization: derive one keyed style from a local base with BasedOn.
+       Request it with Style="{StaticResource Emphasized}". -->
+  <Style x:Key="BaseText" TargetType="TextBlock">
+    <Style.Setters>
+      <Setter Property="FontSize" Value="10" />
+    </Style.Setters>
+  </Style>
+  <Style x:Key="Emphasized" TargetType="TextBlock" BasedOn="{StaticResource BaseText}">
     <Style.Setters>
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="#FF4C8DFF" />
