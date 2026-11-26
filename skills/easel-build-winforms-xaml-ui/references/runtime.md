@@ -124,10 +124,14 @@ release. `ProcessPointerDown` returns whether the element handled the event.
 | `Visibility` | `Visible`, `Hidden` (occupies space, not painted), `Collapsed` (not measured). |
 | `IsEnabled` | Inherited; disabled subtrees reject pointer input. |
 | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` | Self-drawn chrome on `VisualElement`. |
+| `ChromeBackground`, `ChromeBorderBrush`, `ChromeBorderThickness`, `ChromeBorderWidth` | The chrome a template paints: the element's own `Background`/`BorderBrush`/`BorderThickness` when set, otherwise the palette role the control declares. |
 | `Opacity`, `Transform`, `Transform3D`, `Clip`, `ClipToBounds`, `OpacityMask`, `OpacityMaskMode`, `Effect`, `CacheAsBitmap` | Visual composition (see [visuals.md](visuals.md)). |
 | `FontSize`, `FontFamily`, `FontWeight` | Inherited typography; derived into `Font`. |
 | `DataContext` | Inherited binding source; falls back to the hosting `VisualHost.DataContext`. |
 | `Focusable`, `IsTabStop`, `TabIndex` | Logical focus chain. |
+
+`VisualElement.Transitions` is a collection, not a DP: list a DP there to animate every change of it (see
+[animation.md](animation.md#element-transitions)).
 
 The layout pass:
 

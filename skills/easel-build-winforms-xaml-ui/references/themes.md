@@ -3,8 +3,8 @@
 Easel controls have a default palette; an application can switch it, follow Windows, or provide its own
 `ResourceDictionary`. Two surfaces read the theme: `Theme.Current` (palette roles used as template fallbacks,
 self-drawn chrome and control metrics) and the host's resource dictionary (XAML `{DynamicResource}` and custom
-templates). Built-in chrome reads the control's own appearance properties with `Theme.Current` as the fallback;
-set the control property or the palette. The normal customization is a control property, a role DP, or a partial
+templates). Built-in chrome reads the control's own appearance properties with `Theme.Current` as the fallback,
+and a template reads that effective chrome as `Chrome*`; set the control property or the palette. The normal customization is a control property, a role DP, or a partial
 palette; a complete palette is only for replacing every token.
 
 ## Modes and the active palette

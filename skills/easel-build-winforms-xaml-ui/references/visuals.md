@@ -117,7 +117,7 @@ focus, accessibility, templating or a scroll surface.
 | `OpacityMaskMode` | `Alpha` (default; WPF semantics) or `Luminance` (premultiplied luminance × alpha; white covers, black hides). |
 | `Effect` | `VisualEffect`; `DropShadowEffect` (`Offset`, `Blur`, `Color`, `Opacity`). Effects disable bitmap cache. |
 | `CacheAsBitmap` | Reuses the local subtree bitmap. DP changes inside mark the nearest cache dirty; custom visuals call `InvalidateCache`. |
-| `Rendered` chrome | `VisualElement.Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` are self-drawn. |
+| `Rendered` chrome | `VisualElement.Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` are self-drawn; a template paints the effective `Chrome*` values instead (see [runtime.md](runtime.md#visualelement-layout-contract)). |
 
 A gradient opacity mask over a group:
 
@@ -177,13 +177,18 @@ ties use declaration order). `VisualElement.HitTestContent` returns `IsHitTestVi
 ## Drawing on a custom Visual
 
 ```csharp
+using System.Drawing;
+using Easel;
+using Easel.Visuals;
+
 public sealed class Sparkline : Visual
 {
-    public Brush? Stroke { get; set; } // your own API
+    public Easel.Brush? Stroke { get; set; } // your own API
+
     protected override void RenderContent(Graphics graphics)
     {
-        using var pen = new Pen(new SolidBrush(Theme.Current.Accent), 2f);
-        graphics.DrawLines(pen, points);
+        using var pen = new Easel.Pen(new SolidColorBrush(Theme.Current.Accent), 2f);
+        graphics.DrawLines(pen, points); // Easel.Pen converts to System.Drawing.Pen
     }
 }
 ```

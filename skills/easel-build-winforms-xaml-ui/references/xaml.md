@@ -212,6 +212,9 @@ Resources["Accent"] = new SolidColorBrush(newColor); // the border updates
 - `<Trigger.EnterAction>` / `<Trigger.ExitAction>` run a `TransitionAction`, `KeyFrameAnimation`,
   `TriggerActionGroup`, or a custom `VisualTriggerAction` derived type. In a template trigger the action target is
   the same `TargetName` part as the setters.
+- `<Element.Transitions>` is a collection property element: each `<Transition Property="…" Duration="…" Ease="…" />`
+  becomes `Transitions.Add(new Transition { … })`, and the listed DP animates every change. See
+  [animation.md](animation.md#element-transitions).
 
 ### ControlTemplate
 
