@@ -1493,7 +1493,12 @@ public class TextBox : TemplatedControl
         var thickness = (float)CaretThickness;
         var lineIndex = FindLineIndex(CaretIndex);
         var line = _lines[lineIndex];
-        var caretX = content.Left - offset + MeasurePrefix(line, CaretIndex - line.Start);
+        // 密码圆点的排版宽度带 trailing bearing；用墨水右边界让插入符贴住最后一个点。
+        var caretLength = CaretIndex - line.Start;
+        var caretPrefix = IsPassword && caretLength > 0
+            ? VisualText.MeasureInkRight(DisplayText.Substring(line.Start, caretLength), Font, RenderDpi)
+            : MeasurePrefix(line, caretLength);
+        var caretX = content.Left - offset + caretPrefix;
         var top = textTop + (lineIndex * _lineHeight) + 2f;
         var height = Math.Max(1f, _lineHeight - 4f);
         if (IsOverwriteMode)
