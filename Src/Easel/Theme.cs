@@ -601,16 +601,35 @@ public static class Theme
     }
 
     private static bool SameStyle(VisualStyle left, VisualStyle right)
+        => SameStyle(left, right, new HashSet<(VisualStyle Left, VisualStyle Right)>());
+
+    private static bool SameStyle(
+        VisualStyle left,
+        VisualStyle right,
+        HashSet<(VisualStyle Left, VisualStyle Right)> visited)
     {
-        // 只对无 BasedOn/Template、无触发器、无绑定 setter 的样式做逐项比较；其余情况保守地视为不同。
+        if (!visited.Add((left, right)))
+        {
+            return true;
+        }
+
+        // 主题里的样式是两份独立实例但链相同；BasedOn 也按内容递归比较，不能按引用或直接判不同。
         if (left.TargetType != right.TargetType
-            || left.BasedOn is not null
-            || right.BasedOn is not null
             || left.Template is not null
             || right.Template is not null
             || left.Triggers.Count != 0
             || right.Triggers.Count != 0
             || left.Setters.Count != right.Setters.Count)
+        {
+            return false;
+        }
+
+        if ((left.BasedOn is null) != (right.BasedOn is null))
+        {
+            return false;
+        }
+
+        if (left.BasedOn is not null && !SameStyle(left.BasedOn, right.BasedOn!, visited))
         {
             return false;
         }
