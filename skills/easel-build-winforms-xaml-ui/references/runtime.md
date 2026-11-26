@@ -18,7 +18,8 @@ Application.Run(new VisualForm { Root = new MyShellView() });
 
 `VisualForm` creates the dock-filled `VisualHost`; the `Control.ControlCollection` extension does the same for a
 plain `Form`. `Window : VisualForm` adds the XAML surface: a `Window` root with `x:Class`, `Content` as the
-single visual root, `Title` mapped to the caption and `Resources` forwarded to the surface dictionary.
+single visual root, `Title` mapped to the caption and `Resources` forwarded to the surface dictionary. XAML
+`Width`/`Height` are DIPs applied at handle creation; `Form.Width`/`Height` set in code stay physical.
 `VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement`
 gets layout and input; a `ContainerVisual` is painted as lightweight decoration.
 
@@ -200,6 +201,8 @@ EaselApplication.Initialize();              // or ApplicationConfiguration.Initi
 Application.Run(new MainWindow());          // Window : VisualForm
 ```
 
+- `Window.WidthDips`/`HeightDips` are the DIP side of `Width`/`Height`: the XAML initializer writes them, the
+  window applies them at handle creation, and setting them on a live window applies immediately.
 - `DpiScale` re-reads the device DPI on a resize and on `OnDpiChangedAfterParent`; that override is not compiled
   into the `netframework4.6.1` target, so a monitor change there refreshes on the next resize.
 - Tests and captures pin the scale with `DpiScaleOverride`; `RenderTo` never applies DPI.

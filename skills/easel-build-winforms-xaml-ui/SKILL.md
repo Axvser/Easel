@@ -80,8 +80,29 @@ Application.Run(new MainWindow());
 ```
 
 `Window : VisualForm`, so the single surface, theme handling and `DataContext` forwarding are unchanged.
-`Title` maps to the native caption, and `Window.Resources` land on the surface dictionary. `Window` takes one
-content root; wrap siblings in a panel.
+`Title` maps to the native caption, `Window.Resources` land on the surface dictionary, and XAML `Width`/`Height`
+are DIPs: the initializer writes `WidthDips`/`HeightDips`, which the window converts with the monitor DPI at
+handle creation (`Form.Width`/`Height` set in code stay physical pixels). `Window` takes one content root; wrap
+siblings in a panel.
+
+A hand-built shell uses `VisualForm` directly; it hosts the single surface and accepts any visual root:
+
+```csharp
+[STAThread]
+private static void Main()
+{
+    ApplicationConfiguration.Initialize();
+    Application.Run(new VisualForm { Text = "My app", ClientSize = new Size(1200, 800), Root = new MyShellView() });
+}
+```
+
+With an existing native form, the `Control.ControlCollection` extensions create and remove the host:
+
+```csharp
+var form = new Form { Text = "My app", ClientSize = new Size(1200, 800) };
+form.Controls.Add(new MyShellView()); // creates a dock-filled VisualHost
+Application.Run(form);
+```
 
 Every window hosts exactly one `VisualHost`; a second `Add` on the same collection throws. `Remove(view)` removes
 and disposes the host created by `Add`. `VisualHost` remains the only WinForms `Control` inside the visual tree,

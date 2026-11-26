@@ -323,7 +323,7 @@ internal sealed class XamlCompiler
             }
         }
 
-        ApplyAttributes(root, _owner, "this");
+        ApplyAttributes(root, _owner, "this", windowRoot: true);
 
         var hasContent = false;
         foreach (var element in root.Elements())
@@ -340,7 +340,7 @@ internal sealed class XamlCompiler
                     hasContent = true;
                 }
 
-                EmitPropertyElement(element, _owner, "this");
+                EmitPropertyElement(element, _owner, "this", windowRoot: true);
                 continue;
             }
 
@@ -1353,7 +1353,16 @@ internal sealed class XamlCompiler
         _current.Line($"{expression}.{property.Name} = {valueExpression};");
     }
 
-    private void ApplyAttributes(XElement element, ITypeSymbol type, string targetExpression)
+    // Window 的 XAML 尺寸按 DIP 解释；生成代码写 DIP 属性，不直接改 Form 的物理 Width/Height。
+    private static string MapWindowDipProperty(string memberName)
+        => memberName switch
+        {
+            "Width" => "WidthDips",
+            "Height" => "HeightDips",
+            _ => memberName,
+        };
+
+    private void ApplyAttributes(XElement element, ITypeSymbol type, string targetExpression, bool windowRoot = false)
     {
         foreach (var attribute in element.Attributes())
         {
@@ -1368,7 +1377,9 @@ internal sealed class XamlCompiler
                 continue;
             }
 
-            var memberName = attribute.Name.LocalName;
+            var memberName = windowRoot
+                ? MapWindowDipProperty(attribute.Name.LocalName)
+                : attribute.Name.LocalName;
             var isVisual = IsVisualElement(type);
 
             if (memberName == "Style")
@@ -3008,11 +3019,17 @@ internal sealed class XamlCompiler
     private void EmitPropertyElement(
         XElement propertyElement,
         ITypeSymbol ownerType,
-        string ownerExpression)
+        string ownerExpression,
+        bool windowRoot = false)
     {
         var fullName = propertyElement.Name.LocalName;
         var dot = fullName.LastIndexOf('.');
         var memberName = dot >= 0 ? fullName.Substring(dot + 1) : fullName;
+        if (windowRoot)
+        {
+            memberName = MapWindowDipProperty(memberName);
+        }
+
         var prefixOwner = dot > 0 ? fullName.Substring(0, dot) : null;
         var isVisual = IsVisualElement(ownerType);
 

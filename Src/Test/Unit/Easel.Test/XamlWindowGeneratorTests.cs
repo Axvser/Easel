@@ -50,8 +50,40 @@ public sealed class XamlWindowGeneratorTests
 
         var generated = run.GeneratedText();
         StringAssert.Contains(generated, "this.Title = \"Probe\";");
-        StringAssert.Contains(generated, "this.Width = 320;");
+        StringAssert.Contains(generated, "this.WidthDips = 320D;");
+        StringAssert.Contains(generated, "this.HeightDips = 200D;");
         StringAssert.Contains(generated, "this.Content =");
+    }
+
+    [TestMethod]
+    public void AWindowWidthPropertyElementIsInDeviceIndependentPixels()
+    {
+        const string xaml = """
+            <Window
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                x:Class="Probe.ProbeWindow"
+                Title="Probe">
+              <Window.Width>320</Window.Width>
+              <StackPanel>
+                <TextBlock Text="Hi" />
+              </StackPanel>
+            </Window>
+            """;
+
+        var (run, output) = GeneratorProbe.RunAndCompile(
+            [new XamlFileGenerator()],
+            Source,
+            "XamlWindowDipsProbe",
+            new InMemoryAdditionalText("ProbeWindow.xaml", xaml));
+
+        Assert.IsEmpty(run.Diagnostics, GeneratorProbe.Describe(run.Diagnostics));
+        var errors = output.GetDiagnostics()
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+        Assert.IsEmpty(errors, GeneratorProbe.Describe(errors));
+
+        StringAssert.Contains(run.GeneratedText(), "this.WidthDips = 320D;");
     }
 
     [TestMethod]

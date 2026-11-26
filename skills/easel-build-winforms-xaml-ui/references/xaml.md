@@ -12,8 +12,8 @@ Three roots are supported:
 1. A **visual view**: any type deriving `VisualElement`.
 2. A **standalone resource dictionary**: `<ResourceDictionary x:Class="…">` deriving `Easel.ResourceDictionary`.
 3. A **window**: `<Window x:Class="…">` where the code-behind derives `Easel.Visuals.Window`. Its direct
-   children (or `<Window.Content>`) assign `Content`; attributes such as `Title`, `Width` and `Height` write
-   the native form; `<Window.Resources>` lands on the hosting surface.
+   children (or `<Window.Content>`) assign `Content`; `Title` writes the caption; `Width` and `Height` are
+   device-independent pixels applied at handle creation; `<Window.Resources>` lands on the hosting surface.
 
 ```csharp
 public sealed partial class MyView : UserControl

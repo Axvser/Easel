@@ -13,12 +13,37 @@ public sealed class XamlWindowTests
 
         Assert.IsTrue(window is Form);
         Assert.AreEqual("Window fixture", window.Title);
-        Assert.AreEqual(420, window.Width);
-        Assert.AreEqual(260, window.Height);
+        Assert.AreEqual(420d, window.WidthDips);
+        Assert.AreEqual(260d, window.HeightDips);
         Assert.IsNotNull(window.Content);
         Assert.AreSame(window.Content, window.Root);
         Assert.AreSame(window.Content, window.Surface.Root);
         Assert.AreEqual(AutoScaleMode.None, window.AutoScaleMode);
+    }
+
+    [TestMethod]
+    public void XamlWindowSizeIsAppliedInDeviceIndependentPixels()
+    {
+        using var window = new WindowView();
+        window.Surface.DpiScaleOverride = 1.5f;
+
+        _ = window.Handle;
+
+        Assert.AreEqual(630, window.Width);
+        Assert.AreEqual(390, window.Height);
+    }
+
+    [TestMethod]
+    public void ACodeBehindSizeWinsOverTheXamlDips()
+    {
+        using var window = new WindowView();
+        window.Width = 900;
+        window.Surface.DpiScaleOverride = 1.5f;
+
+        _ = window.Handle;
+
+        Assert.AreEqual(900, window.Width);
+        Assert.AreEqual(390, window.Height);
     }
 
     [TestMethod]

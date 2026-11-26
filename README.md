@@ -60,7 +60,8 @@ Application.Run(new MainWindow());
 ```
 
 `Window` derives from `VisualForm`; `Title` maps to the caption, `Window.Resources` go to the surface
-dictionary and the generated initializer assigns the single content root.
+dictionary and the generated initializer assigns the single content root. XAML `Width`/`Height` are
+device-independent pixels applied at handle creation; `Width`/`Height` set in code stay physical pixels.
 
 ## XAML in, controls out
 
