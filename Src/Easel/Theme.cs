@@ -47,6 +47,9 @@ public sealed class ThemePalette
     /// <summary>The default border of an interactive control.</summary>
     public Color ControlBorder { get; set; }
 
+    /// <summary>The neutral border of an interactive control under the pointer.</summary>
+    public Color ControlBorderHover { get; set; }
+
     /// <summary>The hover background of an interactive control.</summary>
     public Color ControlHover { get; set; }
 
@@ -198,6 +201,9 @@ public sealed class ThemePalette
     /// <summary>The default corner radius in pixels.</summary>
     public float CornerRadius { get; set; } = 4f;
 
+    /// <summary>The corner radius of an input control such as a text field or date picker.</summary>
+    public float InputCornerRadius { get; set; } = 4f;
+
     /// <summary>The default interactive control height in pixels.</summary>
     public int ControlHeight { get; set; } = 28;
 
@@ -239,6 +245,7 @@ public sealed class ThemePalette
             SurfaceAlt = Read("Raised"),
             ControlBackground = Read("Input"),
             ControlBorder = Read("Border"),
+            ControlBorderHover = Optional("BorderHover", Read("Border")),
             ControlHover = Read("Hover"),
             ControlPressed = Read("Pressed"),
             Foreground = foreground,
@@ -276,6 +283,9 @@ public sealed class ThemePalette
                 ? weight
                 : Easel.Visuals.FontWeight.Normal,
             CornerRadius = resources["CornerRadius"] is double radius ? (float)radius : 4f,
+            InputCornerRadius = resources["InputCornerRadius"] is double inputRadius
+                ? (float)inputRadius
+                : resources["CornerRadius"] is double fallbackRadius ? (float)fallbackRadius : 4f,
             ControlHeight = resources["ControlHeight"] is int height ? height : 28,
             ControlBorderThickness = resources["ControlBorderThickness"] is Easel.Controls.Thickness thickness
                 ? thickness
@@ -493,6 +503,7 @@ public static class Theme
         SurfaceAlt = Color.FromArgb(0xFF, 0x16, 0x16, 0x16),
         ControlBackground = Color.FromArgb(0xFF, 0x10, 0x10, 0x10),
         ControlBorder = Color.FromArgb(0xFF, 0x6F, 0x6F, 0x6F),
+        ControlBorderHover = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
         ControlHover = Color.FromArgb(0xFF, 0x1F, 0x1F, 0x1F),
         ControlPressed = Color.FromArgb(0xFF, 0x2E, 0x2E, 0x2E),
         Foreground = Color.White,
@@ -512,6 +523,7 @@ public static class Theme
         FontSize = 9.5f,
         FontWeight = FontWeight.Normal,
         CornerRadius = 2f,
+        InputCornerRadius = 2f,
         ControlHeight = 30,
     };
 
@@ -681,6 +693,7 @@ public static class Theme
         Brush("Raised", palette.SurfaceAlt);
         Brush("Input", palette.ControlBackground);
         Brush("Border", palette.ControlBorder);
+        Brush("BorderHover", palette.ControlBorderHover);
         Brush("Hover", palette.ControlHover);
         Brush("Pressed", palette.ControlPressed);
         Brush("Text", palette.Foreground);
@@ -712,6 +725,7 @@ public static class Theme
         resources["FontSize"] = (double)palette.FontSize;
         resources["FontWeight"] = palette.FontWeight;
         resources["CornerRadius"] = (double)palette.CornerRadius;
+        resources["InputCornerRadius"] = (double)palette.InputCornerRadius;
         resources["ControlHeight"] = palette.ControlHeight;
         resources["ControlBorderThickness"] = palette.ControlBorderThickness;
         resources["FocusThickness"] = (double)palette.FocusThickness;

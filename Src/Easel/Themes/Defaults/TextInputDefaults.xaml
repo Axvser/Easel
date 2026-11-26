@@ -8,13 +8,13 @@
     <Style.Template>
       <ControlTemplate TargetType="RichTextBox">
         <Grid>
-          <Border Background="{DynamicResource Input}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+          <Border Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
-                  BorderThickness="1.5"
+                  BorderThickness="2"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border Padding="{TemplateBinding Padding}">
             <RichTextContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />
@@ -40,13 +40,13 @@
     <Style.Template>
       <ControlTemplate TargetType="TextBox">
         <Grid>
-          <Border Background="{DynamicResource Input}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+          <Border Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
-                  BorderThickness="1.5"
+                  BorderThickness="2"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border Padding="{TemplateBinding Padding}">
             <TextBoxContentHost x:Name="PART_ContentHost" IsHitTestVisible="False" />

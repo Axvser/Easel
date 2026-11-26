@@ -863,6 +863,10 @@ public class ListBox : ItemsControl
         Focusable = true;
         IsHitTestVisible = true;
         MinHeight = Theme.Current.ControlHeight;
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
     }
 
     /// <summary>Raised after <see cref="SelectedIndex"/> or <see cref="SelectedItem"/> changes.</summary>

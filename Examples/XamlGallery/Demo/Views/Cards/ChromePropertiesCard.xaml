@@ -1,0 +1,142 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.ChromePropertiesCard"
+    Width="660"
+    Spacing="10">
+
+  <StackPanel Spacing="2">
+    <TextBlock Text="Control chrome properties"
+               Foreground="{StaticResource Text}"
+               FontSize="18"
+               FontWeight="SemiBold" />
+    <TextBlock Text="Default templates read the control's appearance properties; the palette is the fallback."
+               Foreground="{StaticResource Muted}"
+               FontSize="9" />
+  </StackPanel>
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Spacing="12" Margin="0,0,10,0">
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="8">
+          <TextBlock Text="INPUT CHROME" Foreground="{StaticResource Muted}" FontSize="8" />
+          <Button Text="Brand button"
+                  Height="32"
+                  Background="{StaticResource Accent}"
+                  Foreground="{StaticResource AccentText}"
+                  BorderBrush="{StaticResource Accent}"
+                  CornerRadius="10" />
+          <TextBox Placeholder="Overridden input"
+                   Background="{StaticResource Surface}"
+                   BorderBrush="{StaticResource Accent}" />
+          <ComboBox x:Name="editableCombo"
+                    IsEditable="True"
+                    Placeholder="Type or choose"
+                    Foreground="{StaticResource Accent}"
+                    Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource Accent}" />
+          <DatePicker x:Name="datePicker"
+                      Placeholder="Pick a day"
+                      Background="{StaticResource Surface}"
+                      BorderBrush="{StaticResource Accent}" />
+        </StackPanel>
+      </Border>
+
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="8">
+          <TextBlock Text="SURFACE + ROLES" Foreground="{StaticResource Muted}" FontSize="8" />
+          <ListBox x:Name="listBox"
+                   Height="92"
+                   Background="{StaticResource Surface}"
+                   BorderBrush="{StaticResource Accent}"
+                   BorderThickness="1"
+                   CornerRadius="8"
+                   SelectedIndex="0" />
+          <Slider Minimum="0"
+                  Maximum="100"
+                  Value="55"
+                  TrackBrush="{StaticResource Surface}"
+                  FillBrush="{StaticResource Accent}"
+                  ThumbBrush="{StaticResource Accent}" />
+          <ProgressBar Height="8"
+                       Value="65"
+                       TrackBrush="{StaticResource Surface}"
+                       FillBrush="{StaticResource Accent}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <StackPanel Grid.Column="1" Spacing="12" Margin="10,0,0,0">
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="8">
+          <TextBlock Text="HEADER + GLYPH ROLES" Foreground="{StaticResource Muted}" FontSize="8" />
+          <Expander Header="Header brush"
+                    IsExpanded="True"
+                    HeaderBackground="{StaticResource Surface}"
+                    HeaderForeground="{StaticResource Accent}"
+                    HeaderBorderBrush="{StaticResource Accent}"
+                    HeaderBorderThickness="1">
+            <TextBlock Text="HeaderBackground, HeaderForeground and HeaderBorderBrush."
+                       Foreground="{StaticResource Muted}"
+                       FontSize="9"
+                       Wrap="True" />
+          </Expander>
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <ToggleButton Background="{StaticResource Surface}"
+                          BorderBrush="{StaticResource Accent}"
+                          CornerRadius="10" />
+            <CheckBox Background="{StaticResource Surface}"
+                      BorderBrush="{StaticResource Accent}"
+                      CornerRadius="6"
+                      IsChecked="True" />
+            <RadioButton Background="{StaticResource Surface}"
+                         BorderBrush="{StaticResource Accent}"
+                         GroupName="chrome-card"
+                         IsChecked="True" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="6">
+          <TextBlock Text="RULES" Foreground="{StaticResource Muted}" FontSize="8" />
+          <TextBlock Text="Background / BorderBrush / BorderThickness / CornerRadius / Padding / Foreground override the template chrome."
+                     Foreground="{StaticResource Muted}"
+                     FontSize="9"
+                     Wrap="True" />
+          <TextBlock Text="Role DPs cover tracks, fills, thumbs, headers and selection lines; state rows and the calendar day palette stay theme-driven."
+                     Foreground="{StaticResource Muted}"
+                     FontSize="9"
+                     Wrap="True" />
+          <TextBlock Text="Input fields use the input radius (6px light/dark, 2px high contrast); hover and focus rings fade in, with a neutral hover border and a 2px focus ring."
+                     Foreground="{StaticResource Muted}"
+                     FontSize="9"
+                     Wrap="True" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </Grid>
+
+</local:ThemedStackPanel>

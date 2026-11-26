@@ -14,6 +14,7 @@ internal sealed class GalleryVisualInspector
     private static readonly HashSet<string> Hidden = new(StringComparer.Ordinal)
     {
         "DataContext", "Style", "Template", "ItemsSource", "ItemFactory", "Content", "Child", "Font", "Name",
+        "ChromeBackground", "ChromeBorderBrush", "ChromeBorderThickness", "ChromeBorderWidth",
     };
 
     private static readonly Dictionary<Type, DependencyProperty[]> EditableProperties = [];

@@ -1,0 +1,30 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.TransitionsCard"
+    Spacing="10">
+
+  <TextBlock Text="Hover the panel: Background and CornerRadius animate instead of snapping."
+             Foreground="{StaticResource Muted}"
+             FontSize="9"
+             Wrap="True" />
+
+  <Border x:Name="panel"
+          Width="260"
+          Height="120"
+          Background="{StaticResource SurfaceAlt}"
+          CornerRadius="10"
+          PointerEntered="OnPanelPointerEntered"
+          PointerExited="OnPanelPointerExited">
+    <Border.Transitions>
+      <Transition Property="Background" Duration="0:0:0.25" Ease="CubicOut" />
+      <Transition Property="CornerRadius" Duration="0:0:0.25" Ease="CubicOut" />
+    </Border.Transitions>
+    <TextBlock Text="Hover me"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               Foreground="{StaticResource Text}" />
+  </Border>
+
+</local:ThemedStackPanel>

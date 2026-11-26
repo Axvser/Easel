@@ -77,8 +77,9 @@ public class VisualPopup : VisualElement
     public VisualPopup()
     {
         IsHitTestVisible = true;
-        Background = Theme.Current.Surface;
-        BorderBrush = Theme.Current.ControlBorder;
+        // 主题层而不是本地值：运行时切主题时表面与边框要跟着换。
+        SetThemeMetric(BackgroundProperty, static palette => new SolidColorBrush(palette.Surface));
+        SetThemeMetric(BorderBrushProperty, static palette => new SolidColorBrush(palette.ControlBorder));
         BorderThickness = new XamlThickness(1f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Padding = new XamlThickness(2f);

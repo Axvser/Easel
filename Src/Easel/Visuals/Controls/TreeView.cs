@@ -549,6 +549,10 @@ public class TreeView : TemplatedControl
         IsHitTestVisible = true;
         Focusable = true;
         Padding = new XamlThickness(0f);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
         Items.CollectionChanged += OnRootItemsChanged;
         // 预览阶段先截住展开器：模板里用 ToggleButton 当展开器时也要由树统一切换。
         PreviewPointerPressed += OnPreviewPointerPressed;

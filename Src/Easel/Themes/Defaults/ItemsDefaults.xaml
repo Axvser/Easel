@@ -21,9 +21,10 @@
     <Style.Template>
       <ControlTemplate TargetType="ListBox">
         <Grid x:Name="Root">
-          <!-- No carrying surface: Transparent keeps empty-area hit-testing while the host supplies the fill. -->
-          <Border Background="Transparent"
-                  BorderThickness="0"
+          <!-- The chrome layer stays transparent until the host sets Background/Border on the list. -->
+          <Border Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"
@@ -80,7 +81,7 @@
                   Background="{DynamicResource Selection}"
                   CornerRadius="{TemplateBinding CornerRadius}"
                   IsHitTestVisible="False" />
-          <ContentPresenter Padding="{TemplateBinding Padding}" IsHitTestVisible="False" />
+          <ContentPresenter IsHitTestVisible="False" />
         </Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsPointerOver" Value="False">
@@ -121,8 +122,9 @@
     <Style.Template>
       <ControlTemplate TargetType="TreeView">
         <Grid>
-          <Border Background="Transparent"
-                  BorderThickness="0"
+          <Border Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   BorderBrush="{DynamicResource Focus}"

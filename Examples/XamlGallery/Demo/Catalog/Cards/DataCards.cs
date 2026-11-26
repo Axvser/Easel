@@ -34,8 +34,8 @@ internal static class DataCards
             "data.combo-box",
             "Data",
             "ComboBox",
-            "A drop-down that opens in the surface overlay.",
-            "<ComboBox Width=\"240\" SelectedIndex=\"0\" />",
+            "Read-only and editable drop-downs that open in the surface overlay; hover is neutral and the open/focus rings fade in.",
+            "<ComboBox IsEditable=\"True\" Placeholder=\"Type or choose…\" />",
             _ => new ComboBoxCard()),
         Card(
             "data.virtual-list",

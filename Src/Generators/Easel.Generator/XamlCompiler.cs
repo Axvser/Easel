@@ -3141,6 +3141,13 @@ internal sealed class XamlCompiler
                     continue;
                 }
 
+                // 元素级过渡：Transition 的 Property 指向拥有者元素的 DP，不能走通用属性转换。
+                if (property.Name == "Transitions" && childType.ToDisplayString() == "Easel.Visuals.Transition")
+                {
+                    EmitVisualTransition(child, ownerType, property.Name, ownerExpression);
+                    continue;
+                }
+
                 var childExpression = EmitXamlObject(child, childType);
                 if (childExpression is not null)
                 {
@@ -3212,6 +3219,58 @@ internal sealed class XamlCompiler
         }
 
         EmitVisualAttachedValue(propertyElement, ownerExpression, dependencyProperty, valueType, propertyElement.Value);
+    }
+
+    // 元素级过渡描述符：Property 解析到拥有者元素的 DP，Duration / Ease 缺省时沿用描述符默认值。
+    private void EmitVisualTransition(
+        XElement transition,
+        ITypeSymbol ownerType,
+        string collectionName,
+        string ownerExpression)
+    {
+        if (!TryResolveVisualProperty(transition, ownerType, out var property))
+        {
+            return;
+        }
+
+        if (!TryGetDependencyPropertyReference(property, out var dependencyProperty))
+        {
+            Report(
+                Diagnostics.UnsupportedConstruct,
+                transition,
+                $"'{property.Name}' is not a dependency property and cannot drive a transition.");
+            return;
+        }
+
+        var initializer = $"Property = {dependencyProperty}";
+
+        var durationAttribute = transition.Attribute("Duration");
+        if (durationAttribute is not null)
+        {
+            if (!TimeSpan.TryParse(durationAttribute.Value, CultureInfo.InvariantCulture, out _))
+            {
+                Report(Diagnostics.UnsupportedValue, durationAttribute, durationAttribute.Value, "System.TimeSpan");
+                return;
+            }
+
+            initializer +=
+                $", Duration = global::System.TimeSpan.Parse({SyntaxHelpers.Quote(durationAttribute.Value)}, global::System.Globalization.CultureInfo.InvariantCulture)";
+        }
+
+        var easeAttribute = transition.Attribute("Ease");
+        if (easeAttribute is not null)
+        {
+            if (!TryMapEase(easeAttribute.Value, out var ease))
+            {
+                Report(Diagnostics.UnsupportedValue, easeAttribute, easeAttribute.Value, "Ease");
+                return;
+            }
+
+            initializer += $", Ease = {ease}";
+        }
+
+        _current.Line(
+            $"{ownerExpression}.{collectionName}.Add(new {VisualFqn("Transition")} {{ {initializer} }});");
     }
 
     private void EmitResources(XElement propertyElement, string ownerExpression, ITypeSymbol ownerType)

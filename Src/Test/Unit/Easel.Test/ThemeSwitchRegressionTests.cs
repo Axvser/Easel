@@ -11,7 +11,7 @@ namespace Easel.Test;
 public sealed class ThemeSwitchRegressionTests
 {
     [TestMethod]
-    public void ThemeSwitchMutatesTheBrushTheTemplateAlreadyHolds()
+    public void ThemeSwitchUpdatesTheButtonChromeBrush()
     {
         var previous = Theme.Mode;
         try
@@ -24,14 +24,12 @@ public sealed class ThemeSwitchRegressionTests
 
             var chrome = button.GetTemplateChild<VC.Border>("Chrome");
             Assert.IsNotNull(chrome);
-            var brush = chrome.Background as SolidColorBrush;
-            Assert.IsNotNull(brush);
-            var before = brush.Color;
+            var before = chrome.Background!.ApproximateColor;
 
             Theme.Mode = ThemeMode.Light;
 
-            Assert.AreSame(brush, chrome.Background, "the template keeps the same brush instance");
-            Assert.AreNotEqual(before.ToArgb(), brush.Color.ToArgb(), "the shared theme brush changed colour in place");
+            Assert.AreNotEqual(before.ToArgb(), chrome.Background!.ApproximateColor.ToArgb(),
+                "the chrome brush follows the switched palette");
         }
         finally
         {

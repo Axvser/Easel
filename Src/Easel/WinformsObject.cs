@@ -117,6 +117,57 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
         return property.DefaultValue;
     }
 
+    // 忽略某个优先级层后的有效值；元素级过渡用它读取动画层下面的真实目标。
+    internal object? GetValueExcluding(DependencyProperty property, BindingPriority excluded)
+    {
+        if (property is null) throw new ArgumentNullException(nameof(property));
+
+        if (_values.TryGetValue(property, out var layers))
+        {
+            var found = false;
+            var best = default(BindingPriority);
+            object? top = null;
+            if (layers.Priority != excluded)
+            {
+                best = layers.Priority;
+                top = layers.Value;
+                found = true;
+            }
+
+            if (layers.Extra is { } extra)
+            {
+                foreach (var layer in extra)
+                {
+                    if (layer.Key != excluded && (!found || layer.Key < best))
+                    {
+                        best = layer.Key;
+                        top = layer.Value;
+                        found = true;
+                    }
+                }
+            }
+
+            if (found)
+            {
+                return top;
+            }
+        }
+
+        if (property.Metadata.Inherits && GetInheritedValue(property) is { } inherited)
+        {
+            return inherited;
+        }
+
+        return property.DefaultValue;
+    }
+
+    /// <summary>Called after a value layer of <paramref name="property"/> changes, even when the effective value does not.</summary>
+    /// <param name="property">The property whose layer changed.</param>
+    /// <param name="priority">The layer that was written or cleared.</param>
+    protected virtual void OnLayerValueChanged(DependencyProperty property, BindingPriority priority)
+    {
+    }
+
     /// <inheritdoc />
     public void SetValue(DependencyProperty property, object? value, BindingPriority priority = BindingPriority.LocalValue)
     {
@@ -129,6 +180,7 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
             var oldValue = property.Metadata.Inherits ? GetValue(property) : property.DefaultValue;
             value = property.CoerceFor(this, value);
             _values[property] = new LayerValue { Priority = priority, Value = value };
+            OnLayerValueChanged(property, priority);
             if (!Equals(oldValue, value))
             {
                 RaisePropertyChanged(property, oldValue, value, priority);
@@ -148,6 +200,7 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
 
             layers.Value = value;
             _values[property] = layers;
+            OnLayerValueChanged(property, priority);
             RaisePropertyChanged(property, oldValue, value, priority);
             return;
         }
@@ -173,6 +226,7 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
         }
 
         _values[property] = layers;
+        OnLayerValueChanged(property, priority);
 
         var newValue = GetValue(property);
         if (!Equals(previous, newValue))
@@ -244,6 +298,8 @@ public abstract class WinformsObject : IWinformsObject, INotifyPropertyChanged
                 _values.Remove(property);
             }
         }
+
+        OnLayerValueChanged(property, priority);
 
         var newValue = GetValue(property);
         if (!Equals(oldValue, newValue))

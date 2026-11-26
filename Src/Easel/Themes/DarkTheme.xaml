@@ -10,6 +10,7 @@
     <SolidColorBrush x:Key="Raised" Color="#FF2D2D2D" />
     <SolidColorBrush x:Key="Input" Color="#FF2A2A2A" />
     <SolidColorBrush x:Key="Border" Color="#FF333333" />
+    <SolidColorBrush x:Key="BorderHover" Color="#FF4A4F55" />
     <SolidColorBrush x:Key="Hover" Color="#FF303030" />
     <SolidColorBrush x:Key="Pressed" Color="#FF3A3A3A" />
     <SolidColorBrush x:Key="Text" Color="#FFE7E7E7" />
@@ -35,6 +36,7 @@
     <x:FontWeight x:Key="FontWeight">Normal</x:FontWeight>
 
     <x:Double x:Key="CornerRadius">4</x:Double>
+    <x:Double x:Key="InputCornerRadius">6</x:Double>
     <x:Int32 x:Key="ControlHeight">28</x:Int32>
 
     <x:Thickness x:Key="ControlBorderThickness">1</x:Thickness>

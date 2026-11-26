@@ -12,10 +12,11 @@
       <ControlTemplate TargetType="Calendar">
         <Grid ClipToBounds="True">
           <Border IsHitTestVisible="False"
-                  Background="Transparent"
-                  BorderThickness="0"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
-          <CalendarItem x:Name="PART_CalendarItem" />
+          <CalendarItem x:Name="PART_CalendarItem" Padding="{TemplateBinding Padding}" />
         </Grid>
       </ControlTemplate>
     </Style.Template>
@@ -26,9 +27,14 @@
       <ControlTemplate TargetType="CalendarItem">
         <!-- The fixed 238px column and 34/22/168 rows keep the original 250x226 month geometry; the padding comes
              from the item so CalendarItem can fill the calendar without a second inset. -->
-        <Grid x:Name="Root"
-              ClipToBounds="True"
-              Padding="{TemplateBinding Padding}">
+        <Border x:Name="Root"
+                ClipToBounds="True"
+                Padding="{TemplateBinding Padding}"
+                Background="{TemplateBinding ChromeBackground}"
+                BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="238" />
           </Grid.ColumnDefinitions>
@@ -82,7 +88,8 @@
                        Grid.Row="2"
                        Rows="6"
                        Columns="7" />
-        </Grid>
+          </Grid>
+        </Border>
       </ControlTemplate>
     </Style.Template>
   </Style>
@@ -93,18 +100,19 @@
     </Style.Setters>
     <Style.Template>
       <ControlTemplate TargetType="DatePicker">
-        <Grid x:Name="Root">
+        <Grid x:Name="Root" ClipToBounds="True">
           <Border IsHitTestVisible="False"
-                  Background="{DynamicResource Input}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <TextBox x:Name="PART_TextBox"
-                   Padding="{TemplateBinding Padding}" />
+                   Padding="{TemplateBinding Padding}"
+                   Margin="0,-1" />
           <Border x:Name="FocusRing"
                   IsHitTestVisible="False"
                   BorderBrush="{DynamicResource Focus}"
-                  BorderThickness="1.5"
+                  BorderThickness="2"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Button x:Name="PART_Button"
                   Width="24"

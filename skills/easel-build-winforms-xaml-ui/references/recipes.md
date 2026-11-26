@@ -213,8 +213,9 @@ surface.Resources.MergedDictionaries.Add(overrides);
 ```
 
 Omitted keys keep resolving from the active Dark+/Light+ theme; overridden keys stay fixed across a theme switch
-until you replace the overlay. Most control metrics and self-drawn chrome read `Theme.Current`, so call
-`Theme.ApplyPalette` as well when those should change. For a complete palette, start from `DarkTheme.xaml`:
+until you replace the overlay. The overlay reaches XAML `{DynamicResource}` and custom templates. Built-in chrome
+reads the control's appearance properties with `Theme.Current` as fallback: set the control property or role DP,
+or call `Theme.ApplyPalette`/assign `Theme.Current` to change it. For a complete palette, start from `DarkTheme.xaml`:
 
 ```csharp
 var custom = new MyApp.Themes.MyTheme();

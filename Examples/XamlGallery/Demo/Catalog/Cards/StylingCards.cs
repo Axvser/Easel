@@ -50,6 +50,20 @@ internal static class StylingCards
             "DynamicResource follows dictionary changes; StaticResource keeps the value it resolved at construction.",
             "<Border Background=\"{DynamicResource Accent}\" />",
             _ => new DynamicResourceCard()),
+        Card(
+            "style.control-chrome",
+            "Styling",
+            "Control chrome properties",
+            "Default templates read the control's appearance properties; the palette is the fallback.",
+            "<Slider TrackBrush=\"{StaticResource Accent}\" FillBrush=\"{StaticResource Accent}\" />",
+            _ => new ChromePropertiesCard()),
+        Card(
+            "style.transitions",
+            "Styling",
+            "Element transitions",
+            "The Transitions collection animates every change of the listed dependency properties on that element.",
+            "<Border.Transitions><Transition Property=\"Background\" Duration=\"0:0:0.25\" Ease=\"CubicOut\" />",
+            _ => new TransitionsCard()),
     ];
 
     private static GalleryCard Card(

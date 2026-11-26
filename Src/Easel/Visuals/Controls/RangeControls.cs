@@ -39,11 +39,23 @@ public class ProgressBar : TemplatedControl
         nameof(Value), typeof(double), typeof(ProgressBar),
         new PropertyMetadata(0d) { AffectsRender = true });
 
+    /// <summary>The unfilled track brush; unset uses the theme's alternate surface.</summary>
+    public static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(XamlBrush), typeof(ProgressBar),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The filled track brush; unset uses the theme accent.</summary>
+    public static readonly DependencyProperty FillBrushProperty = DependencyProperty.Register(
+        nameof(FillBrush), typeof(XamlBrush), typeof(ProgressBar),
+        new PropertyMetadata(null) { AffectsRender = true });
+
     /// <summary>Creates a non-interactive bar.</summary>
     public ProgressBar()
     {
         IsHitTestVisible = false;
         MinHeight = 6f;
+        SetThemeMetric(TrackBrushProperty, static palette => new SolidColorBrush(palette.SurfaceAlt));
+        SetThemeMetric(FillBrushProperty, static palette => new SolidColorBrush(palette.Accent));
     }
 
     /// <summary>The lowest value.</summary>
@@ -65,6 +77,20 @@ public class ProgressBar : TemplatedControl
     {
         get => (double)GetValue(ValueProperty)!;
         set => SetValue(ValueProperty, XamlMath.Clamp(value, Minimum, Maximum));
+    }
+
+    /// <summary>The unfilled track brush; unset uses the theme's alternate surface.</summary>
+    public XamlBrush? TrackBrush
+    {
+        get => (XamlBrush?)GetValue(TrackBrushProperty);
+        set => SetValue(TrackBrushProperty, value);
+    }
+
+    /// <summary>The filled track brush; unset uses the theme accent.</summary>
+    public XamlBrush? FillBrush
+    {
+        get => (XamlBrush?)GetValue(FillBrushProperty);
+        set => SetValue(FillBrushProperty, value);
     }
 
     /// <summary>The covered fraction in the range 0..1.</summary>
@@ -178,26 +204,24 @@ public class ProgressBar : TemplatedControl
     /// <inheritdoc />
     protected override void OnRender(Graphics graphics)
     {
-        var theme = Theme.Current;
         var bounds = new RectangleF(0f, 0f, Math.Max(0f, Bounds.Width), Math.Max(0f, Bounds.Height));
         var radius = Math.Max(1f, bounds.Height / 2f);
-        using (var track = new SolidBrush(theme.SurfaceAlt))
-        using (var path = XamlDrawing.RoundedRectangle(bounds, radius))
+        if (TrackBrush is { } trackBrush)
         {
-            graphics.FillPath(track, path);
+            using var path = XamlDrawing.RoundedRectangle(bounds, radius);
+            trackBrush.FillPath(graphics, path);
         }
 
         var width = (float)(bounds.Width * Fraction);
-        if (width <= 0f)
+        if (width <= 0f || FillBrush is not { } fillBrush)
         {
             return;
         }
 
-        using var fill = new SolidBrush(theme.Accent);
         using var fillPath = XamlDrawing.RoundedRectangle(
             new RectangleF(0f, 0f, width, bounds.Height),
             radius);
-        graphics.FillPath(fill, fillPath);
+        fillBrush.FillPath(graphics, fillPath);
     }
 
     /// <inheritdoc />
@@ -323,6 +347,26 @@ public class Slider : TemplatedControl
         nameof(Value), typeof(double), typeof(Slider),
         new PropertyMetadata(0d) { AffectsRender = true });
 
+    /// <summary>The unfilled track brush; unset uses the theme's alternate surface.</summary>
+    public static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(XamlBrush), typeof(Slider),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The filled track brush; unset uses the theme accent.</summary>
+    public static readonly DependencyProperty FillBrushProperty = DependencyProperty.Register(
+        nameof(FillBrush), typeof(XamlBrush), typeof(Slider),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The thumb brush; unset uses the theme accent.</summary>
+    public static readonly DependencyProperty ThumbBrushProperty = DependencyProperty.Register(
+        nameof(ThumbBrush), typeof(XamlBrush), typeof(Slider),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The keyboard focus ring brush; unset uses the theme focus ring.</summary>
+    public static readonly DependencyProperty FocusRingBrushProperty = DependencyProperty.Register(
+        nameof(FocusRingBrush), typeof(XamlBrush), typeof(Slider),
+        new PropertyMetadata(null) { AffectsRender = true });
+
     internal const float ThumbRadius = 7f;
     internal const float TrackHeight = 4f;
 
@@ -333,6 +377,10 @@ public class Slider : TemplatedControl
         IsHitTestVisible = true;
         Cursor = Cursors.Hand;
         MinHeight = 24f;
+        SetThemeMetric(TrackBrushProperty, static palette => new SolidColorBrush(palette.SurfaceAlt));
+        SetThemeMetric(FillBrushProperty, static palette => new SolidColorBrush(palette.Accent));
+        SetThemeMetric(ThumbBrushProperty, static palette => new SolidColorBrush(palette.Accent));
+        SetThemeMetric(FocusRingBrushProperty, static palette => new SolidColorBrush(palette.FocusRing));
     }
 
     /// <summary>Raised after <see cref="Value"/> changes.</summary>
@@ -357,6 +405,34 @@ public class Slider : TemplatedControl
     {
         get => (double)GetValue(ValueProperty)!;
         set => SetValue(ValueProperty, XamlMath.Clamp(value, Minimum, Maximum));
+    }
+
+    /// <summary>The unfilled track brush; unset uses the theme's alternate surface.</summary>
+    public XamlBrush? TrackBrush
+    {
+        get => (XamlBrush?)GetValue(TrackBrushProperty);
+        set => SetValue(TrackBrushProperty, value);
+    }
+
+    /// <summary>The filled track brush; unset uses the theme accent.</summary>
+    public XamlBrush? FillBrush
+    {
+        get => (XamlBrush?)GetValue(FillBrushProperty);
+        set => SetValue(FillBrushProperty, value);
+    }
+
+    /// <summary>The thumb brush; unset uses the theme accent.</summary>
+    public XamlBrush? ThumbBrush
+    {
+        get => (XamlBrush?)GetValue(ThumbBrushProperty);
+        set => SetValue(ThumbBrushProperty, value);
+    }
+
+    /// <summary>The keyboard focus ring brush; unset uses the theme focus ring.</summary>
+    public XamlBrush? FocusRingBrush
+    {
+        get => (XamlBrush?)GetValue(FocusRingBrushProperty);
+        set => SetValue(FocusRingBrushProperty, value);
     }
 
     private double Fraction
@@ -489,29 +565,32 @@ public class Slider : TemplatedControl
         var theme = Theme.Current;
         var center = Bounds.Height / 2f;
         var track = new RectangleF(ThumbRadius, center - (TrackHeight / 2f), Math.Max(0f, Bounds.Width - (ThumbRadius * 2f)), TrackHeight);
-        using (var background = new SolidBrush(theme.SurfaceAlt))
-        using (var path = XamlDrawing.RoundedRectangle(track, TrackHeight / 2f))
+        if (TrackBrush is { } trackBrush)
         {
-            graphics.FillPath(background, path);
+            using var path = XamlDrawing.RoundedRectangle(track, TrackHeight / 2f);
+            trackBrush.FillPath(graphics, path);
         }
 
         var thumbX = track.Left + (float)(track.Width * Fraction);
         var active = new RectangleF(track.Left, track.Top, Math.Max(0f, thumbX - track.Left), track.Height);
-        if (active.Width > 0f)
+        if (active.Width > 0f && FillBrush is { } fillBrush)
         {
-            using var fill = new SolidBrush(theme.Accent);
             using var path = XamlDrawing.RoundedRectangle(active, TrackHeight / 2f);
-            graphics.FillPath(fill, path);
+            fillBrush.FillPath(graphics, path);
         }
 
-        using (var thumb = new SolidBrush(IsEnabled ? theme.Accent : theme.DisabledForeground))
+        var thumbColor = IsEnabled
+            ? ThumbBrush?.ApproximateColor ?? theme.Accent
+            : theme.DisabledForeground;
+        using (var thumb = new SolidBrush(thumbColor))
         {
             graphics.FillEllipse(thumb, thumbX - ThumbRadius, center - ThumbRadius, ThumbRadius * 2f, ThumbRadius * 2f);
         }
 
         if (IsFocusVisible)
         {
-            using var pen = new Pen(theme.FocusRing, theme.FocusThicknessMedium);
+            var focusColor = FocusRingBrush?.ApproximateColor ?? theme.FocusRing;
+            using var pen = new Pen(focusColor, theme.FocusThicknessMedium);
             graphics.DrawEllipse(pen, thumbX - ThumbRadius - 2f, center - ThumbRadius - 2f, (ThumbRadius * 2f) + 4f, (ThumbRadius * 2f) + 4f);
         }
     }

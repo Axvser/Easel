@@ -4,6 +4,17 @@ using Easel.Visuals;
 
 namespace Easel.Visuals.Controls;
 
+// 复合控件内嵌编辑器时只保留内容宿主，外框由外层控件负责。
+internal static class EmbeddedTextBoxTemplate
+{
+    internal static readonly VisualControlTemplate ContentHostOnly = new(static scope =>
+    {
+        var host = new TextBoxContentHost { IsHitTestVisible = false };
+        scope.Register("PART_ContentHost", host);
+        return host;
+    });
+}
+
 /// <summary>The template part that paints a <see cref="TextBox"/>'s text surface and locates its native editor island.</summary>
 /// <remarks>
 /// <para>

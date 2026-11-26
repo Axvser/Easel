@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Easel;
+using XamlBrush = Easel.Brush;
 using XamlThickness = Easel.Controls.Thickness;
 using XamlVisibility = Easel.Controls.Visibility;
 using XamlStretch = Easel.Controls.Stretch;
@@ -330,6 +331,11 @@ public class HeaderedContentControl : TemplatedControl
         nameof(Content), typeof(VisualElement), typeof(HeaderedContentControl),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
 
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public static readonly DependencyProperty HeaderForegroundProperty = DependencyProperty.Register(
+        nameof(HeaderForeground), typeof(XamlBrush), typeof(HeaderedContentControl),
+        new PropertyMetadata(null) { AffectsRender = true });
+
     private const float HeaderHeight = 24f;
 
     private VisualElement? _contentHost;
@@ -341,6 +347,11 @@ public class HeaderedContentControl : TemplatedControl
     public HeaderedContentControl()
     {
         IsHitTestVisible = true;
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
+        SetThemeMetric(HeaderForegroundProperty, static palette => new SolidColorBrush(palette.Foreground));
     }
 
     /// <summary>The header text.</summary>
@@ -348,6 +359,13 @@ public class HeaderedContentControl : TemplatedControl
     {
         get => (string)GetValue(HeaderProperty)!;
         set => SetValue(HeaderProperty, value ?? string.Empty);
+    }
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public XamlBrush? HeaderForeground
+    {
+        get => (XamlBrush?)GetValue(HeaderForegroundProperty);
+        set => SetValue(HeaderForegroundProperty, value);
     }
 
     /// <summary>The content below the header.</summary>

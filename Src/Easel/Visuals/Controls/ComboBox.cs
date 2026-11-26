@@ -125,6 +125,10 @@ public class ComboBox : TemplatedControl
     private bool _syncingText;
     private int _selectionAtOpen = -1;
 
+    // 只更新默认投影出来的行，内联 ComboBoxItem 保留作者自己的字体/颜色。
+    private static readonly DependencyProperty ProjectedRowProperty = DependencyProperty.RegisterAttached(
+        "ProjectedRow", typeof(bool), typeof(ComboBox), new PropertyMetadata(false));
+
     /// <summary>Creates an empty, focusable selector with theme metrics.</summary>
     public ComboBox()
     {
@@ -133,7 +137,11 @@ public class ComboBox : TemplatedControl
         Cursor = Cursors.Hand;
         Padding = new XamlThickness(10f, 6f);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
-        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.InputCornerRadius);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
         _items.CollectionChanged += OnItemsCollectionChanged;
 
         _list.Focusable = false;
@@ -272,11 +280,11 @@ public class ComboBox : TemplatedControl
     protected override void ArrangeOverride(Size finalSize)
     {
         base.ArrangeOverride(finalSize);
-        // 弹层的宽度按目标控件收口：ListBox/ItemsControl 的默认外壳会想要整块可用宽度，
-        // 不约束的话下拉会被 desired.Width 撑到整个画面。
-        if (_templatePopup?.Child is { } child && finalSize.Width > 0f)
+        // 弹层的宽度按目标控件收口：ListBox/ItemsControl 的默认外壳会想要整块可用宽度；
+        // Popup 的 padding 会加在外宽上，所以子项还要扣掉它。
+        if (_templatePopup is { Child: { } child } popup && finalSize.Width > 0f)
         {
-            child.MaxWidth = finalSize.Width;
+            child.MaxWidth = Math.Max(1f, finalSize.Width - popup.Padding.Horizontal);
         }
     }
 
@@ -314,9 +322,13 @@ public class ComboBox : TemplatedControl
                     ? theme.ControlHover
                     : theme.ControlBackground);
         var border = BorderBrush?.ApproximateColor
-            ?? (IsEnabled && (IsPointerOver || IsDropDownOpen)
-                ? theme.FocusRing
-                : theme.ControlBorder);
+            ?? (!IsEnabled
+                ? theme.ControlBorder
+                : IsDropDownOpen || IsFocusVisible
+                    ? theme.FocusRing
+                    : IsPointerOver
+                        ? theme.ControlBorderHover
+                        : theme.ControlBorder);
         var bounds = new Rectangle(0, 0, Math.Max(1, (int)Math.Ceiling(Bounds.Width)), Math.Max(1, (int)Math.Ceiling(Bounds.Height)));
         var thickness = BorderThickness.IsEmpty ? theme.ControlBorderThickness : BorderThickness;
         var radius = CornerRadius > 0 ? CornerRadius : theme.CornerRadius;
@@ -501,6 +513,16 @@ public class ComboBox : TemplatedControl
             return;
         }
 
+        if (ReferenceEquals(e.Property, IsEnabledProperty))
+        {
+            if (!IsEnabled)
+            {
+                IsDropDownOpen = false;
+            }
+
+            return;
+        }
+
         if (ReferenceEquals(e.Property, ItemsSourceProperty))
         {
             _list.ItemsSource = ItemsSource ?? _items;
@@ -525,6 +547,16 @@ public class ComboBox : TemplatedControl
         if (ReferenceEquals(e.Property, PlaceholderProperty))
         {
             SyncDisplayText();
+            SyncEditableText();
+            return;
+        }
+
+        if (ReferenceEquals(e.Property, ForegroundProperty)
+            || ReferenceEquals(e.Property, FontSizeProperty)
+            || ReferenceEquals(e.Property, FontFamilyProperty)
+            || ReferenceEquals(e.Property, FontWeightProperty))
+        {
+            RefreshProjectedRows();
             return;
         }
 
@@ -578,6 +610,21 @@ public class ComboBox : TemplatedControl
 
             if (IsDropDownOpen)
             {
+                if (!CanOpenDropDown)
+                {
+                    _syncingOpen = true;
+                    try
+                    {
+                        IsDropDownOpen = false;
+                    }
+                    finally
+                    {
+                        _syncingOpen = false;
+                    }
+
+                    return;
+                }
+
                 _selectionAtOpen = SelectedIndex;
                 SyncListSelection();
                 ActivePopup.IsOpen = true;
@@ -674,6 +721,9 @@ public class ComboBox : TemplatedControl
 
     // ItemsSource 非空时压过 Items；ListBox 直接观察这个集合，集合变化会重建行。
     private IEnumerable EffectiveItems => ItemsSource ?? _items;
+
+    // 空列表与禁用状态都不进入展开流程。
+    private bool CanOpenDropDown => IsEnabled && Count(EffectiveItems) > 0;
 
     private void ResolveTemplateParts()
     {
@@ -790,6 +840,12 @@ public class ComboBox : TemplatedControl
         if (part is not VisualTextBox editable)
         {
             throw WrongPart("PART_EditableTextBox", part, "TextBox");
+        }
+
+        // 自定义模板自带 Template 时尊重它；默认模板里的裸 TextBox 换成只有内容宿主的模板。
+        if (editable.Template is null)
+        {
+            editable.Template = EmbeddedTextBoxTemplate.ContentHostOnly;
         }
 
         _editablePart = editable;
@@ -919,7 +975,9 @@ public class ComboBox : TemplatedControl
         _syncingText = true;
         try
         {
-            _editablePart.Text = DisplayText;
+            // 占位符交给 TextBox 自己画；没有选中项时编辑框保留用户输入的 Text。
+            _editablePart.Placeholder = Placeholder;
+            _editablePart.Text = SelectedItem is not null ? FormatItem(SelectedItem) : Text;
         }
         finally
         {
@@ -1114,12 +1172,49 @@ public class ComboBox : TemplatedControl
             return factory(item);
         }
 
-        return item as VisualElement
-            ?? new TextBlock
+        if (item is VisualElement element)
+        {
+            return element;
+        }
+
+        var textBlock = new TextBlock
+        {
+            Text = FormatItem(item),
+            Padding = new XamlThickness(8f, 4f),
+        };
+        textBlock.SetValue(ProjectedRowProperty, true);
+        ApplyRowText(textBlock);
+        return textBlock;
+    }
+
+    // 弹层行会被 reparent 到 overlay，父链继承失效；把控件当前的颜色与字体写在行上。
+    private void ApplyRowText(TextBlock textBlock)
+    {
+        if (GetValue(ForegroundProperty) is XamlBrush foreground)
+        {
+            textBlock.SetValue(TextBlock.ForegroundProperty, foreground);
+        }
+        else
+        {
+            textBlock.ClearValue(TextBlock.ForegroundProperty);
+        }
+
+        var font = ResolveFont(DefaultFont);
+        textBlock.SetValue(FontSizeProperty, (double)font.Size);
+        textBlock.SetValue(FontFamilyProperty, font.FontFamily.Name);
+        textBlock.SetValue(FontWeightProperty, font.Bold ? FontWeight.Bold : FontWeight.Normal);
+    }
+
+    private void RefreshProjectedRows()
+    {
+        foreach (var row in _list.Items)
+        {
+            if (row is ListBoxItem { Content: TextBlock textBlock }
+                && (bool)textBlock.GetValue(ProjectedRowProperty)!)
             {
-                Text = FormatItem(item),
-                Padding = new XamlThickness(8f, 4f),
-            };
+                ApplyRowText(textBlock);
+            }
+        }
     }
 
     private string FormatItem(object item)
@@ -1138,6 +1233,12 @@ public class ComboBox : TemplatedControl
             {
                 return value.ToString() ?? string.Empty;
             }
+        }
+
+        // 内联 ComboBoxItem 是 TextBlock，ToString 给出的是类型名而不是显示文本。
+        if (item is TextBlock textBlock)
+        {
+            return textBlock.Text;
         }
 
         return item.ToString() ?? string.Empty;

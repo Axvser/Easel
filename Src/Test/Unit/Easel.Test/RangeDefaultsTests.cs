@@ -164,15 +164,22 @@ public sealed class RangeDefaultsTests
     }
 
     [TestMethod]
-    public void RangeDefaults_BrushesComeFromTheHostPalette()
+    public void RangeDefaults_BrushesComeFromControlProperties()
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         var trackColor = Color.FromArgb(0xFF, 0x12, 0x34, 0x56);
         var accentColor = Color.FromArgb(0xFF, 0x65, 0x43, 0x21);
-        surface.Resources["SurfaceAlt"] = new SolidColorBrush(trackColor);
-        surface.Resources["Accent"] = new SolidColorBrush(accentColor);
 
-        using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 50 };
+        using var slider = new VC.Slider
+        {
+            Width = 200,
+            Minimum = 0,
+            Maximum = 100,
+            Value = 50,
+            TrackBrush = new SolidColorBrush(trackColor),
+            FillBrush = new SolidColorBrush(accentColor),
+            ThumbBrush = new SolidColorBrush(accentColor),
+        };
         surface.Root = slider;
         Layout(surface, 320, 240);
 

@@ -189,7 +189,8 @@ earlier one.
 ⚙ **A partial theme overlay wins by merge order.** The host merges its built-in theme dictionary first; append a
 partial `ResourceDictionary` to `VisualHost.Resources.MergedDictionaries` to override only the keys it defines
 (omitted keys fall back to the active theme; keys stored directly on the host or a view win over every merged
-dictionary). See [references/themes.md](references/themes.md#custom-themes).
+dictionary). The overlay reaches XAML `{DynamicResource}` and custom templates; built-in chrome reads the
+control's appearance properties with `Theme.Current` as fallback. See [references/themes.md](references/themes.md#custom-themes).
 
 ⚙ **Do not write layout in a code callback.** Use `PropertyMetadata.AffectsMeasure` /
 `AffectsArrange` / `AffectsRender` on DPs. `VisualElement.Width`/`Height`/`Margin`/`Padding` and panel attached

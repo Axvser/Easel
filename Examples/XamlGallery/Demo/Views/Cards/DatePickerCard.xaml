@@ -32,6 +32,7 @@
         <DatePicker x:Name="datePicker"
                     Width="300"
                     Height="34"
+                    Placeholder="Pick a ship date"
                     SelectedDateChanged="OnSelectedDateChanged" />
       </StackPanel>
 

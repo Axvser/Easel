@@ -59,6 +59,10 @@ public class CalendarItem : TemplatedControl
         IsHitTestVisible = true;
         Padding = new XamlThickness(6f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
     }
 
     /// <summary>The month-title and day-number colour as a brush value; an empty colour uses the active theme.</summary>
@@ -639,6 +643,10 @@ public class Calendar : TemplatedControl
         IsHitTestVisible = true;
         Padding = new XamlThickness(6f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
         DisplayMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
     }
 
@@ -1071,7 +1079,11 @@ public class DatePicker : TemplatedControl
         Cursor = Cursors.Hand;
         Padding = new XamlThickness(10f, 6f);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
-        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.InputCornerRadius);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
 
         _calendar.Width = 250f;
         _calendar.Height = 226f;
@@ -1376,6 +1388,12 @@ public class DatePicker : TemplatedControl
             throw WrongPart("PART_TextBox", textPart, "TextBox");
         }
 
+        // DatePicker 的模板只提供字段外框；编辑器只保留内容宿主，避免再叠一层 TextBox chrome。
+        if (textBox.Template is null)
+        {
+            textBox.Template = EmbeddedTextBoxTemplate.ContentHostOnly;
+        }
+
         _partTextBox = textBox;
         _partTextBox.PropertyChanged -= OnPartTextChanged;
         _partTextBox.PropertyChanged += OnPartTextChanged;
@@ -1516,11 +1534,10 @@ public class DatePicker : TemplatedControl
         _syncingText = true;
         try
         {
-            _partTextBox.Text = DisplayText;
-            // 未选日期时用弱化色；模板里的 TextBox 只认自己的 Foreground 本地值。
-            _partTextBox.Foreground = SelectedDate is null
-                ? Theme.Current.MutedForeground
-                : Foreground.IsEmpty ? Theme.Current.Foreground : Foreground;
+            // 占位符交给 TextBox 自己画；没有选中日期时字段为空。
+            _partTextBox.Placeholder = Placeholder;
+            _partTextBox.Text = SelectedDate is null ? string.Empty : DisplayText;
+            _partTextBox.Foreground = Foreground.IsEmpty ? Theme.Current.Foreground : Foreground;
         }
         finally
         {

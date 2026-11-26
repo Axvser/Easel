@@ -1,9 +1,11 @@
 ﻿# Themes and resource dictionaries
 
 Easel controls have a default palette; an application can switch it, follow Windows, or provide its own
-`ResourceDictionary`. Two surfaces read the theme: the host's theme resource dictionary (the built-in styles use
-`{DynamicResource}` keys) and `Theme.Current` (self-drawn chrome and control metrics). The normal customization is
-a partial resource overlay plus, when needed, `Style.BasedOn`; a complete palette is only for replacing every token.
+`ResourceDictionary`. Two surfaces read the theme: `Theme.Current` (palette roles used as template fallbacks,
+self-drawn chrome and control metrics) and the host's resource dictionary (XAML `{DynamicResource}` and custom
+templates). Built-in chrome reads the control's own appearance properties with `Theme.Current` as the fallback;
+set the control property or the palette. The normal customization is a control property, a role DP, or a partial
+palette; a complete palette is only for replacing every token.
 
 ## Modes and the active palette
 
@@ -40,15 +42,19 @@ The built-in Dark+ and Light+ palettes are **XAML `ResourceDictionary` files in 
 - [`Src/Easel/Themes/LightTheme.xaml`](../../../Src/Easel/Themes/LightTheme.xaml)
 
 `Caret` is the default text-field caret colour; a dictionary that omits it falls back to `Focus`.
+`InputCornerRadius` is the radius the input controls (`TextBox`, `RichTextBox`, `ComboBox`, `DatePicker`) read: 6 in
+Light/Dark, 2 in HighContrast. `BorderHover` supplies `ThemePalette.ControlBorderHover`, the neutral border an
+interactive control paints under the pointer.
 
 The host merges the active theme dictionary into `VisualHost.Resources` in its constructor (it is the first entry of
 `MergedDictionaries`), so a control template can use `{DynamicResource Accent}` and other theme keys directly. On a
-theme switch the host syncs that dictionary's brushes and metrics in place. Built-in fallback control styles live in
-`Src/Easel/Themes/DefaultStyles.xaml`; they are template-based defaults keyed by control type and apply when the
-control has no explicit style.
+theme switch the host syncs that dictionary's brushes and metrics in place. Built-in fallback control styles live
+under `Src/Easel/Themes/Defaults/` (merged by `Src/Easel/Themes/DefaultStyles.xaml`); they are template-based
+defaults keyed by control type and apply when the control has no explicit style.
 
-They are the source of truth for the current role names and values. They carry palette brushes, metrics
-(`CornerRadius`, `ControlHeight`, typography tokens where present) and keyed typography styles
+They are the source of truth for the current role names and values. They carry palette brushes (`BorderHover` is the
+neutral interactive hover border), metrics (`CornerRadius`, `InputCornerRadius`, `ControlHeight`, typography tokens
+where present) and keyed typography styles
 (`Heading`, `Subheading`, `Body`, `Caption`). `Theme.CreateDark()` / `CreateLight()` read the files into a
 `ThemePalette`.
 
@@ -111,9 +117,10 @@ surface.Resources.MergedDictionaries.Add(overrides); // appended after the theme
   `Theme.Changed`.
 - `{StaticResource}` on a visual resolves once, so add the overlay before building views that read it, or use
   `{DynamicResource}` for keys that must change later.
-- The overlay changes resource lookups. Built-in styles read theme keys with `{DynamicResource}`, so default
-  control chrome follows the overlay. Most control metrics and self-drawn chrome read `Theme.Current`, not the
-  resource dictionary; call `Theme.ApplyPalette` (or assign `Theme.Current`) as well when those should change.
+- The overlay changes resource lookups for XAML `{DynamicResource}` and custom templates. Built-in control chrome
+  does not read those keys: it reads the control's appearance properties with `Theme.Current` as fallback. Set the
+  control property or role DP, or call `Theme.ApplyPalette` (or assign `Theme.Current`), to recolour built-in
+  chrome.
 
 ### Deriving styles with BasedOn
 
@@ -154,23 +161,25 @@ var custom = new MyApp.Themes.MyTheme(); // complete standalone dictionary
 Theme.ApplyPalette(ThemeMode.Dark, ThemePalette.FromResourceDictionary(custom));
 ```
 
-`Theme.ApplyPalette` changes `Theme.Current` immediately, so existing controls re-read its colors and metrics, but
-it does not rewrite `VisualHost.Resources`. Merge a dictionary as above when templates and `{DynamicResource}` keys
-should use the custom colors too.
+`Theme.ApplyPalette` changes `Theme.Current` immediately, so existing controls re-read its colors and metrics; it
+does not put the custom colours into `VisualHost.Resources`. Merge a dictionary as above when XAML
+`{DynamicResource}` keys and custom templates should use the custom colors too; built-in chrome follows
+`Theme.Current`.
 
 ### Per-view copies
 
 A view does not need its own theme copy. `Theme.CreateResourceDictionary(...)` returns a snapshot whose brushes are
 new instances; a copy merged into a view outranks the host and is not updated by a theme switch. Merge a dictionary
-into a view only for view-local overrides or decoration (the gallery's `Themed*` bases do this for its custom
-high-contrast theme and gradient brushes), and refresh that copy yourself when the palette changes.
+into a view only for view-local overrides or decoration (the gallery's `Themed*` bases do this for the Midnight
+palette and its gradient brushes), and refresh that copy yourself when the palette changes.
 
 ## Typography
 
 `ThemePalette` carries font family, size and weight, scroll-bar thumb colors/radius, shape stroke and
 shadow defaults, control border/focus thicknesses and the existing layout metrics. The built-in dictionaries
-define `Heading`/`Subheading`/`Body`/`Caption` styles; `Subheading`/`Heading`/`Caption` derive from `Body` with
-`BasedOn`. A control's default text reads the palette's font tokens; a `Style` setter reads explicit values. `x:String`, `x:Double`, `x:FontWeight`, `x:Thickness`,
+define `Heading`/`Subheading`/`Body`/`Caption` styles; `Subheading` and `Caption` derive from `Body`, `Heading`
+from `Subheading`. A control's default text reads the palette's font tokens; a `Style` setter reads explicit
+values. `x:String`, `x:Double`, `x:FontWeight`, `x:Thickness`,
 `x:PointF` and the other scalar resource types can carry those tokens in a custom dictionary. Use styles for
 authored headings and body text, and set `FontFamily`/`FontSize`/`FontWeight` locally only when a card
 intentionally departs from the theme.

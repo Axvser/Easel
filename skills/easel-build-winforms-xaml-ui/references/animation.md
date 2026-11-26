@@ -20,18 +20,19 @@ public sealed class AnimationSpec
 }
 ```
 
-| `AnimationSpec` | Meaning |
-| --- | --- |
-| `Duration` | Total duration; default 240 ms. |
-| `Ease` | `IEase`; default `Eases.Cubic.Out`. `Eases` provides Sine/Quad/Cubic/Quart/Quint/Expo/Circ/Back/Elastic/Bounce with `In/Out/InOut`. |
-| `FPS` | Target frame rate; default 60. |
-| `LoopTime` | Additional full passes; 0 once, `int.MaxValue` forever. |
-| `IsAutoReverse` | Each pass also runs backwards. |
+| `AnimationSpec` | Meaning                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Duration`      | Total duration; default 240 ms.                                                                                                             |
+| `Ease`          | `IEase`; default `Eases.Cubic.Out`. `Eases` provides Sine/Quad/Cubic/Quart/Quint/Expo/Circ/Back/Elastic/Bounce with `In/Out/InOut`. |
+| `FPS`           | Target frame rate; default 60.                                                                                                              |
+| `LoopTime`      | Additional full passes; 0 once, `int.MaxValue` forever.                                                                                   |
+| `IsAutoReverse` | Each pass also runs backwards.                                                                                                              |
 
 The engine writes at `BindingPriority.Animation` while running and supersedes an animation on the same property.
-When it completes or is stopped, it holds the reached value at local precedence and clears the animation layer; a
-superseded animation simply ends and the newer one takes over. The value is converted to the DP type before it
-reaches the engine.
+When an explicit animation completes or is stopped, it holds the reached value at local precedence and clears the
+animation layer; an implicit element transition only releases the layer, because its new value already lives in the
+trigger, style or local layer. A superseded animation simply ends and the newer one takes over. The value is
+converted to the DP type before it reaches the engine.
 
 ## Markup actions
 
@@ -63,6 +64,30 @@ Inside a style/template trigger:
 `TransitionAction`/`KeyFrameAnimation` call `VisualTransition.Animate`/`AnimateKeyFrames`, which reject a
 property the engine cannot interpolate (`NotSupportedException`) rather than running an empty animation.
 
+## Element transitions
+
+A `VisualElement` exposes a `Transitions` collection; each `Transition` names one DP on that element:
+
+```xml
+<Border.Transitions>
+  <Transition Property="Background" Duration="0:0:0.25" Ease="CubicOut" />
+  <Transition Property="CornerRadius" Duration="0:0:0.25" Ease="CubicOut" />
+</Border.Transitions>
+```
+
+Every change of a listed DP animates from the old value to the new value, whatever its source — a style
+setter, a trigger setter, a local write or a binding. The transition sees the change, not the cause, so no
+enter/exit action pair is needed: when a trigger exits, its setter falls back to the baseline and the same
+transition animates back. `Duration` defaults to 240 ms and `Ease` to `CubicOut`.
+
+- Writes made by the animation itself, including the final layer release, do not re-trigger it.
+- A property with no interpolation, or a change whose old or new value is `null`, is skipped.
+- A change that arrives mid-flight retargets the running transition from its current frame to the new target.
+  This includes a trigger or style value changing underneath the animation layer.
+
+The default `ComboBox` rings use it: the state triggers set ring `Opacity` to 1 (baseline 0) and each
+ring's `Transitions` collection fades the change both ways.
+
 ## Code API
 
 ```csharp
@@ -87,8 +112,9 @@ VisualTransition.AnimateKeyFrames(
 VisualTransition.Stop(card);
 ```
 
-`VisualTransition.Stop` freezes the reached value at local precedence and clears the animation layer, so a
-later local/style write can take over.
+`VisualTransition.Stop` ends every animation on the element. An explicit animation writes the reached value at
+local precedence and clears the animation layer, so a later local/style write can take over; an implicit element
+transition only releases the layer.
 
 ## How the engine runs
 
@@ -99,12 +125,14 @@ same property supersedes the older one; animations on different properties run i
 - Frames are computed on a timer at `FPS` and written at `BindingPriority.Animation`.
 - When the element is hosted, frame writes and the final hold are marshalled to its `VisualHost` handle
   thread; an unparented element is written in place.
-- When the animation completes or is stopped, the reached value is written at `BindingPriority.LocalValue` and the
-  animation layer is cleared. A superseded animation ends without a hold; the newer run owns the property.
+- When an explicit animation completes or is stopped, the reached value is written at `BindingPriority.LocalValue`
+  and the animation layer is cleared; an implicit element transition only releases the layer. A superseded
+  animation ends without a hold; the newer run owns the property.
 - Key frames form one chain: each adjacent pair is a segment whose duration is proportional to its offset
   slice, and `LoopTime`/`IsAutoReverse` apply to each segment.
-- Native islands (`NativeElement`/`NativeControlHost`, and a focused `TextBox` with `UseNativeEditor=true`) are
-  not part of the visual animation.
+- A live native island cannot be transformed or alpha-blended: animating `Opacity` or `Transform` on a
+  `NativeElement`/`NativeControlHost` switches it to the snapshot path automatically. A focused `TextBox` with
+  `UseNativeEditor=true` is a child HWND and cannot follow.
 
 ## Animatable properties
 
@@ -112,12 +140,12 @@ Animate **DP-backed** properties: opacity, margin/padding, width/height, corner 
 brushes, `Transform`, `Transform3D`, `Clip`, a custom `[XamlProperty]`, etc. A property whose CLR type has no
 interpolation is rejected by `VisualTransition`; do not rely on a silent no-op.
 
-| Group | Types |
-| --- | --- |
-| numbers | `double`, `float`, `int`, `long`, `short`, `byte`, `decimal` |
-| geometry | `Point`, `PointF`, `Size`, `SizeF`, `Rectangle`, `RectangleF`, `Padding`, `Thickness` |
-| transforms | `Matrix` (2D), `Matrix4x4`, `Transform3D` |
-| colour | `Color`, `Brush` |
+| Group      | Types                                                                                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------- |
+| numbers    | `double`, `float`, `int`, `long`, `short`, `byte`, `decimal`                            |
+| geometry   | `Point`, `PointF`, `Size`, `SizeF`, `Rectangle`, `RectangleF`, `Padding`, `Thickness` |
+| transforms | `Matrix` (2D), `Matrix4x4`, `Transform3D`                                                       |
+| colour     | `Color`, `Brush`                                                                                  |
 
 Nullable value types of these are supported. Brush and `Transform3D` interpolation is **structural**:
 

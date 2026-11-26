@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using Easel;
 using Easel.Visuals;
 using VC = Easel.Visuals.Controls;
 using XamlVisibility = Easel.Controls.Visibility;
@@ -136,6 +137,157 @@ public sealed class ComboBoxDefaultsTests
         surface.ProcessPointerUp(row, MouseButtons.Left);
         Assert.AreEqual(1, combo.SelectedIndex, "the no-template popup still commits a row");
         Assert.IsFalse(combo.IsDropDownOpen);
+    }
+
+    [TestMethod]
+    public void DefaultStyle_InlineComboBoxItemShowsItsText()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var combo = new VC.ComboBox { Width = 180, SelectedIndex = 0 };
+        combo.Items.Add(new VC.ComboBoxItem { Text = "Alpha" });
+        combo.Items.Add(new VC.ComboBoxItem { Text = "Beta" });
+        surface.Root = combo;
+        Layout(surface, 320, 240);
+
+        var display = combo.GetTemplateChild<VC.TextBlock>("PART_Display");
+        Assert.IsNotNull(display);
+        Assert.AreEqual("Alpha", display!.Text, "an inline ComboBoxItem shows its Text, not its type name");
+
+        combo.SelectedIndex = 1;
+        Assert.AreEqual("Beta", display.Text, "a later inline item shows its own text");
+    }
+
+    [TestMethod]
+    public void DefaultStyle_EditablePartKeepsOnlyTheContentHost()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var combo = new VC.ComboBox
+        {
+            Width = 180,
+            IsEditable = true,
+            Placeholder = "Choose",
+        };
+        combo.Items.Add("One");
+        combo.Items.Add("Two");
+        surface.Root = combo;
+        Layout(surface, 320, 240);
+
+        var editor = combo.EditableTextBox;
+        Assert.IsNotNull(editor);
+        Assert.IsInstanceOfType<VC.TextBoxContentHost>(
+            editor!.TemplateRoot,
+            "the default editor template keeps only the content host, not the TextBox chrome");
+        Assert.AreEqual(string.Empty, editor.Text, "no selection leaves the editor empty");
+        Assert.AreEqual("Choose", editor.Placeholder, "the placeholder stays on the TextBox");
+        Assert.IsFalse(combo.HasSelection);
+
+        combo.SelectedIndex = 0;
+        Assert.AreEqual("One", editor.Text, "a selection drives the editor text");
+        Assert.AreEqual("Choose", editor.Placeholder, "the placeholder is not consumed by the selection");
+    }
+
+    [TestMethod]
+    public void DefaultStyle_EmptyComboDoesNotOpen()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var combo = new VC.ComboBox { Width = 180, Placeholder = "Nothing here" };
+        surface.Root = combo;
+        Layout(surface, 320, 240);
+
+        combo.IsDropDownOpen = true;
+        Assert.IsFalse(combo.IsDropDownOpen, "an empty combo ignores a programmatic open");
+        Assert.IsFalse(combo.TemplatePopup!.IsOpen);
+
+        var center = Center(combo.AbsoluteBounds);
+        surface.ProcessPointerDown(center, MouseButtons.Left);
+        surface.ProcessPointerUp(center, MouseButtons.Left);
+        Assert.IsFalse(combo.IsDropDownOpen, "a pointer press on an empty combo does not open");
+    }
+
+    [TestMethod]
+    public void DefaultStyle_DisablingClosesAndLocksTheDropDown()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var combo = new VC.ComboBox { Width = 180, SelectedIndex = 0 };
+        combo.Items.Add("One");
+        combo.Items.Add("Two");
+        surface.Root = combo;
+        Layout(surface, 320, 240);
+
+        combo.IsDropDownOpen = true;
+        Layout(surface, 320, 240);
+        Assert.IsTrue(combo.TemplatePopup!.IsOpen);
+
+        combo.IsEnabled = false;
+        Assert.IsFalse(combo.IsDropDownOpen, "disabling closes the drop-down");
+        Assert.IsFalse(combo.TemplatePopup!.IsOpen, "the overlay popup closes with the control");
+
+        combo.IsDropDownOpen = true;
+        Assert.IsFalse(combo.IsDropDownOpen, "a disabled combo stays closed");
+
+        combo.IsEnabled = true;
+        combo.IsDropDownOpen = true;
+        Assert.IsTrue(combo.IsDropDownOpen, "re-enabling restores opening");
+        Assert.IsTrue(combo.TemplatePopup!.IsOpen);
+    }
+
+    [TestMethod]
+    public void DefaultStyle_DropDownMatchesTheComboWidth()
+    {
+        using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+        using var combo = new VC.ComboBox { Width = 180, SelectedIndex = 0 };
+        combo.Items.Add("One");
+        combo.Items.Add("Two");
+        surface.Root = combo;
+        Layout(surface, 320, 240);
+
+        combo.IsDropDownOpen = true;
+        Layout(surface, 320, 240);
+
+        var popup = combo.TemplatePopup!;
+        Assert.AreEqual(combo.Bounds.Width, popup.Bounds.Width, 0.5f,
+            "the popup surface matches the control width");
+        Assert.AreEqual(combo.AbsoluteBounds.Left, popup.AbsoluteBounds.Left, 0.5f,
+            "the popup starts at the control's left edge");
+        Assert.AreEqual(
+            popup.AbsoluteBounds.Left + popup.Padding.Left,
+            combo.DropDownList.AbsoluteBounds.Left,
+            0.5f,
+            "the list starts inside the popup padding");
+    }
+
+    [TestMethod]
+    public void DefaultStyle_DropDownSurfaceFollowsThemeMode()
+    {
+        var originalMode = Theme.Mode;
+        try
+        {
+            Theme.Mode = ThemeMode.Dark;
+            var dark = Theme.CreateDark();
+            using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
+            using var combo = new VC.ComboBox { Width = 180, SelectedIndex = 0 };
+            combo.Items.Add("One");
+            combo.Items.Add("Two");
+            surface.Root = combo;
+            Layout(surface, 320, 240);
+            combo.IsDropDownOpen = true;
+            Layout(surface, 320, 240);
+
+            var popup = combo.TemplatePopup!;
+            Assert.AreEqual(dark.Surface.ToArgb(), popup.Background!.ApproximateColor.ToArgb(),
+                "the popup surface reads the dark palette");
+
+            Theme.Mode = ThemeMode.Light;
+            var light = Theme.CreateLight();
+            Assert.AreEqual(light.Surface.ToArgb(), popup.Background!.ApproximateColor.ToArgb(),
+                "an open popup follows a theme switch");
+            Assert.AreEqual(light.ControlBorder.ToArgb(), popup.BorderBrush!.ApproximateColor.ToArgb(),
+                "an open popup follows the switched border colour");
+        }
+        finally
+        {
+            Theme.Mode = originalMode;
+        }
     }
 
     private sealed class Option

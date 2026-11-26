@@ -146,7 +146,7 @@ public sealed class ThemeTests
         Assert.AreEqual(palette.ControlHeight, button.MinHeight);
         Assert.AreEqual(palette.CornerRadius, button.CornerRadius);
         Assert.AreEqual(palette.ControlHeight, textBox.MinHeight);
-        Assert.AreEqual(palette.CornerRadius, textBox.CornerRadius);
+        Assert.AreEqual(palette.InputCornerRadius, textBox.CornerRadius, "text inputs use the input radius");
         Assert.AreEqual(palette.CornerRadius, border.CornerRadius);
     }
 

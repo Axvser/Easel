@@ -9,10 +9,10 @@
       <ControlTemplate TargetType="Slider">
         <SliderChrome x:Name="PART_Chrome"
                       IsHitTestVisible="False"
-                      TrackBrush="{DynamicResource SurfaceAlt}"
-                      FillBrush="{DynamicResource Accent}"
-                      ThumbBrush="{DynamicResource Accent}"
-                      FocusRingBrush="{DynamicResource Focus}"
+                      TrackBrush="{TemplateBinding TrackBrush}"
+                      FillBrush="{TemplateBinding FillBrush}"
+                      ThumbBrush="{TemplateBinding ThumbBrush}"
+                      FocusRingBrush="{TemplateBinding FocusRingBrush}"
                       ShowFocusRing="{TemplateBinding IsFocusVisible}" />
         <ControlTemplate.Triggers>
           <Trigger Property="IsEnabled" Value="False">
@@ -30,8 +30,8 @@
       <ControlTemplate TargetType="ProgressBar">
         <ProgressBarChrome x:Name="PART_Chrome"
                            IsHitTestVisible="False"
-                           TrackBrush="{DynamicResource SurfaceAlt}"
-                           FillBrush="{DynamicResource Accent}"
+                           TrackBrush="{TemplateBinding TrackBrush}"
+                           FillBrush="{TemplateBinding FillBrush}"
                            CornerRadius="{TemplateBinding CornerRadius}" />
       </ControlTemplate>
     </Style.Template>

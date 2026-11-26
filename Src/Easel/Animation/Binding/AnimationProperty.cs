@@ -26,7 +26,31 @@ internal sealed class AnimationProperty
     // value 由调用方给出：托管元素上最后一帧可能还在消息队列里，等回读时它已因登记被摘而跳过。
     internal void Hold(object? value)
     {
-        _property.ClearValue(_target, BindingPriority.Animation);
-        _property.SetValue(_target, value, BindingPriority.LocalValue);
+        // 这两跳都是引擎自己的落值，不能让元素级过渡把它们当成用户改动再开一趟。
+        _target.BeginTransitionHold();
+        try
+        {
+            _property.ClearValue(_target, BindingPriority.Animation);
+            _property.SetValue(_target, value, BindingPriority.LocalValue);
+        }
+        finally
+        {
+            _target.EndTransitionHold();
+        }
+    }
+
+    // 隐式过渡收尾：只摘 Animation 层，露出触发/样式/本地层里已经写好的终值。
+    // 这一跳同样会引发 PropertyChanged，压住过渡标记，避免再起一趟。
+    internal void Release()
+    {
+        _target.BeginTransitionHold();
+        try
+        {
+            _property.ClearValue(_target, BindingPriority.Animation);
+        }
+        finally
+        {
+            _target.EndTransitionHold();
+        }
     }
 }

@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Easel;
 using Easel.Visuals;
+using XamlBrush = Easel.Brush;
 using XamlDrawing = Easel.Controls.XamlDrawing;
 using XamlThickness = Easel.Controls.Thickness;
 
@@ -86,6 +87,26 @@ public class ScrollBar : VisualElement
         nameof(ReserveCornerSize), typeof(double), typeof(ScrollBar),
         new PropertyMetadata(0d) { AffectsRender = true });
 
+    /// <summary>The track brush; unset uses the theme's alternate surface.</summary>
+    public static readonly DependencyProperty TrackBrushProperty = DependencyProperty.Register(
+        nameof(TrackBrush), typeof(XamlBrush), typeof(ScrollBar),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The thumb brush; unset uses the theme scrollbar thumb.</summary>
+    public static readonly DependencyProperty ThumbBrushProperty = DependencyProperty.Register(
+        nameof(ThumbBrush), typeof(XamlBrush), typeof(ScrollBar),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The hovered or dragged thumb brush; unset uses the theme hover thumb.</summary>
+    public static readonly DependencyProperty ThumbHoverBrushProperty = DependencyProperty.Register(
+        nameof(ThumbHoverBrush), typeof(XamlBrush), typeof(ScrollBar),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The thumb and track corner radius; unset uses the theme scrollbar thumb radius.</summary>
+    public static readonly DependencyProperty ThumbRadiusProperty = DependencyProperty.Register(
+        nameof(ThumbRadius), typeof(float), typeof(ScrollBar),
+        new PropertyMetadata(3f) { AffectsRender = true });
+
     private VisualControlTemplate? _styleTemplate;
     private VisualControlTemplate? _appliedTemplate;
     private VisualElement? _templateRoot;
@@ -104,6 +125,10 @@ public class ScrollBar : VisualElement
         IsHitTestVisible = true;
         Focusable = true;
         Padding = XamlThickness.Empty;
+        SetThemeMetric(TrackBrushProperty, static palette => new SolidColorBrush(palette.SurfaceAlt));
+        SetThemeMetric(ThumbBrushProperty, static palette => new SolidColorBrush(palette.ScrollBarThumb));
+        SetThemeMetric(ThumbHoverBrushProperty, static palette => new SolidColorBrush(palette.ScrollBarThumbHover));
+        SetThemeMetric(ThumbRadiusProperty, static palette => palette.ScrollBarThumbRadius);
 
         // 预览先于目标部件自己的按下处理；模板里的重复按钮即使是 Button，也拿不到这一笔。
         PreviewPointerPressed += OnPreviewPointerPressed;
@@ -176,6 +201,34 @@ public class ScrollBar : VisualElement
     {
         get => (double)GetValue(ReserveCornerSizeProperty)!;
         set => SetValue(ReserveCornerSizeProperty, value);
+    }
+
+    /// <summary>The track brush; unset uses the theme's alternate surface.</summary>
+    public XamlBrush? TrackBrush
+    {
+        get => (XamlBrush?)GetValue(TrackBrushProperty);
+        set => SetValue(TrackBrushProperty, value);
+    }
+
+    /// <summary>The thumb brush; unset uses the theme scrollbar thumb.</summary>
+    public XamlBrush? ThumbBrush
+    {
+        get => (XamlBrush?)GetValue(ThumbBrushProperty);
+        set => SetValue(ThumbBrushProperty, value);
+    }
+
+    /// <summary>The hovered or dragged thumb brush; unset uses the theme hover thumb.</summary>
+    public XamlBrush? ThumbHoverBrush
+    {
+        get => (XamlBrush?)GetValue(ThumbHoverBrushProperty);
+        set => SetValue(ThumbHoverBrushProperty, value);
+    }
+
+    /// <summary>The thumb and track corner radius; unset uses the theme scrollbar thumb radius.</summary>
+    public float ThumbRadius
+    {
+        get => (float)GetValue(ThumbRadiusProperty)!;
+        set => SetValue(ThumbRadiusProperty, value);
     }
 
     /// <summary>The root of the applied template, or <see langword="null"/> when none is applied.</summary>
@@ -514,9 +567,10 @@ public class ScrollBar : VisualElement
         }
 
         var theme = Theme.Current;
-        using var brush = new SolidBrush(ThumbColor(theme, _dragging || _hover));
-        using var path = XamlDrawing.RoundedRectangle(thumb, theme.ScrollBarThumbRadius);
-        graphics.FillPath(brush, path);
+        var brush = (_dragging || _hover ? ThumbHoverBrush : ThumbBrush)
+            ?? new SolidColorBrush(ThumbColor(theme, _dragging || _hover));
+        using var path = XamlDrawing.RoundedRectangle(thumb, ThumbRadius);
+        brush.FillPath(graphics, path);
     }
 
     private static Color ThumbColor(ThemePalette theme, bool highlighted)

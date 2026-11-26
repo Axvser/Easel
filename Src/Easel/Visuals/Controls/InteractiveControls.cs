@@ -49,6 +49,10 @@ public class Button : ButtonBase
         Padding = new XamlThickness(14f, 6f);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
     }
 
     /// <summary>The text drawn inside the button.</summary>
@@ -535,7 +539,11 @@ public class TextBox : TemplatedControl
         Cursor = Cursors.IBeam;
         Padding = new XamlThickness(8f, 6f);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
-        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.InputCornerRadius);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
     }
 
     /// <summary>The current text.</summary>

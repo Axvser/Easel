@@ -24,6 +24,10 @@ public abstract class ToggleButtonBase : ButtonBase
         Cursor = Cursors.Hand;
         SetThemeMetric(MinWidthProperty, static palette => (double)palette.ControlHeight);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
     }
 
     /// <summary>Raised when the control changes from a non-checked state to checked.</summary>
@@ -193,6 +197,7 @@ public class ToggleButton : ToggleButtonBase
     /// <summary>Creates an unchecked switch.</summary>
     public ToggleButton()
     {
+        SetThemeMetric(CornerRadiusProperty, static _ => 10f);
     }
 
     /// <summary>Whether the switch is on.</summary>
@@ -287,6 +292,7 @@ public class CheckBox : ToggleButtonBase
     /// <summary>Creates an unchecked check box.</summary>
     public CheckBox()
     {
+        SetThemeMetric(CornerRadiusProperty, static _ => 3f);
     }
 
     /// <summary>The checked state; <see langword="null"/> draws the indeterminate dash.</summary>
@@ -395,6 +401,10 @@ public class RadioButton : ToggleButtonBase
     /// <summary>Creates an unchecked radio button.</summary>
     public RadioButton()
     {
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.FocusThicknessMedium);
     }
 
     /// <summary>The checked state; setting it to <see langword="true"/> clears the grouped siblings.</summary>

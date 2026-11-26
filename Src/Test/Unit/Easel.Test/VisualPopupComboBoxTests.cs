@@ -253,14 +253,19 @@ public sealed class VisualPopupComboBoxTests
         var y = (int)(combo.AbsoluteBounds.Y + (combo.Bounds.Height / 2f));
         using var before = Render(surface, 320, 240);
         surface.ProcessPointerMove(Center(combo.AbsoluteBounds));
+        var hoverRing = combo.GetTemplateChild<VC.Border>("HoverRing");
+        Assert.IsNotNull(hoverRing, "the default template carries the hover ring");
+        WaitForTransition(hoverRing!);
         using var after = Render(surface, 320, 240);
 
-        Assert.IsTrue(
-            after.GetPixel(x, y).B > after.GetPixel(x, y).R + 30,
-            $"hover draws the accent border (pixel={after.GetPixel(x, y)})");
-        Assert.IsTrue(
-            before.GetPixel(x, y).B <= before.GetPixel(x, y).R + 30,
-            $"at rest the border stays neutral (pixel={before.GetPixel(x, y)})");
+        Assert.AreEqual(
+            Theme.Current.ControlBorderHover.ToArgb(),
+            after.GetPixel(x, y).ToArgb(),
+            "hover draws the neutral hover border");
+        Assert.AreEqual(
+            Theme.Current.ControlBorder.ToArgb(),
+            before.GetPixel(x, y).ToArgb(),
+            "at rest the border stays neutral");
     }
 
     [TestMethod]
@@ -365,6 +370,16 @@ public sealed class VisualPopupComboBoxTests
         using var bitmap = new Bitmap(1, 1);
         using var graphics = Graphics.FromImage(bitmap);
         surface.RenderTo(graphics, new Size(width, height));
+    }
+
+    // 悬停环的过渡在指针进入时同步启动；等到动画结束再取像素。
+    private static void WaitForTransition(VisualElement target)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (VisualTransition.HasActive(target) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(10);
+        }
     }
 
     private static Bitmap Render(VisualHost surface, int width, int height)

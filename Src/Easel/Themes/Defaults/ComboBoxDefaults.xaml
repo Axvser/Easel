@@ -5,25 +5,48 @@
 
   <!-- Built-in fallback appearance for ComboBox; added to the implicit style table by Theme.DefaultStyles. -->
 <Style TargetType="ComboBox">
+    <Style.Setters>
+      <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
+      <Setter TargetName="ActiveRing" Property="Opacity" Value="0" />
+      <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
+      <Setter TargetName="ChevronUp" Property="Visibility" Value="Collapsed" />
+    </Style.Setters>
     <Style.Template>
       <ControlTemplate TargetType="ComboBox">
         <Grid x:Name="Root" IsHitTestVisible="False">
           <Border x:Name="Chrome"
                   IsHitTestVisible="False"
-                  Background="{DynamicResource Input}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="{DynamicResource ControlBorderThickness}"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="HoverRing"
                   IsHitTestVisible="False"
-                  BorderBrush="{DynamicResource Focus}"
+                  BorderBrush="{DynamicResource BorderHover}"
                   BorderThickness="{DynamicResource ControlBorderThickness}"
-                  CornerRadius="{TemplateBinding CornerRadius}" />
-          <Border x:Name="FocusRing"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <Border.Transitions>
+              <Transition Property="Opacity" Duration="0:0:0.15" Ease="CubicOut" />
+            </Border.Transitions>
+          </Border>
+          <Border x:Name="ActiveRing"
                   IsHitTestVisible="False"
                   BorderBrush="{DynamicResource Focus}"
                   BorderThickness="1.5"
-                  CornerRadius="{TemplateBinding CornerRadius}" />
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <Border.Transitions>
+              <Transition Property="Opacity" Duration="0:0:0.15" Ease="CubicOut" />
+            </Border.Transitions>
+          </Border>
+          <Border x:Name="FocusRing"
+                  IsHitTestVisible="False"
+                  BorderBrush="{DynamicResource Focus}"
+                  BorderThickness="2"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <Border.Transitions>
+              <Transition Property="Opacity" Duration="0:0:0.15" Ease="CubicOut" />
+            </Border.Transitions>
+          </Border>
           <Border IsHitTestVisible="False"
                   Padding="{TemplateBinding Padding}"
                   Margin="0,0,22,0">
@@ -32,10 +55,15 @@
                        Foreground="{TemplateBinding Foreground}"
                        VerticalAlignment="Center" />
           </Border>
-          <TextBox x:Name="PART_EditableTextBox"
-                   Padding="{TemplateBinding Padding}"
-                   Margin="0,0,22,0"
-                   Foreground="{TemplateBinding Foreground}" />
+          <!-- The editor reserves 2px for a border the chrome-less row no longer has; the negative vertical
+               margin absorbs it so editable and read-only rows share one height. The wrapping grid clips that
+               overhang locally instead of clipping the whole control root. -->
+          <Grid ClipToBounds="True">
+            <TextBox x:Name="PART_EditableTextBox"
+                     Padding="{TemplateBinding Padding}"
+                     Margin="0,-1,22,-1"
+                     Foreground="{TemplateBinding Foreground}" />
+          </Grid>
           <!-- Each chevron layer pairs the theme colour with a control-Foreground overlay; the overlay's
                TemplateBinding clears when Foreground is unset, so the theme brush underneath shows through. -->
           <Grid x:Name="ChevronDown"
@@ -83,40 +111,24 @@
           </VisualPopup>
         </Grid>
         <ControlTemplate.Triggers>
-          <!-- Trigger-controlled parts carry no baseline attributes: template setters rank below local values,
-               and among active triggers the later one wins. -->
-          <Trigger Property="IsPointerOver" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsDropDownOpen" Value="True">
-            <Trigger.Setters>
-              <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
-              <Setter TargetName="ChevronDown" Property="Visibility" Value="Collapsed" />
-              <Setter TargetName="ChevronUp" Property="Visibility" Value="Visible" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsDropDownOpen" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="HoverRing" Property="Opacity" Value="0" />
-              <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible" />
-              <Setter TargetName="ChevronUp" Property="Visibility" Value="Collapsed" />
-            </Trigger.Setters>
-          </Trigger>
+          <!-- Ring opacity rests at the style baseline (0). Each state sets its ring to 1 with a plain setter;
+               when the trigger exits the setter falls back to 0, and the ring's own Transitions collection fades
+               the change both ways. The open state also swaps the chevron. -->
           <Trigger Property="IsPointerOver" Value="True">
             <Trigger.Setters>
               <Setter TargetName="HoverRing" Property="Opacity" Value="1" />
             </Trigger.Setters>
           </Trigger>
+          <Trigger Property="IsDropDownOpen" Value="True">
+            <Trigger.Setters>
+              <Setter TargetName="ActiveRing" Property="Opacity" Value="1" />
+              <Setter TargetName="ChevronDown" Property="Visibility" Value="Collapsed" />
+              <Setter TargetName="ChevronUp" Property="Visibility" Value="Visible" />
+            </Trigger.Setters>
+          </Trigger>
           <Trigger Property="IsFocusVisible" Value="True">
             <Trigger.Setters>
               <Setter TargetName="FocusRing" Property="Opacity" Value="1" />
-            </Trigger.Setters>
-          </Trigger>
-          <Trigger Property="IsFocusVisible" Value="False">
-            <Trigger.Setters>
-              <Setter TargetName="FocusRing" Property="Opacity" Value="0" />
             </Trigger.Setters>
           </Trigger>
           <Trigger Property="IsEditable" Value="True">

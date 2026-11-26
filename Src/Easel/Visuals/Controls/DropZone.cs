@@ -81,6 +81,10 @@ public class DropZone : TemplatedControl
         IsHitTestVisible = true;
         AllowDrop = true;
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
         MinHeight = 88d;
         Padding = new XamlThickness(18f, 14f);
     }

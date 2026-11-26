@@ -473,9 +473,15 @@ public class VisualContextMenu : VisualPopup
         Focusable = true;
         Padding = new XamlThickness(4f);
         // 弹层没有宿主可依托；子菜单/Dropdown 又是内部新建的实例，只共享模板，所以表面必须随默认样式一起到。
-        Background = Theme.Current.SurfaceAlt;
-        BorderBrush = Theme.Current.ControlBorder;
-        BorderThickness = new XamlThickness(1f);
+        SetThemeMetric(BackgroundProperty, static palette => new SolidColorBrush(palette.SurfaceAlt));
+        SetThemeMetric(BorderBrushProperty, static palette => new SolidColorBrush(palette.ControlBorder));
+        SetThemeMetric(
+            BorderThicknessProperty,
+            static palette => new XamlThickness(palette.ControlBorderThickness.Left));
+        SetChromeTheme(
+            static palette => palette.SurfaceAlt,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
         Closed += (_, _) =>
         {
@@ -1228,6 +1234,10 @@ public class VisualMenu : TemplatedControl
         IsHitTestVisible = true;
         Focusable = true;
         Padding = new XamlThickness(4f, 2f);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
     }
 
     /// <summary>The top-level entries.</summary>

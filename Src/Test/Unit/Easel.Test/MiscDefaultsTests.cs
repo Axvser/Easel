@@ -14,7 +14,6 @@ public sealed class MiscDefaultsTests
     {
         using var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
         var trackColor = Color.FromArgb(0xFF, 0x33, 0x44, 0x55);
-        surface.Resources["SurfaceAlt"] = new SolidColorBrush(trackColor);
 
         using var bar = new VC.ScrollBar
         {
@@ -23,6 +22,7 @@ public sealed class MiscDefaultsTests
             Maximum = 1000,
             ViewportSize = 300,
             LargeChange = 150,
+            TrackBrush = new SolidColorBrush(trackColor),
         };
         surface.Root = bar;
         Layout(surface, 320, 240);
@@ -32,7 +32,7 @@ public sealed class MiscDefaultsTests
         Assert.IsNotNull(track);
         Assert.IsFalse(track!.IsHitTestVisible, "the track is decorative");
         Assert.AreEqual(trackColor.ToArgb(), track.Background!.ApproximateColor.ToArgb(),
-            "the track paints the host palette");
+            "the track paints the control's TrackBrush");
 
         var press = bar.PointToSurface(new PointF(3f, 80f));
         surface.ProcessPointerDown(press, MouseButtons.Left);

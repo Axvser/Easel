@@ -292,6 +292,9 @@ internal sealed class VisualStyleApplication
             return;
         }
 
+        // 首次样式应用是控件/模板部件的初始基线，不应触发元素级过渡（否则一创建就闪一下）。
+        var isInitialStyle = _style is null;
+
         // 先退订再摘层：摘层会发 PropertyChanged，若还挂着触发器会被当成一次真实变更重新求值。
         Unsubscribe();
         ExitActiveTriggers();
@@ -382,7 +385,21 @@ internal sealed class VisualStyleApplication
             _styleProperties ??= [];
             foreach (var pair in values)
             {
-                pair.Key.Property.SetValue(pair.Key.Target, pair.Value, BindingPriority.Style);
+                var targetElement = isInitialStyle ? pair.Key.Target as VisualElement : null;
+                if (targetElement is not null)
+                {
+                    targetElement.BeginTransitionHold();
+                }
+
+                try
+                {
+                    pair.Key.Property.SetValue(pair.Key.Target, pair.Value, BindingPriority.Style);
+                }
+                finally
+                {
+                    targetElement?.EndTransitionHold();
+                }
+
                 _styleProperties.Add(pair.Key);
             }
         }

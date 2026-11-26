@@ -14,8 +14,8 @@
           <Border x:Name="PART_Track"
                   IsHitTestVisible="False"
                   Padding="0"
-                  Background="{DynamicResource SurfaceAlt}"
-                  CornerRadius="{DynamicResource ScrollBarThumbRadius}" />
+                  Background="{TemplateBinding TrackBrush}"
+                  CornerRadius="{TemplateBinding ThumbRadius}" />
         </Grid>
       </ControlTemplate>
     </Style.Template>
@@ -29,13 +29,21 @@
             <RowDefinition Height="24" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
+          <Border Grid.RowSpan="2"
+                  IsHitTestVisible="False"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <TextBlock x:Name="PART_Header"
                      Text="{TemplateBinding Header}"
+                     Foreground="{TemplateBinding HeaderForeground}"
                      Opacity="0.65"
                      VerticalAlignment="Center"
                      IsHitTestVisible="False" />
           <Grid x:Name="PART_ContentHost"
                 Grid.Row="1"
+                Margin="{TemplateBinding Padding}"
                 IsHitTestVisible="False" />
         </Grid>
       </ControlTemplate>
@@ -45,12 +53,19 @@
   <Style TargetType="DropZone">
     <Style.Template>
       <ControlTemplate TargetType="DropZone">
-        <DropZoneChrome x:Name="Chrome"
-                        IsHitTestVisible="False"
-                        Title="{TemplateBinding Title}"
-                        Detail="{TemplateBinding Detail}"
-                        CornerRadius="{TemplateBinding CornerRadius}"
-                        Padding="{TemplateBinding Padding}" />
+        <Grid IsHitTestVisible="False">
+          <Border IsHitTestVisible="False"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <DropZoneChrome x:Name="Chrome"
+                          IsHitTestVisible="False"
+                          Title="{TemplateBinding Title}"
+                          Detail="{TemplateBinding Detail}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Padding="{TemplateBinding Padding}" />
+        </Grid>
       </ControlTemplate>
     </Style.Template>
   </Style>

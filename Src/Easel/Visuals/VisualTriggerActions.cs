@@ -173,6 +173,34 @@ public static class VisualTransition
         AnimationScheduler.Animate(target, property, to, effect ?? new AnimationSpec());
     }
 
+    // 元素级过渡要显式从旧值起步：新值此时已经写进 Local 层，再回读只会读到它。
+    internal static void AnimateFrom(
+        VisualElement target,
+        DependencyProperty property,
+        object? from,
+        object? to,
+        AnimationSpec effect)
+    {
+        if (target is null) throw new ArgumentNullException(nameof(target));
+        if (property is null) throw new ArgumentNullException(nameof(property));
+
+        EnsureAnimatable(property);
+
+        // 与 Animate 一样把端点统一成属性类型，插值器就不必猜。
+        if (from is not null && !property.PropertyType.IsInstanceOfType(from))
+        {
+            from = XamlRuntime.ConvertValue(from, property.PropertyType);
+        }
+
+        if (to is not null && !property.PropertyType.IsInstanceOfType(to))
+        {
+            to = XamlRuntime.ConvertValue(to, property.PropertyType);
+        }
+
+        // 隐式过渡收尾只摘动画层：终值已经在触发/本地层里，落 Local 会压住后续触发器。
+        AnimationScheduler.Animate(target, property, from, to, effect, holdOnComplete: false);
+    }
+
     /// <summary>Animates <paramref name="property"/> through <paramref name="frames"/>, one segment per adjacent pair.</summary>
     /// <param name="target">The element whose property is animated.</param>
     /// <param name="property">The dependency property to animate.</param>
@@ -254,6 +282,12 @@ public static class VisualTransition
     }
 
     internal static bool HasActive(VisualElement target) => AnimationScheduler.HasActive(target);
+
+    internal static bool IsActive(VisualElement target, DependencyProperty property)
+        => AnimationScheduler.IsActive(target, property);
+
+    internal static bool IsImplicitActive(VisualElement target, DependencyProperty property)
+        => AnimationScheduler.IsImplicitActive(target, property);
 
     // 没有该类型的插值器时整段停住当前值；在启动前直接拒绝，而不是开一趟什么也不写的动画。
     private static void EnsureAnimatable(DependencyProperty property)

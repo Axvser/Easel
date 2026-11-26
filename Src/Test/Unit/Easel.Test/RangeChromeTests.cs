@@ -19,6 +19,7 @@ public sealed class RangeChromeTests
     {
         using var surface = CreateSurface();
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 50 };
+        ApplyBrushes(slider);
         surface.Root = slider;
         Layout(surface);
 
@@ -39,6 +40,7 @@ public sealed class RangeChromeTests
     {
         using var surface = CreateSurface();
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 50 };
+        ApplyBrushes(slider);
         surface.Root = slider;
         Layout(surface);
 
@@ -63,6 +65,7 @@ public sealed class RangeChromeTests
     {
         using var surface = CreateSurface();
         using var slider = new VC.Slider { Width = 200, Minimum = 0, Maximum = 100, Value = 80 };
+        ApplyBrushes(slider);
         surface.Root = slider;
         Layout(surface);
         Layout(surface);
@@ -88,6 +91,7 @@ public sealed class RangeChromeTests
     {
         using var surface = CreateSurface();
         using var bar = new VC.ProgressBar { Width = 200, Height = 10, Minimum = 0, Maximum = 100, Value = 25 };
+        ApplyBrushes(bar);
         surface.Root = bar;
         Layout(surface);
 
@@ -105,6 +109,7 @@ public sealed class RangeChromeTests
     {
         using var surface = CreateSurface();
         using var bar = new VC.ProgressBar { Width = 200, Height = 10, Minimum = 0, Maximum = 100, Value = 80 };
+        ApplyBrushes(bar);
         surface.Root = bar;
         Layout(surface);
         Layout(surface);
@@ -156,12 +161,21 @@ public sealed class RangeChromeTests
     }
 
     private static VisualHost CreateSurface()
+        => new() { Size = new Size(320, 240), DpiScaleOverride = 1f };
+
+    // 角色刷现在来自控件 DP，不再是 SurfaceAlt/Accent/Focus 资源键。
+    private static void ApplyBrushes(VC.Slider slider)
     {
-        var surface = new VisualHost { Size = new Size(320, 240), DpiScaleOverride = 1f };
-        surface.Resources["SurfaceAlt"] = new SolidColorBrush(TrackColor);
-        surface.Resources["Accent"] = new SolidColorBrush(AccentColor);
-        surface.Resources["Focus"] = new SolidColorBrush(FocusColor);
-        return surface;
+        slider.TrackBrush = new SolidColorBrush(TrackColor);
+        slider.FillBrush = new SolidColorBrush(AccentColor);
+        slider.ThumbBrush = new SolidColorBrush(AccentColor);
+        slider.FocusRingBrush = new SolidColorBrush(FocusColor);
+    }
+
+    private static void ApplyBrushes(VC.ProgressBar bar)
+    {
+        bar.TrackBrush = new SolidColorBrush(TrackColor);
+        bar.FillBrush = new SolidColorBrush(AccentColor);
     }
 
     private static void Layout(VisualHost surface)

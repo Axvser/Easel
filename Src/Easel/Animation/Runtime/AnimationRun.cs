@@ -18,6 +18,8 @@ internal sealed class AnimationRun
     private readonly AnimationEffect _effect;
     private readonly object? _singleTo;
     private readonly IReadOnlyList<KeyFrame>? _frames;
+    private readonly object? _startFrom;
+    private readonly bool _holdOnComplete;
 
     private Segment[] _segments = [];
     private System.Threading.Timer? _timer;
@@ -37,7 +39,9 @@ internal sealed class AnimationRun
         DependencyProperty property,
         AnimationEffect effect,
         object? to,
-        IReadOnlyList<KeyFrame>? frames)
+        IReadOnlyList<KeyFrame>? frames,
+        object? from = null,
+        bool holdOnComplete = true)
     {
         _target = target;
         _property = property;
@@ -45,6 +49,8 @@ internal sealed class AnimationRun
         _effect = effect;
         _singleTo = to;
         _frames = frames;
+        _startFrom = from;
+        _holdOnComplete = holdOnComplete;
     }
 
     internal VisualElement Target => _target;
@@ -52,6 +58,9 @@ internal sealed class AnimationRun
     internal DependencyProperty Property => _property;
 
     internal AnimationProperty Binding => _binding;
+
+    // 隐式过渡收尾只摘动画层，让触发/样式/本地层的终值显出；显式动画仍把终值落到 Local 层。
+    internal bool HoldOnComplete => _holdOnComplete;
 
     // 最后一个算出来的帧值；收尾时直接落它，避免托管元素的排队写入在登记被摘后跳过而导致落值不精确。
     internal object? LastWritten
@@ -74,7 +83,8 @@ internal sealed class AnimationRun
                 return;
             }
 
-            var start = _binding.Read();
+            // 元素级过渡显式给出旧值；其余动画仍从当前值起步。
+            var start = _startFrom ?? _binding.Read();
             _segments = BuildSegments();
             _lastWritten = start;
             EnterSegment(0, start, Stopwatch.GetTimestamp());

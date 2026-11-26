@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using Easel;
+using XamlBrush = Easel.Brush;
 using XamlThickness = Easel.Controls.Thickness;
 using XamlVisibility = Easel.Controls.Visibility;
 
@@ -29,6 +30,26 @@ public class Expander : TemplatedControl
         nameof(Content), typeof(VisualElement), typeof(Expander),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
 
+    /// <summary>The header background brush; unset uses the theme's raised surface.</summary>
+    public static readonly DependencyProperty HeaderBackgroundProperty = DependencyProperty.Register(
+        nameof(HeaderBackground), typeof(XamlBrush), typeof(Expander),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public static readonly DependencyProperty HeaderForegroundProperty = DependencyProperty.Register(
+        nameof(HeaderForeground), typeof(XamlBrush), typeof(Expander),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header border brush; unset uses the theme border.</summary>
+    public static readonly DependencyProperty HeaderBorderBrushProperty = DependencyProperty.Register(
+        nameof(HeaderBorderBrush), typeof(XamlBrush), typeof(Expander),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header border thickness; unset uses the theme control border thickness.</summary>
+    public static readonly DependencyProperty HeaderBorderThicknessProperty = DependencyProperty.Register(
+        nameof(HeaderBorderThickness), typeof(XamlThickness), typeof(Expander),
+        new PropertyMetadata(XamlThickness.Empty));
+
     private const float HeaderHeight = 32f;
 
     private VisualElement? _headerPart;
@@ -43,6 +64,14 @@ public class Expander : TemplatedControl
         Focusable = true;
         Padding = new XamlThickness(0f);
         SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
+        SetThemeMetric(HeaderBackgroundProperty, static palette => new SolidColorBrush(palette.SurfaceAlt));
+        SetThemeMetric(HeaderForegroundProperty, static palette => new SolidColorBrush(palette.Foreground));
+        SetThemeMetric(HeaderBorderBrushProperty, static palette => new SolidColorBrush(palette.ControlBorder));
+        SetThemeMetric(HeaderBorderThicknessProperty, static palette => palette.ControlBorderThickness);
     }
 
     /// <summary>The text shown in the header.</summary>
@@ -50,6 +79,34 @@ public class Expander : TemplatedControl
     {
         get => (string)GetValue(HeaderProperty)!;
         set => SetValue(HeaderProperty, value ?? string.Empty);
+    }
+
+    /// <summary>The header background brush; unset uses the theme's raised surface.</summary>
+    public XamlBrush? HeaderBackground
+    {
+        get => (XamlBrush?)GetValue(HeaderBackgroundProperty);
+        set => SetValue(HeaderBackgroundProperty, value);
+    }
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public XamlBrush? HeaderForeground
+    {
+        get => (XamlBrush?)GetValue(HeaderForegroundProperty);
+        set => SetValue(HeaderForegroundProperty, value);
+    }
+
+    /// <summary>The header border brush; unset uses the theme border.</summary>
+    public XamlBrush? HeaderBorderBrush
+    {
+        get => (XamlBrush?)GetValue(HeaderBorderBrushProperty);
+        set => SetValue(HeaderBorderBrushProperty, value);
+    }
+
+    /// <summary>The header border thickness; unset uses the theme control border thickness.</summary>
+    public XamlThickness HeaderBorderThickness
+    {
+        get => (XamlThickness)GetValue(HeaderBorderThicknessProperty)!;
+        set => SetValue(HeaderBorderThicknessProperty, value);
     }
 
     /// <summary>Whether the content is shown.</summary>
@@ -306,6 +363,26 @@ public class GroupBox : TemplatedControl
         nameof(Child), typeof(VisualElement), typeof(GroupBox),
         new PropertyMetadata(null) { AffectsMeasure = true, AffectsRender = false });
 
+    /// <summary>The header badge background brush; unset uses the theme surface.</summary>
+    public static readonly DependencyProperty HeaderBackgroundProperty = DependencyProperty.Register(
+        nameof(HeaderBackground), typeof(XamlBrush), typeof(GroupBox),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public static readonly DependencyProperty HeaderForegroundProperty = DependencyProperty.Register(
+        nameof(HeaderForeground), typeof(XamlBrush), typeof(GroupBox),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header border brush; unset uses the theme border.</summary>
+    public static readonly DependencyProperty HeaderBorderBrushProperty = DependencyProperty.Register(
+        nameof(HeaderBorderBrush), typeof(XamlBrush), typeof(GroupBox),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The header border thickness; empty draws no header border.</summary>
+    public static readonly DependencyProperty HeaderBorderThicknessProperty = DependencyProperty.Register(
+        nameof(HeaderBorderThickness), typeof(XamlThickness), typeof(GroupBox),
+        new PropertyMetadata(XamlThickness.Empty));
+
     private VisualElement? _contentHost;
     private VisualElement? _hostedChild;
     private bool _disposing;
@@ -316,6 +393,13 @@ public class GroupBox : TemplatedControl
         IsHitTestVisible = false;
         Padding = new XamlThickness(10f);
         CornerRadius = 6f;
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
+        SetThemeMetric(HeaderBackgroundProperty, static palette => new SolidColorBrush(palette.Surface));
+        SetThemeMetric(HeaderForegroundProperty, static palette => new SolidColorBrush(palette.Foreground));
+        SetThemeMetric(HeaderBorderBrushProperty, static palette => new SolidColorBrush(palette.ControlBorder));
     }
 
     /// <summary>The text drawn in the top border gap.</summary>
@@ -323,6 +407,34 @@ public class GroupBox : TemplatedControl
     {
         get => (string)GetValue(HeaderProperty)!;
         set => SetValue(HeaderProperty, value ?? string.Empty);
+    }
+
+    /// <summary>The header badge background brush; unset uses the theme surface.</summary>
+    public XamlBrush? HeaderBackground
+    {
+        get => (XamlBrush?)GetValue(HeaderBackgroundProperty);
+        set => SetValue(HeaderBackgroundProperty, value);
+    }
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public XamlBrush? HeaderForeground
+    {
+        get => (XamlBrush?)GetValue(HeaderForegroundProperty);
+        set => SetValue(HeaderForegroundProperty, value);
+    }
+
+    /// <summary>The header border brush; unset uses the theme border.</summary>
+    public XamlBrush? HeaderBorderBrush
+    {
+        get => (XamlBrush?)GetValue(HeaderBorderBrushProperty);
+        set => SetValue(HeaderBorderBrushProperty, value);
+    }
+
+    /// <summary>The header border thickness; empty draws no header border.</summary>
+    public XamlThickness HeaderBorderThickness
+    {
+        get => (XamlThickness)GetValue(HeaderBorderThicknessProperty)!;
+        set => SetValue(HeaderBorderThicknessProperty, value);
     }
 
     /// <summary>The single child.</summary>
@@ -531,10 +643,25 @@ public class TabItem : TemplatedControl
         nameof(IsPointerOver), typeof(bool), typeof(TabItem),
         new PropertyMetadata(false) { AffectsRender = true });
 
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public static readonly DependencyProperty HeaderForegroundProperty = DependencyProperty.Register(
+        nameof(HeaderForeground), typeof(XamlBrush), typeof(TabItem),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The selected-tab accent line brush; unset uses the theme accent.</summary>
+    public static readonly DependencyProperty SelectionLineBrushProperty = DependencyProperty.Register(
+        nameof(SelectionLineBrush), typeof(XamlBrush), typeof(TabItem),
+        new PropertyMetadata(null) { AffectsRender = true });
+
     /// <summary>Creates an empty tab.</summary>
     public TabItem()
     {
-        Padding = new XamlThickness(0f);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
+        SetThemeMetric(HeaderForegroundProperty, static palette => new SolidColorBrush(palette.Foreground));
+        SetThemeMetric(SelectionLineBrushProperty, static palette => new SolidColorBrush(palette.Accent));
     }
 
     /// <summary>The text shown on the tab.</summary>
@@ -562,6 +689,20 @@ public class TabItem : TemplatedControl
     /// <remarks>This dependency property shadows <see cref="VisualElement.IsPointerOver"/> so a style or template
     /// trigger can observe the tab's hover state.</remarks>
     public new bool IsPointerOver => (bool)GetValue(IsPointerOverProperty)!;
+
+    /// <summary>The header text colour; unset uses the theme foreground.</summary>
+    public XamlBrush? HeaderForeground
+    {
+        get => (XamlBrush?)GetValue(HeaderForegroundProperty);
+        set => SetValue(HeaderForegroundProperty, value);
+    }
+
+    /// <summary>The selected-tab accent line brush; unset uses the theme accent.</summary>
+    public XamlBrush? SelectionLineBrush
+    {
+        get => (XamlBrush?)GetValue(SelectionLineBrushProperty);
+        set => SetValue(SelectionLineBrushProperty, value);
+    }
 
     /// <inheritdoc />
     protected override void OnPointerEntered(VisualPointerEventArgs args)
@@ -601,7 +742,10 @@ public class TabControl : TemplatedControl
     public TabControl()
     {
         Focusable = true;
-        Padding = new XamlThickness(0f);
+        SetChromeTheme(
+            static _ => Color.Transparent,
+            static _ => Color.Transparent,
+            static _ => 0f);
     }
 
     /// <summary>Raised after <see cref="SelectedIndex"/> changes.</summary>

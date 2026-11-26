@@ -178,9 +178,10 @@ public sealed class CalendarDefaultsTests
         Layout(surface, 320, 300);
 
         var textBox = picker.GetTemplateChild<VC.TextBox>("PART_TextBox")!;
-        Assert.AreEqual("Pick a day", textBox.Text, "the placeholder fills an empty field");
-        Assert.AreEqual(Theme.Current.MutedForeground.ToArgb(), textBox.Foreground.ToArgb(),
-            "the placeholder uses the muted palette colour");
+        Assert.AreEqual(string.Empty, textBox.Text, "no date leaves the field empty");
+        Assert.AreEqual("Pick a day", textBox.Placeholder, "the placeholder is drawn by the TextBox");
+        Assert.AreEqual(Theme.Current.Foreground.ToArgb(), textBox.Foreground.ToArgb(),
+            "the editor keeps the normal text colour; the placeholder has its own muted brush");
 
         Click(surface, Center(picker.AbsoluteBounds));
         Assert.IsTrue(picker.IsDropDownOpen, "a press on the field opens the drop-down");

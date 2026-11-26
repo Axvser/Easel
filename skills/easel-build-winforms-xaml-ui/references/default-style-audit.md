@@ -1,58 +1,42 @@
-# Built-in default style audit (3.0.0)
+# Default style property contract
 
-Rule: a **content-only container** must not get a fallback colour. Its fallback may host content and provide
-structure, but it must not paint a background, border or fill of its own. **Control chrome** that is the control's
-purpose (a button's surface, an input's frame, a popup card, a scrollbar) keeps its colours. A **selectable
-carrying surface** (selection list, tree, table, calendar, menu bar) is `transparent / host-supplied`: its state
-rows, headers, text and focus rings stay, but the fill behind them is supplied by whoever hosts the control. A
-popup menu card is control chrome, not a host-supplied surface: it floats without a host, and its submenus are
-created internally sharing only the template, not a parent `Background`.
+Default templates paint their outer chrome from the control's own appearance properties. `ChromeBackground`,
+`ChromeBorderBrush`, `ChromeBorderThickness` and `ChromeBorderWidth` are the effective values a template binds:
+the local `Background`/`BorderBrush`/`BorderThickness` when set, otherwise the palette role the control declares
+through `SetChromeTheme`. `Theme.Changed` refreshes them; local values and style setters win. Role DPs cover
+internal parts that are not one outer chrome. State rows, focus rings, separators and the calendar day palette
+stay theme-driven.
 
-A content-only container is a control whose job is to host arbitrary content (`ItemsControl`,
-`HeaderedContentControl`, `ContentControl`, `VirtualList`, `ScrollViewer`, `CalendarItem`, `TabControl` content).
-Control chrome is appearance that is the control's own purpose or interactive affordance (`Button`, `TextBox`,
-`ComboBox`/`DatePicker` field, scrollbars, `GroupBox` frame, `Expander` header). Ambiguous = a hybrid; marked for a
-decision instead of silently changed.
+A `ResourceDictionary` overlay on a surface does not recolour the outer chrome, which is computed from
+`Theme.Current`; set the control property or the role DP, or assign `Theme.Current`, instead. Template parts that
+read `{DynamicResource}` — hover/pressed bands, focus rings, separators — still follow the overlay.
 
-| file | target type | template/setters | background | border | foreground/fill | container? | verdict | action |
-|---|---|---|---|---|---|---|---|---|
-| DefaultStyles.xaml | — | merge hub for 10 dictionaries | — | — | — | — | n/a | no action |
-| ButtonDefaults.xaml | Button, RepeatButton (`ButtonChromeStyle`) | template: Chrome + Hover/Pressed + FocusRing | Chrome `Input`; Hover `Hover`; Pressed `Pressed` | `Border` 1 | text `Foreground`; focus `Focus` | N | keep chrome | none |
-| ButtonDefaults.xaml | ToggleButton | template | track `Input`; checked `Accent` | `Border` 1 | knobs `Muted`/`AccentText` | N | keep chrome | none |
-| ButtonDefaults.xaml | CheckBox | template | box `Input`; checked `Accent` | `Border` stroke 1 | mark `AccentText` | N | keep chrome | none |
-| ButtonDefaults.xaml | RadioButton | template | ring `Input`; checked `Accent` dot | `Border` stroke | dot `Accent` | N | keep chrome | none |
-| TextInputDefaults.xaml | TextBox | template | `Input` | `Border` 1 | content `Foreground` | N | keep chrome | none |
-| TextInputDefaults.xaml | RichTextBox | template | `Input` | `Border` 1 | content `Foreground` | N | keep chrome | none |
-| ComboBoxDefaults.xaml | ComboBox | template | Chrome `Input` | `ControlBorderThickness` | chevron `Text`/`Foreground` | ambiguous | keep chrome (input+items) | none |
-| ComboBoxDefaults.xaml | ComboBoxItem | setters: Padding/alignment/wrap | none | none | inherited text | N (row) | transparent | none |
-| ContainersDefaults.xaml | Expander | template; header Border, content host | header `Raised`; content host none | header `Border` 1 | header text | Y | keep header chrome; content transparent | none |
-| ContainersDefaults.xaml | GroupBox | template; frame Border + header chip | header chip `Surface`; frame none | frame `Border` 1 | header text | Y | ambiguous | recommend keep (frame is the control's identity); no content fill |
-| ContainersDefaults.xaml | TabItem (keyed + implicit) | template; hover/selection bands | `Hover`/`Raised`; line `Accent` | none | labels | N | keep chrome | none |
-| ContainersDefaults.xaml | TabControl | template; header host + 1px separator | none (content); separator `Border` | separator line only | — | Y | keep structural | none |
-| RangeDefaults.xaml | Slider | template `SliderChrome` | track `SurfaceAlt`; fill/thumb `Accent` | none | `Accent`, focus `Focus` | N | keep chrome | none |
-| RangeDefaults.xaml | ProgressBar | template `ProgressBarChrome` | track `SurfaceAlt`; fill `Accent` | none | `Accent` | N | keep chrome | none |
-| ItemsDefaults.xaml | **ItemsControl** | template: bare `ItemsPresenter` (no inner ScrollViewer) | **was `Input` → none** | **was `Border` 1 → none** | — | **Y** | **transparent, unclipped** | no ScrollViewer so content is not clipped at the control bounds; host wraps it to scroll |
-| ItemsDefaults.xaml | ListBox | template: Transparent Border + FocusRing + ScrollViewer + presenter | **was `Input` → Transparent** | **was `Border` 1 → none**; focus `Focus` | selection via item | N | **fixed: transparent / host-supplied** | surface Border kept only for empty-area hit-testing/focus |
-| ItemsDefaults.xaml | ListBoxItem | template: Hover/Selection bands | `Hover`/`Selection` only | none | content | N (row) | keep (state-driven) | none |
-| ItemsDefaults.xaml | VirtualList | template: ItemsPresenter only | none | none | — | Y | transparent | none |
-| ItemsDefaults.xaml | TreeView | template: Transparent Border + FocusRing + presenter | **was `Surface` → Transparent** | **was `Border` 1 → none**; focus `Focus` | — | N | **fixed: transparent / host-supplied** | surface Border kept only for empty-area hit-testing |
-| ItemsDefaults.xaml | TreeViewItem | template bands + chevrons | `Raised`/`Selection` | none | chevron `Muted` | N | keep (state-driven) | none |
-| DataGridDefaults.xaml | DataGridBadgeCell/CheckCell/ProgressCell + `DataGridCellChrome` | setters (hit-test/focus only) | none | none | grid owns drawing | N | transparent | none |
-| DataGridDefaults.xaml | DataGrid | template: empty region Borders; ctor self-draws | **was `Surface` (ctor) → none** | **was `ControlBorder` 1 (ctor) → none** | header/rows/gridlines/text stay | N | **fixed: transparent / host-supplied** | removed ctor chrome; `RenderContent` paints only a host-set brush |
-| CalendarDefaults.xaml | Calendar | template Border + CalendarItem; ctor clears | **was `Surface` → Transparent/none** | **was `ControlBorder` → none** | header/day content stays | N | **fixed: transparent / host-supplied** | template Border kept structural (`IsHitTestVisible=false`); ctor sets no surface |
-| CalendarDefaults.xaml | CalendarItem | template; nav glyphs + grids | none | none | nav `Muted`, header `Foreground` | Y | transparent | none |
-| CalendarDefaults.xaml | DatePicker | template | `Input` | `ControlBorderThickness` | text | N | keep chrome | none |
-| MenuDefaults.xaml | VisualContextMenu | template; Chrome + HoverRing + presenter | `SurfaceAlt` | `Border` 1 | rows/hover ring stay | N | keep chrome (popup card) | no host backdrop; submenus share only the template, so the surface stays on the default style and ctor |
-| MenuDefaults.xaml | VisualMenu | template | **was `Raised` → Transparent** | **was bottom `Border` 1 → none** | top-level item content/state stays | N | **fixed: transparent / host-supplied** | its dropdown is a `VisualContextMenu`, which keeps its popup surface |
-| MenuDefaults.xaml | VisualMenuItemContainer | template bands/separator/checkmark | `Selection`/`Pressed` | separator `Border` | `Accent`, `Muted` | N | keep (state-driven) | none |
-| MiscDefaults.xaml | ScrollBar | template track only | track `SurfaceAlt` | none | thumb self-drawn | N | keep chrome | none |
-| MiscDefaults.xaml | HeaderedContentControl | template: header text + content host | none | none | header 0.65 opacity | Y | transparent | none |
-| MiscDefaults.xaml | DropZone | template `DropZoneChrome` | self-drawn (dashed border; hot `Accent`) | self-drawn | text | ambiguous | keep chrome (drop affordance) | none |
-| Theme.cs | palette + typography resources | no container styles; `AddTypographyStyles` targets `TextBlock` | — | — | — | — | n/a | no action |
-| DarkTheme.xaml / LightTheme.xaml | palette + named `TextBlock` styles | no container styles | — | — | typography only | — | n/a | no action |
-| Controls ctor (Calendar.cs, DataGrid.cs, Menu.cs, Popup.cs) | VisualPopup (ComboBox/DatePicker host) | base popup chrome | `Surface` | `ControlBorder` 1 | per control | N | keep (popup cards) | Calendar/DataGrid set no surface; VisualContextMenu keeps `SurfaceAlt`/`ControlBorder` |
-| ScrollViewer.cs `DefaultChrome` | ScrollViewer | code template: Grid + presenter + two bars | none | none | — | Y | transparent structural | none |
-| LayoutExtras.cs (`GridSplitter.OnRender`) | GridSplitter sash | self-drawn unless `Background` set | `SurfaceAlt` | none | — | N | keep chrome | none |
-| InteractiveControls.cs:2038 | visual TextBox native editor | nearest ancestor background else `ControlBackground` | `ControlBackground` fallback | — | — | N | keep chrome | none |
-| NativeElement.cs:950 | native island backcolor | native surface | `ControlBackground` | — | — | N (HWND island) | keep | none |
-| ContentControls.cs | ContentControl / UserControl | no default style/template | none (Background default null) | none | — | Y | transparent | none |
+| control | outer chrome | role DPs / notes |
+| --- | --- | --- |
+| `Button`, `RepeatButton` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding`, `Foreground`, `Text`, `Font` | Background paints below Hover/Pressed; the border paints above them. |
+| `ToggleButton`, `CheckBox`, `RadioButton` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` drive the track/box/ring | Checked fill, check mark, knob and dot stay `Accent`/`AccentText`. |
+| `TextBox`, `RichTextBox` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `Foreground` and font are read by the content host. Radius defaults to `InputCornerRadius` (6 Light/Dark, 2 HighContrast); a 2px `Focus` ring fades in. |
+| `ComboBox` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `Foreground` and typography reach the projected drop-down rows; inline `ComboBoxItem`s keep their own. The editable part is a chrome-less TextBox (`Placeholder` supplied). Radius defaults to `InputCornerRadius`; the hover ring is neutral `BorderHover`, the open ring 1.5px `Focus`, keyboard focus 2px `Focus`; ring opacities use each ring's element `Transitions` collection (150 ms, CubicOut). |
+| `DatePicker` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | The embedded `PART_TextBox` is chrome-less; `Placeholder` is drawn by it and `Foreground` is pushed. Radius defaults to `InputCornerRadius`; the focus ring is 2px `Focus`. |
+| `ListBox`, `TreeView` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | Transparent by default; a host-set chrome paints. `ListBoxItem` also inherits the ContentControl base chrome; row state bands stay theme. |
+| `ItemsControl`, `VirtualList` | none | Layout-only realization hosts; `Background`/`BorderBrush`/`Padding` are not applied. Wrap to add a surface or scrolling. |
+| `Expander` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `HeaderBackground`, `HeaderForeground`, `HeaderBorderBrush`, `HeaderBorderThickness` cover the header. |
+| `GroupBox` | same as Expander | Same header DPs; the frame is the control chrome. |
+| `TabControl` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | The content host is inset by `Padding`; the header row reuses `TabItem`. |
+| `TabItem` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `HeaderForeground` and `SelectionLineBrush`; hover/selection bands stay theme. |
+| `HeaderedContentControl` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `HeaderForeground`; the content host is inset by `Padding`. |
+| `Slider` | none (role chrome) | `TrackBrush`, `FillBrush`, `ThumbBrush`, `FocusRingBrush`. |
+| `ProgressBar` | `CornerRadius` | `TrackBrush`, `FillBrush`. |
+| `ScrollBar` | none (role chrome) | `TrackBrush`, `ThumbBrush`, `ThumbHoverBrush`, `ThumbRadius`. |
+| `Calendar` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `Foreground` is pushed to the month item; day/weekend/today colours stay theme. |
+| `CalendarItem` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `Foreground` covers the month title and day numbers. |
+| `DataGrid` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | Code-painted only when set. Rows, headers, cells, badge/check/progress colours have their own DPs. |
+| `VisualContextMenu` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius` | `Padding` insets the presenter; `Foreground` is pushed to rows; row state bands stay theme. |
+| `VisualMenu` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | `Foreground` is pushed to rows. |
+| `VisualMenuItemContainer` | none | Row bands, check mark, submenu arrow and separator stay theme. |
+| `DropZone` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | The dashed/hot affordance stays theme-driven. |
+| `ScrollViewer` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | ContentControl base paints the chrome; `Padding` insets the template root. |
+| `VisualPopup` | `Background`, `BorderBrush`, `BorderThickness`, `CornerRadius`, `Padding` | Base chrome seeded from the palette; local values win. |
+
+`Border`, `TextBlock`, `ContentControl` and other template-less elements paint `Background`/`BorderBrush` directly
+through the base renderer.

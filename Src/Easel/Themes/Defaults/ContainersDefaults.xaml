@@ -8,14 +8,25 @@
   <Style TargetType="Expander">
     <Style.Template>
       <ControlTemplate TargetType="Expander">
-        <StackPanel IsHitTestVisible="False">
+        <Grid IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Border Grid.RowSpan="2"
+                  IsHitTestVisible="False"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="PART_Header"
+                  Grid.Row="0"
                   IsHitTestVisible="False"
                   Height="32"
                   Padding="0"
-                  Background="{DynamicResource Raised}"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+                  Background="{TemplateBinding HeaderBackground}"
+                  BorderBrush="{TemplateBinding HeaderBorderBrush}"
+                  BorderThickness="{TemplateBinding HeaderBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}">
             <StackPanel Orientation="Horizontal"
                         Spacing="6"
@@ -27,14 +38,16 @@
                          VerticalAlignment="Center"
                          IsHitTestVisible="False" />
               <TextBlock Text="{TemplateBinding Header}"
+                         Foreground="{TemplateBinding HeaderForeground}"
                          VerticalAlignment="Center"
                          IsHitTestVisible="False" />
             </StackPanel>
           </Border>
           <Grid x:Name="PART_ContentHost"
+                Grid.Row="1"
                 Padding="{TemplateBinding Padding}"
                 IsHitTestVisible="False" />
-        </StackPanel>
+        </Grid>
       </ControlTemplate>
     </Style.Template>
   </Style>
@@ -48,8 +61,9 @@
           </Grid.RowDefinitions>
           <Border IsHitTestVisible="False"
                   Padding="0"
-                  BorderBrush="{DynamicResource Border}"
-                  BorderThickness="1"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="PART_Header"
                   IsHitTestVisible="False"
@@ -57,8 +71,11 @@
                   Padding="4,0"
                   HorizontalAlignment="Left"
                   VerticalAlignment="Top"
-                  Background="{DynamicResource Surface}">
+                  Background="{TemplateBinding HeaderBackground}"
+                  BorderBrush="{TemplateBinding HeaderBorderBrush}"
+                  BorderThickness="{TemplateBinding HeaderBorderThickness}">
             <TextBlock Text="{TemplateBinding Header}"
+                       Foreground="{TemplateBinding HeaderForeground}"
                        IsHitTestVisible="False" />
           </Border>
           <StackPanel x:Name="PART_ContentHost"
@@ -74,9 +91,15 @@
        implicit style below applies it. A host replaces the header look by supplying its own TabItem style; the
        tab control only pushes IsSelected / IsPointerOver / IsFocusVisible onto these containers. -->
   <Style x:Key="TabItemContainerStyle" TargetType="TabItem">
+    <Style.Setters>
+      <Setter Property="Padding" Value="14,0" />
+    </Style.Setters>
     <Style.Template>
       <ControlTemplate TargetType="TabItem">
         <Grid Height="32" IsHitTestVisible="False">
+          <Border IsHitTestVisible="False"
+                  Background="{TemplateBinding ChromeBackground}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="HoverBand"
                   IsHitTestVisible="False"
                   Background="{DynamicResource Hover}" />
@@ -87,7 +110,12 @@
                   IsHitTestVisible="False"
                   Height="2"
                   VerticalAlignment="Bottom"
-                  Background="{DynamicResource Accent}" />
+                  Background="{TemplateBinding SelectionLineBrush}" />
+          <Border x:Name="ChromeBorder"
+                  IsHitTestVisible="False"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Border x:Name="FocusRing"
                   IsHitTestVisible="False"
                   Margin="1"
@@ -96,13 +124,15 @@
                   CornerRadius="{TemplateBinding CornerRadius}" />
           <TextBlock x:Name="MutedLabel"
                      Text="{TemplateBinding Header}"
-                     Padding="14,0"
+                     Foreground="{TemplateBinding HeaderForeground}"
+                     Padding="{TemplateBinding Padding}"
                      HorizontalAlignment="Center"
                      VerticalAlignment="Center"
                      IsHitTestVisible="False" />
           <TextBlock x:Name="SelectedLabel"
                      Text="{TemplateBinding Header}"
-                     Padding="14,0"
+                     Foreground="{TemplateBinding HeaderForeground}"
+                     Padding="{TemplateBinding Padding}"
                      HorizontalAlignment="Center"
                      VerticalAlignment="Center"
                      IsHitTestVisible="False" />
@@ -167,8 +197,14 @@
         <Grid IsHitTestVisible="False">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
           </Grid.RowDefinitions>
+          <Border Grid.RowSpan="2"
+                  IsHitTestVisible="False"
+                  Background="{TemplateBinding ChromeBackground}"
+                  BorderBrush="{TemplateBinding ChromeBorderBrush}"
+                  BorderThickness="{TemplateBinding ChromeBorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
           <Grid Grid.Row="0" IsHitTestVisible="False">
             <StackPanel x:Name="PART_HeaderHost"
                         Orientation="Horizontal"
@@ -178,9 +214,9 @@
                     Background="{DynamicResource Border}"
                     IsHitTestVisible="False" />
           </Grid>
-          <Grid x:Name="PART_ContentHost"
-                Grid.Row="1"
-                IsHitTestVisible="False" />
+          <Border Grid.Row="1" Padding="{TemplateBinding Padding}" IsHitTestVisible="False">
+            <Grid x:Name="PART_ContentHost" IsHitTestVisible="False" />
+          </Border>
         </Grid>
       </ControlTemplate>
     </Style.Template>

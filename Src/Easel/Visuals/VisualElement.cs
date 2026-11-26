@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using Easel.Animation;
+using Easel.Animation.Sampling;
 using Easel.Controls;
 using Easel.Visuals.Controls;
 using XamlBrush = Easel.Brush;
@@ -161,6 +163,26 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         nameof(CornerRadius), typeof(float), typeof(VisualElement),
         new PropertyMetadata(0f));
 
+    /// <summary>The background a template should paint: <see cref="Background"/> when set, otherwise the element's theme role.</summary>
+    public static readonly DependencyProperty ChromeBackgroundProperty = DependencyProperty.Register(
+        nameof(ChromeBackground), typeof(XamlBrush), typeof(VisualElement),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The border brush a template should paint: <see cref="BorderBrush"/> when set, otherwise the element's theme role.</summary>
+    public static readonly DependencyProperty ChromeBorderBrushProperty = DependencyProperty.Register(
+        nameof(ChromeBorderBrush), typeof(XamlBrush), typeof(VisualElement),
+        new PropertyMetadata(null) { AffectsRender = true });
+
+    /// <summary>The border thickness a template should paint: <see cref="BorderThickness"/> when set, otherwise the element's theme role.</summary>
+    public static readonly DependencyProperty ChromeBorderThicknessProperty = DependencyProperty.Register(
+        nameof(ChromeBorderThickness), typeof(XamlThickness), typeof(VisualElement),
+        new PropertyMetadata(XamlThickness.Empty));
+
+    /// <summary>The uniform border width a shape template should paint, derived from <see cref="ChromeBorderThickness"/>.</summary>
+    public static readonly DependencyProperty ChromeBorderWidthProperty = DependencyProperty.Register(
+        nameof(ChromeBorderWidth), typeof(float), typeof(VisualElement),
+        new PropertyMetadata(0f));
+
     /// <summary>The opacity of this element and its subtree, in the range 0..1.</summary>
     public static readonly DependencyProperty OpacityProperty = DependencyProperty.Register(
         nameof(Opacity), typeof(double), typeof(VisualElement),
@@ -291,6 +313,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private VisualStyle? _implicitStyle;
     private VisualStyleApplication? _styleApplication;
     private VisualStyleCollection? _styles;
+    private List<Transition>? _transitions;
+    private bool _transitionHold;
     private ResourceDictionary? _resources;
     private VisualNameScope? _templateScope;
     private VisualNameScope? _instanceScope;
@@ -304,6 +328,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     private bool _resolvedFontBold;
     private List<ThemeMetric>? _themeMetrics;
     private bool _themeMetricsSubscribed;
+    private Func<ThemePalette, Color>? _chromeBackgroundTheme;
+    private Func<ThemePalette, Color>? _chromeBorderTheme;
+    private Func<ThemePalette, float>? _chromeBorderWidthTheme;
+    private bool _chromeMetricsRegistered;
 
     // 主题度量必须单占一层：与 Style 同层会在样式卸载时被一并清掉；Inherited(4) 让本地值、
     // 样式触发器、模板与样式 setter 都排在它前面，主题只做兜底。
@@ -470,6 +498,18 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         get => (XamlBrush?)GetValue(BackgroundProperty)!;
         set => SetValue(BackgroundProperty, value);
     }
+
+    /// <summary>The background a template should paint; falls back to the element's theme role when <see cref="Background"/> is unset.</summary>
+    public XamlBrush? ChromeBackground => (XamlBrush?)GetValue(ChromeBackgroundProperty);
+
+    /// <summary>The border brush a template should paint; falls back to the element's theme role when <see cref="BorderBrush"/> is unset.</summary>
+    public XamlBrush? ChromeBorderBrush => (XamlBrush?)GetValue(ChromeBorderBrushProperty);
+
+    /// <summary>The border thickness a template should paint; falls back to the element's theme role when <see cref="BorderThickness"/> is empty.</summary>
+    public XamlThickness ChromeBorderThickness => (XamlThickness)GetValue(ChromeBorderThicknessProperty)!;
+
+    /// <summary>The uniform border width for a shape template, derived from <see cref="ChromeBorderThickness"/>.</summary>
+    public float ChromeBorderWidth => (float)GetValue(ChromeBorderWidthProperty)!;
 
     /// <summary>The background and border corner radius in pixels.</summary>
     public new float CornerRadius
@@ -852,6 +892,14 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// or replaced.
     /// </remarks>
     public VisualStyleCollection Styles => _styles ??= CreateStyles();
+
+    /// <summary>Transitions that animate changes of this element's dependency properties.</summary>
+    /// <remarks>
+    /// The first entry whose <see cref="Transition.Property"/> matches a changed property drives that change from the
+    /// old value to the new value. The collection is created on first use, so elements that declare no transition pay
+    /// nothing for it.
+    /// </remarks>
+    public IList<Transition> Transitions => _transitions ??= [];
 
     /// <summary>Raised after the pointer is pressed on this element or bubbles from a child.</summary>
     public event EventHandler<VisualPointerEventArgs>? PointerPressed;
@@ -1492,6 +1540,18 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     {
         base.OnPropertyChanged(e);
 
+        if (_transitions is { Count: > 0 })
+        {
+            TryStartImplicitTransition(e);
+        }
+
+        if (ReferenceEquals(e.Property, BackgroundProperty)
+            || ReferenceEquals(e.Property, BorderBrushProperty)
+            || ReferenceEquals(e.Property, BorderThicknessProperty))
+        {
+            RefreshChromeValues();
+        }
+
         // 根节点只有位移变化时，整帧像素就是平移；本地记录平移量，避免把整棵树重画一遍。
         // 只有变换与绘制属性才需要沿父链找表面；模板初始化写 TemplatedParent 这类属性不该付这次查找。
         var rootTranslation = false;
@@ -1590,6 +1650,97 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         {
             InvalidateVisual();
         }
+    }
+
+    // 引擎收尾把值落到 Local 层时置位；这一跳是引擎自己写的，不能再被当成用户改动起一趟过渡。
+    internal void BeginTransitionHold() => _transitionHold = true;
+
+    internal void EndTransitionHold() => _transitionHold = false;
+
+    /// <inheritdoc />
+    protected override void OnLayerValueChanged(DependencyProperty property, BindingPriority priority)
+    {
+        base.OnLayerValueChanged(property, priority);
+
+        // 动画层压在底层之上时，底层的 trigger/style 变更不会改写有效值；这里直接把正在跑的过渡改道到新目标。
+        if (priority == BindingPriority.Animation
+            || _transitionHold
+            || !VisualTransition.IsImplicitActive(this, property)
+            || FindTransition(property) is not { } transition)
+        {
+            return;
+        }
+
+        var current = GetValue(property);
+        var underlying = GetValueExcluding(property, BindingPriority.Animation);
+        if (current is null
+            || underlying is null
+            || !ValueInterpolator.CanInterpolate(property.PropertyType))
+        {
+            return;
+        }
+
+        VisualTransition.AnimateFrom(this, property, current, underlying, new AnimationSpec
+        {
+            Duration = transition.Duration,
+            Ease = transition.Ease ?? Eases.Cubic.Out,
+        });
+    }
+
+    // 元素级过渡：按 DP 的旧/新值起一趟动画。引擎自己的帧写（Animation 层）与收尾落值（Hold 包住的那一跳）
+    // 必须跳过，否则会自激成无限动画。
+    private void TryStartImplicitTransition(DependencyPropertyChangedEventArgs e)
+    {
+        // 动画层在跑时，底层的有效值变更（包括与帧写交错出来的旧/新值）由 OnLayerValueChanged 改道，
+        // 这里不能再起一趟，否则会用「当前帧 → 当前帧」盖掉正确的改道。
+        if (_transitionHold
+            || e.Priority == BindingPriority.Animation
+            || VisualTransition.IsActive(this, e.Property))
+        {
+            return;
+        }
+
+        if (FindTransition(e.Property) is not { } match)
+        {
+            return;
+        }
+
+        var oldValue = e.OldValue;
+        var newValue = e.NewValue;
+        if (oldValue is null || newValue is null || Equals(oldValue, newValue))
+        {
+            return;
+        }
+
+        // 没有插值器的类型谈不上“过渡”，直接让新值生效。
+        if (!ValueInterpolator.CanInterpolate(e.Property.PropertyType))
+        {
+            return;
+        }
+
+        VisualTransition.AnimateFrom(this, e.Property, oldValue, newValue, new AnimationSpec
+        {
+            Duration = match.Duration,
+            Ease = match.Ease ?? Eases.Cubic.Out,
+        });
+    }
+
+    private Transition? FindTransition(DependencyProperty property)
+    {
+        if (_transitions is not { Count: > 0 } transitions)
+        {
+            return null;
+        }
+
+        foreach (var transition in transitions)
+        {
+            if (transition is not null && ReferenceEquals(transition.Property, property))
+            {
+                return transition;
+            }
+        }
+
+        return null;
     }
 
     // 宿主 DataContext 变化时由 VisualHost 调用：根没有本地值时补一次 inherited 通知，
@@ -1909,6 +2060,68 @@ public abstract class VisualElement : ContainerVisual, IDisposable
         }
 
         return Surface?.Styles.FindMatch(this) ?? Easel.Theme.FindDefaultStyle(this);
+    }
+
+    /// <summary>Declares the theme colours a template paints when the element's own appearance properties are unset.</summary>
+    /// <param name="background">The palette colour used when <see cref="Background"/> is unset.</param>
+    /// <param name="border">The palette colour used when <see cref="BorderBrush"/> is unset.</param>
+    /// <param name="borderWidth">The border width used when <see cref="BorderThickness"/> is empty.</param>
+    protected void SetChromeTheme(
+        Func<ThemePalette, Color> background,
+        Func<ThemePalette, Color> border,
+        Func<ThemePalette, float> borderWidth)
+    {
+        _chromeBackgroundTheme = background ?? throw new ArgumentNullException(nameof(background));
+        _chromeBorderTheme = border ?? throw new ArgumentNullException(nameof(border));
+        _chromeBorderWidthTheme = borderWidth ?? throw new ArgumentNullException(nameof(borderWidth));
+        if (!_chromeMetricsRegistered)
+        {
+            RegisterChromeMetrics();
+            _chromeMetricsRegistered = true;
+        }
+
+        RefreshChromeValues();
+    }
+
+    // 指标只注册一次；本地属性变化直接写 Chrome 层，避免在主题遍历中改指标集合。
+    private void RegisterChromeMetrics()
+    {
+        SetThemeMetric(ChromeBackgroundProperty, palette =>
+            Background ?? new SolidColorBrush(_chromeBackgroundTheme!(palette)));
+        SetThemeMetric(ChromeBorderBrushProperty, palette =>
+            BorderBrush ?? new SolidColorBrush(_chromeBorderTheme!(palette)));
+        SetThemeMetric(ChromeBorderThicknessProperty, palette =>
+            BorderThickness.IsEmpty
+                ? new XamlThickness(_chromeBorderWidthTheme!(palette))
+                : BorderThickness);
+        SetThemeMetric(ChromeBorderWidthProperty, palette =>
+            BorderThickness.IsEmpty ? _chromeBorderWidthTheme!(palette) : BorderThickness.Left);
+    }
+
+    private void RefreshChromeValues()
+    {
+        if (_chromeBackgroundTheme is null || _chromeBorderTheme is null || _chromeBorderWidthTheme is null)
+        {
+            return;
+        }
+
+        var palette = Theme.Current;
+        SetValue(
+            ChromeBackgroundProperty,
+            Background ?? new SolidColorBrush(_chromeBackgroundTheme(palette)),
+            ThemeMetricPriority);
+        SetValue(
+            ChromeBorderBrushProperty,
+            BorderBrush ?? new SolidColorBrush(_chromeBorderTheme(palette)),
+            ThemeMetricPriority);
+        SetValue(
+            ChromeBorderThicknessProperty,
+            BorderThickness.IsEmpty ? new XamlThickness(_chromeBorderWidthTheme(palette)) : BorderThickness,
+            ThemeMetricPriority);
+        SetValue(
+            ChromeBorderWidthProperty,
+            BorderThickness.IsEmpty ? _chromeBorderWidthTheme(palette) : BorderThickness.Left,
+            ThemeMetricPriority);
     }
 
     /// <summary>Seeds a dependency property from the active palette and keeps it current when the palette changes.</summary>

@@ -153,7 +153,11 @@ public class RichTextBox : TemplatedControl
         IsHitTestVisible = true;
         Padding = new XamlThickness(10f, 8f);
         SetThemeMetric(MinHeightProperty, static palette => (double)palette.ControlHeight);
-        SetThemeMetric(CornerRadiusProperty, static palette => palette.CornerRadius);
+        SetThemeMetric(CornerRadiusProperty, static palette => palette.InputCornerRadius);
+        SetChromeTheme(
+            static palette => palette.ControlBackground,
+            static palette => palette.ControlBorder,
+            static palette => palette.ControlBorderThickness.Left);
         Cursor = Cursors.IBeam;
 
         _caretTimer = new System.Windows.Forms.Timer { Interval = 530 };

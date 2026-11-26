@@ -27,19 +27,30 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
-      <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-        <TextBlock Text="POLICY" Foreground="{StaticResource Muted}" FontSize="8" />
-        <ComboBox x:Name="comboBox"
-                  Width="320"
-                  Height="34"
-                  SelectedIndex="0"
-                  SelectionChanged="OnSelectionChanged" />
+      <StackPanel Grid.Column="0" Spacing="8" VerticalAlignment="Center">
+        <StackPanel Spacing="4">
+          <TextBlock Text="POLICY" Foreground="{StaticResource Muted}" FontSize="8" />
+          <ComboBox x:Name="comboBox"
+                    Width="320"
+                    Height="34"
+                    SelectedIndex="0"
+                    SelectionChanged="OnSelectionChanged" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+          <TextBlock Text="EDITABLE" Foreground="{StaticResource Muted}" FontSize="8" />
+          <ComboBox x:Name="editableCombo"
+                    Width="320"
+                    Height="34"
+                    IsEditable="True"
+                    Placeholder="Type or choose…"
+                    Foreground="{StaticResource Accent}" />
+        </StackPanel>
       </StackPanel>
 
       <StackPanel Grid.Column="1" Margin="20,0,0,0" Spacing="6" VerticalAlignment="Center">
         <TextBlock Text="CURRENT" Foreground="{StaticResource Muted}" FontSize="8" />
         <TextBlock x:Name="status" Text="—" Foreground="{StaticResource Text}" FontSize="14" FontWeight="SemiBold" />
-        <TextBlock Text="The short list is a ListBox inside a ScrollViewer inside a VisualPopup; the popup renders above the root tree."
+        <TextBlock Text="Hover is neutral; open and focus rings fade in. The editable field uses Placeholder and pushes Foreground to its rows."
                    Foreground="{StaticResource Muted}"
                    FontSize="9"
                    Wrap="True" />

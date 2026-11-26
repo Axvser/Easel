@@ -10,7 +10,26 @@ internal static class AnimationScheduler
     private static readonly ConditionalWeakTable<VisualElement, TargetState> Targets = new();
 
     internal static void Animate(VisualElement target, DependencyProperty property, object? to, AnimationSpec spec)
-        => Start(new AnimationRun(target, property, AnimationEffect.FromSpec(spec), to, null));
+        => Animate(target, property, null, to, spec);
+
+    internal static void Animate(
+        VisualElement target,
+        DependencyProperty property,
+        object? from,
+        object? to,
+        AnimationSpec spec)
+        => Animate(target, property, from, to, spec, holdOnComplete: true);
+
+    // holdOnComplete=false 是隐式过渡：收尾摘掉 Animation 层，不把终值写进 Local 层，
+    // 否则会压过触发器的 StyleTrigger 层，下一次状态切换就不会再变色。
+    internal static void Animate(
+        VisualElement target,
+        DependencyProperty property,
+        object? from,
+        object? to,
+        AnimationSpec spec,
+        bool holdOnComplete)
+        => Start(new AnimationRun(target, property, AnimationEffect.FromSpec(spec), to, null, from, holdOnComplete));
 
     internal static void AnimateKeyFrames(
         VisualElement target,
@@ -52,6 +71,34 @@ internal static class AnimationScheduler
         lock (state.Gate)
         {
             return state.Active.Count > 0;
+        }
+    }
+
+    // 该 DP 上是否还有动画（显式或隐式）；动画层压着底层时，底层写入不该另起一趟过渡。
+    internal static bool IsActive(VisualElement target, DependencyProperty property)
+    {
+        if (!Targets.TryGetValue(target, out var state))
+        {
+            return false;
+        }
+
+        lock (state.Gate)
+        {
+            return state.Active.ContainsKey(property);
+        }
+    }
+
+    // 只认元素级过渡（不落 Local 的那一类）；显式动画仍按自己的终值收尾。
+    internal static bool IsImplicitActive(VisualElement target, DependencyProperty property)
+    {
+        if (!Targets.TryGetValue(target, out var state))
+        {
+            return false;
+        }
+
+        lock (state.Gate)
+        {
+            return state.Active.TryGetValue(property, out var run) && !run.HoldOnComplete;
         }
     }
 
@@ -103,7 +150,14 @@ internal static class AnimationScheduler
             {
                 if (!state.Active.ContainsKey(run.Property))
                 {
-                    run.Binding.Hold(value);
+                    if (run.HoldOnComplete)
+                    {
+                        run.Binding.Hold(value);
+                    }
+                    else
+                    {
+                        run.Binding.Release();
+                    }
                 }
             }
         }

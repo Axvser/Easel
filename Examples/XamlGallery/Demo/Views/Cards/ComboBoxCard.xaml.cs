@@ -12,6 +12,10 @@ public sealed partial class ComboBoxCard : ThemedStackPanel
         comboBox.Items.Add("Throughput");
         comboBox.Items.Add("Latency");
         comboBox.Items.Add("Custom");
+        editableCombo.Items.Add("Balanced");
+        editableCombo.Items.Add("Throughput");
+        editableCombo.Items.Add("Latency");
+        editableCombo.Items.Add("Custom");
         OnSelectionChanged(this, EventArgs.Empty);
     }
 
