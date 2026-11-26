@@ -412,7 +412,7 @@ public class RadioButton : ToggleButtonBase
     }
 
     /// <inheritdoc />
-    protected override void ActivateFromInput() => IsChecked = true;
+    protected override void ActivateFromInput() => IsChecked = IsChecked != true;
 
     /// <inheritdoc />
     protected override void RenderGlyph(Graphics graphics, RectangleF bounds)

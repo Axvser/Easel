@@ -105,7 +105,7 @@ public sealed class VisualControlSetTests
     }
 
     [TestMethod]
-    public void RadioButton_ActivationAlwaysChecksAndNeverTogglesOff()
+    public void RadioButton_ActivationTogglesOffOnASecondClick()
     {
         using var surface = CreateSurface(80, 80);
         var radio = new VC.RadioButton { Width = 34, Height = 34 };
@@ -121,7 +121,7 @@ public sealed class VisualControlSetTests
 
         surface.ProcessPointerDown(center, MouseButtons.Left);
         surface.ProcessPointerUp(center, MouseButtons.Left);
-        Assert.IsTrue(radio.IsChecked == true, "clicking a checked radio keeps it checked");
+        Assert.IsFalse(radio.IsChecked == true, "clicking a checked radio clears it");
     }
 
     [TestMethod]
