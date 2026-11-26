@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- The build runs offline in this repository; package vulnerability auditing cannot reach nuget.org. -->
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+</Project>

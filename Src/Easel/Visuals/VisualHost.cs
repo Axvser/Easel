@@ -2433,7 +2433,7 @@ public class VisualHost : System.Windows.Forms.Control
         }
         else
         {
-            _root.Bounds = new RectangleF(0f, 0f, size.Width, size.Height);
+            _root!.Bounds = new RectangleF(0f, 0f, size.Width, size.Height);
         }
 
         // 覆盖层不属于根树：它铺满客户区，子项（Popup）自己决定位置，不参与面板排版。

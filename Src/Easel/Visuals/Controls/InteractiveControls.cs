@@ -424,7 +424,7 @@ public class TextBox : TemplatedControl
     public static readonly DependencyProperty CaretThicknessProperty =
         DependencyProperty.Register(
             nameof(CaretThickness), typeof(double), typeof(TextBox),
-            new PropertyMetadata(1d, null, static (_, value) => Math.Max(0.5d, (double)value))
+            new PropertyMetadata(1d, null, static (_, value) => Math.Max(0.5d, value is double thickness ? thickness : 1d))
             {
                 AffectsRender = true,
             });
@@ -450,7 +450,7 @@ public class TextBox : TemplatedControl
             nameof(CaretBlockOpacity), typeof(double), typeof(TextBox),
             new PropertyMetadata(0.35d, null, static (_, value) =>
             {
-                var opacity = (double)value;
+                var opacity = value is double number ? number : 0.35d;
                 return opacity < 0d ? 0d : opacity > 1d ? 1d : opacity;
             })
             {
@@ -495,7 +495,7 @@ public class TextBox : TemplatedControl
         _editorFocusTimer.Tick += (_, _) =>
         {
             _editorFocusTimer.Stop();
-            if (!_nativeActive || _editor.IsDisposed || _editor.Focused || !IsFocused)
+            if (!_nativeActive || _editor is null || _editor.IsDisposed || _editor.Focused || !IsFocused)
             {
                 _focusAttempts = 0;
                 return;

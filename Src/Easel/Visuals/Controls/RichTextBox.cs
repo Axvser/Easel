@@ -117,7 +117,7 @@ public class RichTextBox : TemplatedControl
     /// <summary>The caret stroke width in device-independent pixels.</summary>
     public static readonly DependencyProperty CaretThicknessProperty = DependencyProperty.Register(
         nameof(CaretThickness), typeof(double), typeof(RichTextBox),
-        new PropertyMetadata(1.5d, null, static (_, value) => Math.Max(0.5d, (double)value))
+        new PropertyMetadata(1.5d, null, static (_, value) => Math.Max(0.5d, value is double thickness ? thickness : 1.5d))
         {
             AffectsRender = true,
         });
