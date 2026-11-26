@@ -38,7 +38,8 @@ internal sealed class NativeSnapshotProxy : Form
         MaximizeBox = false;
         ControlBox = false;
         Opacity = 1d / 255d;
-        BackColor = Color.Magenta;
+        // 代理窗体本身不可见；用控件的底色而不是洋红，PrintWindow 抓快照时不会把窗口底色带进按钮。
+        BackColor = native.BackColor;
 
         Controls.Add(native);
         native.Dock = DockStyle.None;
@@ -46,6 +47,33 @@ internal sealed class NativeSnapshotProxy : Form
     }
 
     protected override bool ShowWithoutActivation => true;
+
+    // 快照代理只负责把鼠标输入送给原生控件；它一激活，宿主窗口就会变成非活动态（DWM 画白边/浅色标题栏）。
+    // WS_EX_NOACTIVATE + WM_MOUSEACTIVATE 的 MA_NOACTIVATE 让点击留在宿主窗口，代理不抢焦点。
+    private const int WsExNoActivate = 0x08000000;
+    private const int WmMouseActivate = 0x0021;
+    private static readonly IntPtr MaNoActivate = new(3);
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var parameters = base.CreateParams;
+            parameters.ExStyle |= WsExNoActivate;
+            return parameters;
+        }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        if (m.Msg == WmMouseActivate)
+        {
+            m.Result = MaNoActivate;
+            return;
+        }
+
+        base.WndProc(ref m);
+    }
 
     internal Control NativeControl => _native;
 
