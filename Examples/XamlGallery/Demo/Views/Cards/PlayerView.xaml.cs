@@ -43,7 +43,8 @@ public sealed partial class PlayerView : ThemedDockPanel
         _viewModel.PropertyChanged += OnViewModelChanged;
         _timer.Tick += OnTimerTick;
         BuildAuroraBrush();
-        artwork.Background = _auroraBrush;
+        // 流动光效落在边框上：内部仍是深色封面，不把整块内容换成渐变。
+        artwork.BorderBrush = _auroraBrush;
         _auroraTimer.Tick += OnAuroraTick;
         _auroraTimer.Start();
         OpenTrack(_viewModel.SelectedTrack ?? _viewModel.Tracks[0]);
