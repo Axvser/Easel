@@ -15,7 +15,7 @@
           Margin="0,0,0,16">
     <StackPanel Spacing="3">
       <TextBlock Text="Now playing" Foreground="{StaticResource Text}" FontSize="20" FontWeight="SemiBold" />
-      <TextBlock Text="A media page: 3D-tilted artwork, a masked accent strip, transport bindings and a playlist."
+      <TextBlock Text="A media page: gradient-animated artwork, a masked accent strip, transport bindings and a playlist."
                  Foreground="{StaticResource Muted}"
                  FontSize="10"
                  Wrap="True" />
@@ -30,14 +30,12 @@
 
     <StackPanel Grid.Column="0" Width="300" Spacing="14" Margin="0,0,20,0">
 
-      <Border Width="260"
+      <Border x:Name="artwork"
+              Width="260"
               Height="260"
               CornerRadius="18"
               Background="{StaticResource DeepGradient}"
               HorizontalAlignment="Center">
-        <Border.Transform3D>
-          <Rotate3DTransform AngleX="10" AngleY="-16" CenterX="130" CenterY="130" Depth="700" />
-        </Border.Transform3D>
         <Grid>
           <Ellipse Width="150" Height="150" Fill="{StaticResource RadialGlow}" HorizontalAlignment="Center" VerticalAlignment="Center" />
           <StackPanel Spacing="4" VerticalAlignment="Bottom" Margin="18">

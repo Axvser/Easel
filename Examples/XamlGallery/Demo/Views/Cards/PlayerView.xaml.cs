@@ -1,5 +1,9 @@
 using System.ComponentModel;
+using System.Drawing;
 using System.Windows.Media;
+using DrawingColor = System.Drawing.Color;
+using EaselGradientStop = Easel.GradientStop;
+using EaselLinearGradientBrush = Easel.LinearGradientBrush;
 using WinFormsTimer = System.Windows.Forms.Timer;
 using Demo.ViewModels;
 
@@ -17,7 +21,15 @@ public sealed partial class PlayerView : ThemedDockPanel
 
     private readonly MediaPlayer _player = new();
     private readonly WinFormsTimer _timer = new() { Interval = 200 };
+    private readonly WinFormsTimer _auroraTimer = new() { Interval = 33 };
+    private readonly EaselLinearGradientBrush _auroraBrush = new()
+    {
+        StartPoint = new PointF(0f, 0f),
+        EndPoint = new PointF(1f, 1f),
+    };
+
     private PlayerViewModel? _viewModel;
+    private double _auroraPhase;
     private string? _currentTrack;
     private bool _updatingFromPlayer;
 
@@ -30,8 +42,47 @@ public sealed partial class PlayerView : ThemedDockPanel
         _viewModel = (PlayerViewModel)DataContext;
         _viewModel.PropertyChanged += OnViewModelChanged;
         _timer.Tick += OnTimerTick;
+        BuildAuroraBrush();
+        artwork.Background = _auroraBrush;
+        _auroraTimer.Tick += OnAuroraTick;
+        _auroraTimer.Start();
         OpenTrack(_viewModel.SelectedTrack ?? _viewModel.Tracks[0]);
         _timer.Start();
+    }
+
+    // 外观是一块普通 Border + 可变 LinearGradientBrush；没有 Transform，动画直接改画刷内部
+    // 的 stops 与起止点，每次 tick 让高光带沿卡片移动。
+    private void BuildAuroraBrush()
+    {
+        _auroraBrush.GradientStops.Add(new EaselGradientStop(DrawingColor.FromArgb(255, 5, 16, 38), 0.0));
+        _auroraBrush.GradientStops.Add(new EaselGradientStop(DrawingColor.FromArgb(255, 26, 132, 172), 0.24));
+        _auroraBrush.GradientStops.Add(new EaselGradientStop(DrawingColor.FromArgb(255, 92, 92, 255), 0.50));
+        _auroraBrush.GradientStops.Add(new EaselGradientStop(DrawingColor.FromArgb(255, 42, 76, 190), 0.76));
+        _auroraBrush.GradientStops.Add(new EaselGradientStop(DrawingColor.FromArgb(255, 5, 16, 38), 1.0));
+    }
+
+    private void OnAuroraTick(object? sender, EventArgs e)
+    {
+        _auroraPhase += 0.045;
+        if (_auroraPhase > Math.PI * 2d)
+        {
+            _auroraPhase -= Math.PI * 2d;
+        }
+
+        var p1 = 0.24 + (0.10 * Math.Sin(_auroraPhase));
+        var p2 = 0.50 + (0.08 * Math.Sin(_auroraPhase + 2.0));
+        var p3 = 0.76 + (0.10 * Math.Sin(_auroraPhase + 4.0));
+        var ordered = new[] { p1, p2, p3 };
+        Array.Sort(ordered);
+        _auroraBrush.GradientStops[1].Offset = ordered[0];
+        _auroraBrush.GradientStops[2].Offset = ordered[1];
+        _auroraBrush.GradientStops[3].Offset = ordered[2];
+
+        var sweep = 0.5 + (0.5 * Math.Sin(_auroraPhase * 0.5));
+        _auroraBrush.StartPoint = new PointF((float)sweep, 0f);
+        _auroraBrush.EndPoint = new PointF((float)(1d - sweep), 1f);
+
+        artwork.InvalidateVisual();
     }
 
     /// <inheritdoc />
@@ -41,6 +92,8 @@ public sealed partial class PlayerView : ThemedDockPanel
         {
             _timer.Stop();
             _timer.Dispose();
+            _auroraTimer.Stop();
+            _auroraTimer.Dispose();
             if (_viewModel is not null)
             {
                 _viewModel.PropertyChanged -= OnViewModelChanged;

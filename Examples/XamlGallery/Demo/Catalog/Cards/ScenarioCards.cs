@@ -25,7 +25,7 @@ internal static class ScenarioCards
             Card(
                 "scenario.player",
                 "Music player",
-                "A real audio player with three embedded tracks, a 3D-tilted album card, a masked strip and transport/seek controls.",
+                "A real audio player with three embedded tracks, a gradient-animated album card, a masked strip and transport/seek controls.",
                 "<Slider Value=\"{Binding Progress}\" ValueChanged=\"OnSeekChanged\" />",
                 _ => new PlayerView()),
             Card(
