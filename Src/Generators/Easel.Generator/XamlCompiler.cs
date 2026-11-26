@@ -14,8 +14,9 @@ namespace Easel.Generator;
 /// <remarks>
 /// Supported subset:
 /// <list type="bullet">
-/// <item>Easel visual types written unprefixed and resolved against the visual backend (the root must derive
-/// from <c>VisualElement</c>); local types through any <c>clr-namespace:</c> prefix such as <c>local:</c>. A legacy
+/// <item>Easel visual types written unprefixed and resolved against the visual backend (the root owner derives
+/// from <c>VisualElement</c>, <c>Easel.ResourceDictionary</c> or <c>Easel.Visuals.Window</c>); local types through
+/// any <c>clr-namespace:</c> prefix such as <c>local:</c>. A legacy
 /// <c>v:</c> prefix still means the visual namespaces. A <c>System.Windows.Forms</c> control is wrapped in
 /// <c>NativeElement&lt;T&gt;</c>: layout and attached members write the wrapper, the rest write the control, and
 /// one visual content root can be nested inside it.</item>
@@ -117,7 +118,7 @@ internal sealed class XamlCompiler
             return;
         }
 
-        if (!IsVisualElement(owner) && !IsResourceDictionary(owner))
+        if (!IsVisualElement(owner) && !IsResourceDictionary(owner) && !IsWindow(owner))
         {
             Report(Diagnostics.UnsupportedRoot, root, root.Name.LocalName, owner.Name);
             return;
@@ -293,6 +294,12 @@ internal sealed class XamlCompiler
             return;
         }
 
+        if (IsWindow(_owner))
+        {
+            EmitWindowRoot(root);
+            return;
+        }
+
         foreach (var element in root.Elements())
         {
             if (IsResourcesProperty(element))
@@ -303,6 +310,84 @@ internal sealed class XamlCompiler
 
         ApplyAttributes(root, _owner, "this");
         ProcessChildren(root, _owner, "this");
+    }
+
+    // Window 的根元素就是窗口本身，所以子元素写 Content；它下面没有视觉父级可以 Add。
+    private void EmitWindowRoot(XElement root)
+    {
+        foreach (var element in root.Elements())
+        {
+            if (IsResourcesProperty(element))
+            {
+                EmitResources(element, "this", _owner);
+            }
+        }
+
+        ApplyAttributes(root, _owner, "this");
+
+        var hasContent = false;
+        foreach (var element in root.Elements())
+        {
+            if (IsResourcesProperty(element))
+            {
+                continue;
+            }
+
+            if (IsPropertyElement(element))
+            {
+                if (element.Name.LocalName.EndsWith(".Content", StringComparison.Ordinal))
+                {
+                    hasContent = true;
+                }
+
+                EmitPropertyElement(element, _owner, "this");
+                continue;
+            }
+
+            if (hasContent)
+            {
+                Report(
+                    Diagnostics.UnsupportedConstruct,
+                    element,
+                    "A Window takes one content root; wrap sibling elements in a container.");
+                continue;
+            }
+
+            var type = ResolveElementType(element);
+            if (type is null)
+            {
+                if (!IsReported(element))
+                {
+                    Report(Diagnostics.UnknownType, element, element.Name.LocalName);
+                }
+
+                continue;
+            }
+
+            string? expression;
+            if (IsNativeControl(type))
+            {
+                expression = EmitNativeControl(element, type);
+            }
+            else if (IsVisualElement(type))
+            {
+                expression = EmitControl(element, type);
+            }
+            else
+            {
+                Report(
+                    Diagnostics.UnsupportedConstruct,
+                    element,
+                    $"'{type.Name}' cannot be the content of a Window; declare a visual element or a native control.");
+                continue;
+            }
+
+            if (expression is not null)
+            {
+                _current.Line($"this.Content = {expression};");
+                hasContent = true;
+            }
+        }
     }
 
     private void EmitResourceDictionaryRoot(XElement root)
@@ -3114,7 +3199,7 @@ internal sealed class XamlCompiler
 
     private void EmitResources(XElement propertyElement, string ownerExpression, ITypeSymbol ownerType)
     {
-        if (IsVisualElement(ownerType))
+        if (IsVisualElement(ownerType) || IsWindow(ownerType))
         {
             EmitVisualResources(propertyElement, ownerExpression, ownerType);
             return;
@@ -4906,6 +4991,9 @@ internal sealed class XamlCompiler
 
     private static bool IsResourceDictionary(ITypeSymbol type)
         => SyntaxHelpers.DerivesFrom(type, "Easel.ResourceDictionary");
+
+    private static bool IsWindow(ITypeSymbol type)
+        => SyntaxHelpers.DerivesFrom(type, SyntaxHelpers.WindowMetadataName);
 
     private static string VisualFqn(string simpleName) => $"global::Easel.Visuals.{simpleName}";
 

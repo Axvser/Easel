@@ -7,10 +7,13 @@ fallback parser.
 
 ## Root and code-behind
 
-Two roots are supported:
+Three roots are supported:
 
 1. A **visual view**: any type deriving `VisualElement`.
 2. A **standalone resource dictionary**: `<ResourceDictionary x:Class="…">` deriving `Easel.ResourceDictionary`.
+3. A **window**: `<Window x:Class="…">` where the code-behind derives `Easel.Visuals.Window`. Its direct
+   children (or `<Window.Content>`) assign `Content`; attributes such as `Title`, `Width` and `Height` write
+   the native form; `<Window.Resources>` lands on the hosting surface.
 
 ```csharp
 public sealed partial class MyView : UserControl
@@ -21,7 +24,8 @@ public sealed partial class MyView : UserControl
 
 - `x:Class` must name a `partial` type in the compilation (`EASEL_XAML009`).
 - The owner must derive from the root type (`EASEL_XAML011`).
-- The root must be a visual type or `ResourceDictionary`; a non-visual root is rejected.
+- A root is a visual type, `ResourceDictionary` or `Window`; anything else is rejected.
+- A `Window` takes exactly one content root.
 - `InitializeComponent` is generated, private and non-partial. Do not declare it (`EASEL_XAML015`).
 - Without `x:Class`, the file is not consumed by this generator (`EASEL_XAML005`).
 

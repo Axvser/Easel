@@ -73,6 +73,7 @@ internal static class SyntaxHelpers
     public const string DependencyPropertyMetadataName = "Easel.DependencyProperty";
     public const string VisualElementMetadataName = "Easel.Visuals.VisualElement";
     public const string NativeElementMetadataName = "Easel.Visuals.Controls.NativeElement";
+    public const string WindowMetadataName = "Easel.Visuals.Window";
 
     public static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .WithMiscellaneousOptions(

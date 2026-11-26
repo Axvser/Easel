@@ -35,6 +35,7 @@
     <AdditionalFiles Include="Fixtures\VisualFormsView.xaml" />
     <AdditionalFiles Include="Fixtures\Transform3DView.xaml" />
     <AdditionalFiles Include="Fixtures\NativeFormsView.xaml" />
+    <AdditionalFiles Include="Fixtures\WindowView.xaml" />
   </ItemGroup>
 
   <ItemGroup>

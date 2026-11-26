@@ -11,10 +11,15 @@ Application.Run(new VisualForm { Root = new MyShellView() });
 
 // or, with an existing native form:
 // form.Controls.Add(new MyShellView());
+
+// or with the window itself declared in XAML:
+// Application.Run(new MainWindow());
 ```
 
 `VisualForm` creates the dock-filled `VisualHost`; the `Control.ControlCollection` extension does the same for a
-plain `Form`. `VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement`
+plain `Form`. `Window : VisualForm` adds the XAML surface: a `Window` root with `x:Class`, `Content` as the
+single visual root, `Title` mapped to the caption and `Resources` forwarded to the surface dictionary.
+`VisualHost.Root` accepts a `VisualElement` or a plain `ContainerVisual`. Only a `VisualElement`
 gets layout and input; a `ContainerVisual` is painted as lightweight decoration.
 
 `NativeElement` (written `<native:Foo>` in XAML, no `xmlns:native` needed) measures with the native

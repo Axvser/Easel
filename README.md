@@ -34,6 +34,29 @@ Controls.Add(host);
 That gives you dependency properties, measure/arrange, styles, templates, triggers, bindings, commands,
 resource dictionaries and a retained visual layer without giving up the WinForms application model.
 
+The window itself can be a XAML root. Derive from `Easel.Visuals.Window` and run it directly:
+
+```xml
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MyApp.MainWindow"
+        Title="My app" Width="1200" Height="800">
+  <DashboardView />
+</Window>
+```
+
+```csharp
+public partial class MainWindow : Window
+{
+    public MainWindow() => InitializeComponent();
+}
+
+Application.Run(new MainWindow());
+```
+
+`Window` derives from `VisualForm`; `Title` maps to the caption, `Window.Resources` go to the surface
+dictionary and the generated initializer assigns the single content root.
+
 ## XAML in, controls out
 
 A view is a normal `x:Class` file: the markup compiles into an `InitializeComponent()`, and

@@ -9,8 +9,9 @@ namespace Easel.Visuals;
 /// The form owns one dock-filled <see cref="VisualHost"/>. Set <see cref="Root"/> to any
 /// <see cref="VisualElement"/>; a non-container root is wrapped in a dock panel so it fills the client area.
 /// The root is not disposed when it is replaced; the caller owns the view and can move it to another host.
+/// <see cref="Window"/> derives from this type so a window can be declared as a XAML root.
 /// </remarks>
-public sealed class VisualForm : Form
+public class VisualForm : Form
 {
     private readonly VisualHost _surface;
     private VisualElement? _root;
@@ -27,10 +28,39 @@ public sealed class VisualForm : Form
         };
         Controls.Add(_surface);
         Theme.Changed += OnThemeChanged;
+        DataContextChanged += OnDataContextChanged;
+        _surface.DataContext = DataContext;
     }
 
     /// <summary>The single surface hosted by this window.</summary>
     public VisualHost Surface => _surface;
+
+#if !NET8_0_OR_GREATER
+    private object? _dataContext;
+
+    /// <summary>The data context inherited by the hosted visual tree.</summary>
+    /// <remarks>
+    /// On .NET 8 and later this is <see cref="System.Windows.Forms.Control.DataContext"/>. Older target
+    /// frameworks expose the same property, event and behaviour here so XAML binds identically on every target.
+    /// </remarks>
+    public object? DataContext
+    {
+        get => _dataContext;
+        set
+        {
+            if (ReferenceEquals(_dataContext, value))
+            {
+                return;
+            }
+
+            _dataContext = value;
+            DataContextChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Raised when <see cref="DataContext"/> changes.</summary>
+    public event EventHandler? DataContextChanged;
+#endif
 
     /// <summary>The visual root shown by this window, or <see langword="null"/>.</summary>
     public VisualElement? Root
@@ -59,6 +89,7 @@ public sealed class VisualForm : Form
         if (disposing)
         {
             Theme.Changed -= OnThemeChanged;
+            DataContextChanged -= OnDataContextChanged;
         }
 
         base.Dispose(disposing);
@@ -68,6 +99,11 @@ public sealed class VisualForm : Form
     {
         BackColor = Theme.Current.WindowBackground;
         _surface.BackColor = Theme.Current.WindowBackground;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        _surface.DataContext = DataContext;
     }
 }
 

@@ -56,26 +56,34 @@ When consuming a checkout instead of NuGet, reference `Src/Easel/Easel.csproj` a
 
 ## Bootstrap
 
-The recommended path is `VisualForm`; it hosts the single surface and accepts any visual root:
+The `e-app` and `e-window` templates start from a XAML `Window`. Put `x:Class` on a `Window` element, derive the
+partial code-behind from `Window` and let the generated initializer assign the content:
+
+```xml
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MyApp.MainWindow"
+        Title="My app"
+        Width="1200"
+        Height="800">
+  <ShellView />
+</Window>
+```
 
 ```csharp
-[STAThread]
-private static void Main()
+public partial class MainWindow : Window
 {
-    ApplicationConfiguration.Initialize();
-    Application.Run(new VisualForm { Text = "My app", ClientSize = new Size(1200, 800), Root = new MyShellView() });
+    public MainWindow() => InitializeComponent();
 }
+
+Application.Run(new MainWindow());
 ```
 
-With an existing native form, the `Control.ControlCollection` extensions create and remove the host:
+`Window : VisualForm`, so the single surface, theme handling and `DataContext` forwarding are unchanged.
+`Title` maps to the native caption, and `Window.Resources` land on the surface dictionary. `Window` takes one
+content root; wrap siblings in a panel.
 
-```csharp
-var form = new Form { Text = "My app", ClientSize = new Size(1200, 800) };
-form.Controls.Add(new MyShellView()); // creates a dock-filled VisualHost
-Application.Run(form);
-```
-
-Both forms host exactly one `VisualHost`; a second `Add` on the same collection throws. `Remove(view)` removes
+Every window hosts exactly one `VisualHost`; a second `Add` on the same collection throws. `Remove(view)` removes
 and disposes the host created by `Add`. `VisualHost` remains the only WinForms `Control` inside the visual tree,
 and `Root` is a `VisualElement` (or a plain `ContainerVisual`). Everything below it is a retained visual.
 

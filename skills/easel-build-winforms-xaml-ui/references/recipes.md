@@ -25,6 +25,26 @@ private static void Main()
 fill. `VisualForm` owns the single `VisualHost`; for an existing `Form`, `form.Controls.Add(new ShellView())`
 creates the same host and `form.Controls.Remove(view)` tears it down.
 
+To keep the window itself in XAML, make a `Window` view and run it directly:
+
+```xml
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MyApp.MainWindow"
+        Title="My app" Width="1280" Height="800">
+  <ShellView />
+</Window>
+```
+
+```csharp
+public partial class MainWindow : Window
+{
+    public MainWindow() => InitializeComponent();
+}
+
+Application.Run(new MainWindow());
+```
+
 A `Theme.Mode` switch mutates the host's theme brushes in place and repaints; no root rebuild is needed. Recreate
 (or refresh) a view only when it captured `Theme.Current` colors at construction or merged its own snapshot
 dictionary.
