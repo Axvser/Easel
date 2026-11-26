@@ -16,6 +16,9 @@
   <Folder Name="/Test/Unit/">
     <Project Path="Src/Test/Unit/Easel.Test/Easel.Test.csproj" />
   </Folder>
+  <Folder Name="/Test/GcAnalysis/">
+    <Project Path="Src/Test/GcAnalysis/Easel.GcAnalysis.csproj" />
+  </Folder>
   <Folder Name="/Examples/">
     <Project Path="Examples/XamlGallery/Demo/Demo.csproj" />
   </Folder>
