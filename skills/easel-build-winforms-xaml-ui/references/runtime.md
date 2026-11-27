@@ -25,13 +25,20 @@ gets layout and input; a `ContainerVisual` is painted as lightweight decoration.
 
 `NativeElement` (written `<native:Foo>` in XAML, no `xmlns:native` needed) measures with the native
 `GetPreferredSize`, arranges into one child HWND, and can host visual content through a nested `VisualHost` over
-the native display rectangle. A live island cannot be alpha-blended or transformed; `IsSnapshot="True"` paints a
-bitmap in the visual pass when composition is required. In a Form it pairs the snapshot with an almost invisible
-(`Opacity=1/255`) owned proxy window, so real mouse/keyboard/IME keep working: opacity/translation are exact, scale
-re-lays the control out at the scaled size, and rotation keeps the transformed polygon interactive. Popups cover
-an island by cutting their rectangle out of its window region; `CornerRadius` rounds that region. `NativeControlHost` is the code-behind
-equivalent. The visual `TextBox` is the default; set `UseNativeEditor="True"` to give the focused field a private
-native editor for IME/accessibility.
+the native display rectangle. A live island cannot be alpha-blended or transformed; opacity, rotation, an effect,
+an opacity mask or a 3D transform switches the element to its bitmap path automatically (`IsSnapshot="True"` forces
+it). In a Form it pairs the snapshot with an almost invisible (`Opacity=1/255`) owned proxy window, so real
+mouse/keyboard/IME keep working: opacity/translation are exact, scale re-lays the control out at the scaled size,
+and rotation keeps the transformed polygon interactive. Popups cover an island by cutting their rectangle out of its
+window region — the live island's region and the snapshot proxy's region — and `CornerRadius` rounds that region.
+`NativeControlHost` is the code-behind equivalent. The visual `TextBox` is the default; set `UseNativeEditor="True"`
+to give the focused field a private native editor for IME/accessibility.
+
+Any element can host a control from code: `element.AddNative(control)` creates the `NativeElement` wrapper and
+returns it. A panel lays the wrapper out with its other children; any other element gives it the padded content box
+(honouring the wrapper's `Margin`, `Width`/`Height` and alignment). `element.NativeChildren` enumerates the islands,
+`Move` reorders their z-order and `RemoveNative` detaches and disposes the wrapper (the control itself is disposed
+only when added with `ownsNative: true`).
 
 ## Custom window chrome
 

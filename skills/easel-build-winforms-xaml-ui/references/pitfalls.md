@@ -73,10 +73,11 @@ the sash; right/below targets grow toward it (delta inverted). Auto-sized target
 ## Native interop
 
 **A WinForms control disappears or paints over everything.** Declare it as `<native:Foo>` (or assign
-`NativeControlHost.Child`); never add the `Control` itself to a visual parent. A native island is an airspace
-rectangle above the tree: it cannot be transformed, clipped or blended, and a popup covers it only by cutting its
-rectangle out of the island's window region. Visual content inside a native element is painted by a nested surface
-and is still bounded by that island.
+`NativeControlHost.Child`, or call `element.AddNative(control)` from code); never add the `Control` itself to a
+visual parent. A live native island is an airspace rectangle above the tree: it cannot be transformed or
+alpha-blended, an ancestor clip reaches it only as a rectangle cut from its window region, and a popup covers it
+only by the same kind of hole. Visual content inside a native element is painted by a nested surface and is still
+bounded by that island.
 
 **A focused TextBox editor floats over a scrollbar.** With `UseNativeEditor=true`, the native editor is clipped to
 the scroll viewport by the host; if you place it in a transformed/clipped subtree, it cannot follow the transform.
@@ -87,12 +88,29 @@ The default visual path has no island.
 re-implements this, keep the `NativeElement` placement scan.
 
 **Opacity or a transform on a live native element does nothing.** A child HWND rejects `WS_EX_LAYERED` and
-`SetLayeredWindowAttributes` fails with `ERROR_INVALID_PARAMETER`; its affine transform is ignored. Set
-`IsSnapshot="True"` to paint it as a bitmap in the visual pass. An almost invisible (`Opacity=1/255`) input proxy
-keeps real input alive; a fully transparent (`Opacity=0`) window is click-through, so do not use zero. A scale
-re-lays the control out at the scaled size; a rotation's internal hit positions and IME candidate stay
-approximate. Nested visual content inside a snapshot container is not interactive. `CornerRadius` and popup
-coverage work on the live window through its region.
+`SetLayeredWindowAttributes` fails with `ERROR_INVALID_PARAMETER`; its affine transform is ignored. The element
+detects opacity, a non-identity own transform, an effect, an opacity mask or a 3D transform — on itself or an
+ancestor — and switches to the bitmap path, so do not expect a plain HWND whether or not `IsSnapshot` is set
+(setting it forces the same path). An almost invisible (`Opacity=1/255`) input proxy keeps real input alive; a
+fully transparent (`Opacity=0`) window is click-through, so do not use zero. A scale re-lays the control out at the
+scaled size; a rotation's internal hit positions and IME candidate stay approximate. Nested visual content inside a
+snapshot container is not interactive. `CornerRadius` and popup coverage work on the live window through its region.
+
+**A transparent native control turns into a dark rectangle under `WS_EX_COMPOSITED`.** WinForms paints a transparent
+control's backdrop through its parent, and window composition breaks that path: the island shows the system control
+colour instead of the visual background. While hosted, `NativeElement` replaces a transparent `BackColor` with the
+nearest opaque visual background (its own or an ancestor's `Background`, then the host's `BackColor`, then the
+theme) and restores the caller's value when the control is detached. A snapshot captured over the same background
+uses that colour too, so put the island inside the coloured container it should blend with.
+
+**A 1px seam appears at fractional positions or during a resize.** A child HWND is placed on whole pixels; rounding
+the logical rectangle first and scaling it afterwards can leave the last row/column uncovered. The host floors the
+logical origin and ceils the far edge, so the window covers every pixel the element paints. If you place islands
+yourself, do the same.
+
+**A popup over a snapshot island cannot be clicked.** The snapshot's input proxy is a separate top-level window and
+sits above the popup; the host cuts the popup rectangle out of the proxy and of the control inside it, so keep
+`RefreshNativeRegions` reachable (it runs from `VisualPopup.Reposition`).
 
 **Theme/native color mode.** Native islands choose their dark/light mode when their handles are created. Call
 `Application.SetColorMode` before creating them; changing it late does not repaint existing HWNDs.
