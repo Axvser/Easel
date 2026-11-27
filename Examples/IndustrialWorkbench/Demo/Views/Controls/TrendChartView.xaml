@@ -1,0 +1,27 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.TrendChartView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <ind:TrendChart Width="640"
+                      Height="320"
+                      Title="压力 / 流量 · 实时趋势"
+                      Unit="%"
+                      Minimum="0"
+                      Maximum="100"
+                      SeriesA="{Binding TrendA}"
+                      SeriesB="{Binding TrendB}" />
+      <TextBlock Text="SeriesA / SeriesB 为 double[]，每次追加新样本即重绘"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

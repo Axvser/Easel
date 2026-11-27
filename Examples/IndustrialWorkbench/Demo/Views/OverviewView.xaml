@@ -1,0 +1,276 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.OverviewView"
+    Background="{StaticResource HmiBackground}">
+
+  <!-- A fixed-design control wall scaled by a Viewbox, so every control stays visible on any window size. -->
+  <Viewbox Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+    <StackPanel Width="1056" Margin="12" Spacing="10">
+
+      <ind:HazardStripe Height="14" Phase="{Binding FlowPhase}" />
+
+      <!-- Row 1: gauges, digits, meters, status tile and lamps. -->
+      <Grid Height="240">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="1.12*" />
+          <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,10,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="主泵出口压力 · bar" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:CircularGauge Grid.Row="1"
+                               Title="P-204"
+                               Unit="bar"
+                               Minimum="0"
+                               Maximum="100"
+                               Value="{Binding Pressure}"
+                               WarnThreshold="70"
+                               DangerThreshold="90" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,10,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="回路温度 · °C" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:CircularGauge Grid.Row="1"
+                               Title="TIC-301"
+                               Unit="°C"
+                               Minimum="0"
+                               Maximum="150"
+                               Value="{Binding Temperature}"
+                               WarnThreshold="95"
+                               DangerThreshold="120"
+                               Accent="{StaticResource HmiAmber}"
+                               DangerBrush="{StaticResource HmiDanger}" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="2"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,10,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="瞬时流量 · m³/h" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:SevenSegmentDisplay Grid.Row="1"
+                                     Height="84"
+                                     Value="{Binding Throughput}"
+                                     Digits="5"
+                                     Decimals="1"
+                                     Unit="m³/h"
+                                     SegmentBrush="{StaticResource HmiAmber}" />
+            <ind:LinearGauge Grid.Row="2"
+                             Title="设定负荷"
+                             Unit="%"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding Setpoint}"
+                             WarnThreshold="80"
+                             DangerThreshold="95"
+                             Margin="0,10,0,0" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="3"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="机组状态" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:StatusTile Grid.Row="1"
+                            Title="LINE STATUS"
+                            Value="{Binding RunStateText}"
+                            Caption="{Binding FanSpeedText}"
+                            IsOn="{Binding LedRun}"
+                            LampBrush="{StaticResource HmiNormal}" />
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" Margin="0,10,0,0">
+              <ind:LedLamp Width="40" Height="60" Label="RUN"
+                           IsOn="{Binding LedRun}" LampColor="{StaticResource HmiNormal}" Phase="{Binding Pulse}" />
+              <ind:LedLamp Width="40" Height="60" Label="WARN"
+                           IsOn="{Binding LedWarn}" LampColor="{StaticResource HmiAmber}" Phase="{Binding Pulse}" />
+              <ind:LedLamp Width="40" Height="60" Label="ALARM"
+                           IsOn="{Binding LedAlarm}" Blink="True" LampColor="{StaticResource HmiDanger}" Phase="{Binding Pulse}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- Row 2: trend, tank and the rotating machinery. -->
+      <Grid Height="214">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="2*" />
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,10,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="压力 / 流量 · 实时趋势" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:TrendChart Grid.Row="1"
+                            Title=""
+                            Unit="%"
+                            Minimum="0"
+                            Maximum="100"
+                            SeriesA="{Binding TrendA}"
+                            SeriesB="{Binding TrendB}" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10"
+                Margin="0,0,10,0">
+          <ind:TankLevel Title="T-301 清水罐"
+                         Unit="%"
+                         Value="{Binding TankLevel}"
+                         LowLimit="15"
+                         HighLimit="85"
+                         Phase="{Binding FlowPhase}" />
+        </Border>
+
+        <Border Grid.Column="2"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="8">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="1.3*" />
+              <RowDefinition Height="1*" />
+            </Grid.RowDefinitions>
+            <ind:MotorFan Grid.Row="0"
+                          Label="P-204 主泵"
+                          Angle="{Binding FanAngle}"
+                          Speed="{Binding FanSpeed}"
+                          IsRunning="{Binding PumpOn}" />
+            <ind:Valve Grid.Row="1"
+                       Title="V-12 进水阀"
+                       Margin="0,6,0,0"
+                       IsOpen="{Binding ValveOpen, Mode=TwoWay}" />
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- Row 3: pipe, knob and the selector lever. -->
+      <Grid Height="150">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="2*" />
+          <ColumnDefinition Width="1*" />
+          <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12"
+                Margin="0,0,10,0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" Text="主给水管道" Foreground="{StaticResource HmiMuted}" FontSize="9" />
+            <ind:PipeFlow Grid.Row="1"
+                          Label="{Binding FlowLabel}"
+                          IsFlowing="{Binding IsRunning}"
+                          FlowRate="{Binding FlowRate}"
+                          Phase="{Binding FlowPhase}" />
+          </Grid>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="8"
+                Margin="0,0,10,0">
+          <ind:Knob Title="SETPOINT"
+                    Unit="%"
+                    Minimum="0"
+                    Maximum="100"
+                    Value="{Binding Setpoint, Mode=TwoWay}" />
+        </Border>
+
+        <Border Grid.Column="2"
+                Background="{StaticResource HmiPanel}"
+                BorderBrush="{StaticResource HmiLine}"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="8">
+          <ind:ToggleSwitch Title="PUMP P-204" IsOn="{Binding PumpOn, Mode=TwoWay}" />
+        </Border>
+      </Grid>
+
+      <!-- Alarm queue. -->
+      <ind:AlarmBanner Height="46"
+                       Message="{Binding AlarmMessage}"
+                       Severity="{Binding AlarmSeverity}"
+                       IsActive="{Binding AlarmActive}"
+                       IsAcknowledged="{Binding AlarmAcknowledged}"
+                       Count="{Binding AlarmCount}"
+                       Phase="{Binding Pulse}"
+                       Acknowledged="OnAlarmAcknowledged" />
+
+      <TextBlock Text="活控件墙：14 类控件同时运行 · 旋钮 / 阀门 / 拨杆 / 报警条可交互"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Viewbox>
+</UserControl>

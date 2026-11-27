@@ -1,0 +1,37 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.LinearGaugeView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <ind:LinearGauge Width="480"
+                       Height="96"
+                       Title="回流流量"
+                       Unit="m³/h"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="{Binding FlowRate}"
+                       WarnThreshold="65"
+                       DangerThreshold="85" />
+      <ind:LinearGauge Width="480"
+                       Height="96"
+                       Title="设定负荷"
+                       Unit="%"
+                       Minimum="0"
+                       Maximum="100"
+                       Value="{Binding Setpoint}"
+                       WarnThreshold="80"
+                       DangerThreshold="95" />
+      <TextBlock Text="轨道颜色随 Warning / Danger 区间切换，填充头带三角标记"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

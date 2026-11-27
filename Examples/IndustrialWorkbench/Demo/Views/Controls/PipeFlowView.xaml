@@ -1,0 +1,33 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.PipeFlowView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <ind:PipeFlow Width="520"
+                    Height="80"
+                    Label="{Binding FlowLabel}"
+                    IsFlowing="{Binding IsRunning}"
+                    FlowRate="{Binding FlowRate}"
+                    Phase="{Binding FlowPhase}" />
+      <ind:PipeFlow Width="520"
+                    Height="80"
+                    Label="回流支路 · 反向"
+                    IsFlowing="{Binding IsRunning}"
+                    FlowRate="{Binding FlowRate}"
+                    Direction="1"
+                    FlowBrush="{StaticResource HmiAmber}"
+                    Phase="{Binding FlowPhase}" />
+      <TextBlock Text="虚线速度跟随 FlowRate；Direction=1 时反向流动"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

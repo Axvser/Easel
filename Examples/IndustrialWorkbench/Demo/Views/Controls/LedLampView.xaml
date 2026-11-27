@@ -1,0 +1,34 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.LedLampView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <StackPanel Orientation="Horizontal" Spacing="36" HorizontalAlignment="Center">
+        <ind:LedLamp Width="72" Height="92" Label="RUN"
+                     IsOn="{Binding LedRun}"
+                     LampColor="{StaticResource HmiNormal}"
+                     Phase="{Binding Pulse}" />
+        <ind:LedLamp Width="72" Height="92" Label="WARN"
+                     IsOn="{Binding LedWarn}"
+                     LampColor="{StaticResource HmiAmber}"
+                     Phase="{Binding Pulse}" />
+        <ind:LedLamp Width="72" Height="92" Label="ALARM"
+                     IsOn="{Binding LedAlarm}"
+                     Blink="True"
+                     LampColor="{StaticResource HmiDanger}"
+                     Phase="{Binding Pulse}" />
+      </StackPanel>
+      <TextBlock Text="ALARM 灯在报警时闪烁：Blink=True，由 Phase 驱动"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

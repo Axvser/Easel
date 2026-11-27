@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <RootNamespace>IndustrialWorkbench</RootNamespace>
+    <AssemblyName>IndustrialWorkbench</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The XAML views take UserControl/Panel/Orientation from Easel. The implicit WinForms
+         namespace would make those names ambiguous, so every non-XAML file imports WinForms explicitly. -->
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build against the checkout's Easel source projects. -->
+    <ProjectReference Include="..\..\..\Src\Easel\Easel.csproj" />
+    <!-- Debug compiles the generator from source; Release receives the packaged analyzer through Easel. -->
+    <ProjectReference Include="..\..\..\Src\Generators\Easel.Generator\Easel.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="**/*.xaml" />
+  </ItemGroup>
+</Project>

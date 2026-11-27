@@ -1,0 +1,33 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.StatusTileView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <ind:StatusTile Width="250" Height="110"
+                        Title="LINE STATUS"
+                        Value="{Binding RunStateText}"
+                        Caption="{Binding FanSpeedText}"
+                        IsOn="{Binding LedRun}"
+                        LampBrush="{StaticResource HmiNormal}" />
+        <ind:StatusTile Width="250" Height="110"
+                        Title="TANK T-301"
+                        Value="{Binding TankLevel, StringFormat=F0}"
+                        Caption="清水罐 · 液位"
+                        IsOn="{Binding LedWarn}"
+                        LampBrush="{StaticResource HmiAmber}" />
+      </StackPanel>
+      <TextBlock Text="复合控件：StatusTile.xaml 负责视觉，code-behind 提供 DP 与通知"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

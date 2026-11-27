@@ -1,0 +1,13 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:IndustrialWorkbench"
+    xmlns:vm="clr-namespace:IndustrialWorkbench.ViewModels"
+    x:Class="IndustrialWorkbench.MainForm"
+    Title="Industrial Workbench — HMI / SCADA control kit">
+  <!-- DataContext is emitted before the content, so the shell inherits the simulation model as it attaches. -->
+  <Window.DataContext>
+    <vm:WorkbenchViewModel />
+  </Window.DataContext>
+  <local:WorkbenchShell />
+</Window>

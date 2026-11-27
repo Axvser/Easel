@@ -1,0 +1,36 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.HazardStripeView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Border Background="{StaticResource HmiPanel}"
+              BorderBrush="{StaticResource HmiLine}"
+              BorderThickness="1"
+              CornerRadius="4"
+              Padding="0">
+        <StackPanel Spacing="0">
+          <ind:HazardStripe Width="500" Height="18" Phase="{Binding FlowPhase}" />
+          <Border Padding="18,14">
+            <StackPanel Spacing="6">
+              <TextBlock Text="DANGER · 高压区域" Foreground="{StaticResource HmiDanger}" FontSize="13" FontWeight="Bold" />
+              <TextBlock Text="仅授权人员进入。运行时请保持安全距离。"
+                         Foreground="{StaticResource HmiMuted}" FontSize="9" Wrap="True" MaxWidth="440" />
+            </StackPanel>
+          </Border>
+          <ind:HazardStripe Width="500" Height="18" Phase="{Binding FlowPhase}" Angle="45" StripeWidth="14" />
+        </StackPanel>
+      </Border>
+      <TextBlock Text="斜向条纹按 Phase 滚动，可用作分区警示带或装饰"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>

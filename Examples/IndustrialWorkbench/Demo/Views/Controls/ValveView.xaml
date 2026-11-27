@@ -1,0 +1,23 @@
+<UserControl
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ind="clr-namespace:IndustrialWorkbench.Controls"
+    x:Class="IndustrialWorkbench.Views.Controls.ValveView">
+
+  <Border Background="{StaticResource HmiPanelAlt}"
+          BorderBrush="{StaticResource HmiLine}"
+          BorderThickness="1"
+          CornerRadius="4"
+          Padding="24">
+    <StackPanel Spacing="18" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <ind:Valve Width="280"
+                 Height="280"
+                 Title="V-12 进水阀"
+                 IsOpen="{Binding ValveOpen, Mode=TwoWay}" />
+      <TextBlock Text="点击阀门切换开闭；IsOpen 双向写回 ViewModel.ValveOpen"
+                 Foreground="{StaticResource HmiMuted}"
+                 FontSize="9"
+                 HorizontalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</UserControl>
