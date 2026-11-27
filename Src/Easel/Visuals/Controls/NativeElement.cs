@@ -821,6 +821,15 @@ public class NativeElement : VisualElement
         ApplyProxyRegion();
     }
 
+    /// <summary>Re-places the snapshot input proxy after an ancestor scroll moved this element.</summary>
+    internal void RefreshSnapshotPlacement()
+    {
+        if (UseSnapshotPath)
+        {
+            UpdateInputProxy();
+        }
+    }
+
     // 对话框遮罩要盖住原生岛；快照岛的可见内容在宿主里，浮在上面的是代理窗口，一并收起。
     internal void SetProxySuppressed(bool suppressed)
     {

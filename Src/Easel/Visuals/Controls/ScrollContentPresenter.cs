@@ -25,6 +25,8 @@ public class ScrollContentPresenter : ContentPresenter, IScrollInfo
     private float _viewportHeight;
     private float _horizontalOffset;
     private float _verticalOffset;
+    private float _lastArrangedHorizontalOffset;
+    private float _lastArrangedVerticalOffset;
     private bool _canHorizontallyScroll;
     private bool _canVerticallyScroll = true;
     private bool _isExternalScroll;
@@ -297,11 +299,26 @@ public class ScrollContentPresenter : ContentPresenter, IScrollInfo
             var height = Math.Max(viewport.Height, _extentHeight);
             var offsetX = _isExternalScroll ? 0f : _canHorizontallyScroll ? _horizontalOffset : 0f;
             var offsetY = _isExternalScroll ? 0f : _canVerticallyScroll ? _verticalOffset : 0f;
+            var offsetsChanged =
+                Math.Abs(_horizontalOffset - _lastArrangedHorizontalOffset) > 0.01f
+                || Math.Abs(_verticalOffset - _lastArrangedVerticalOffset) > 0.01f;
             content.Arrange(new RectangleF(
                 viewport.Left - offsetX,
                 viewport.Top - offsetY,
                 width,
                 height));
+
+            // 滚动只改内容的排列原点，不保证每个后代都重走 ArrangeOverride；活体 HWND 岛与快照代理
+            // 必须按新的 AbsoluteBounds 重新摆放，否则视觉内容滚走、原生控件留在原处。
+            if (offsetsChanged)
+            {
+                _lastArrangedHorizontalOffset = _horizontalOffset;
+                _lastArrangedVerticalOffset = _verticalOffset;
+                if (!_isExternalScroll)
+                {
+                    Surface?.RefreshNativePlacements();
+                }
+            }
         }
 
         RaiseScrollChanged();

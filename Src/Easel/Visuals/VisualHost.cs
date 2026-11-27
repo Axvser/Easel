@@ -1865,6 +1865,40 @@ public class VisualHost : System.Windows.Forms.Control
         }
     }
 
+    /// <summary>Re-places native islands and snapshot proxies after their visual elements moved without an arrange pass.</summary>
+    /// <remarks>
+    /// A scroll or camera changes the arranged origin of the content without necessarily calling each descendant's
+    /// <c>ArrangeOverride</c>. The HWND islands and their input proxies keep their old screen rectangles unless this
+    /// runs. <see cref="ScrollContentPresenter"/> calls it when an offset changes; custom pan/scroll hosts should do
+    /// the same.
+    /// </remarks>
+    public void RefreshNativePlacements()
+    {
+        if (_nativeChildren.Count == 0 && _snapshotProxies.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var pair in _nativeChildren.ToArray())
+        {
+            if (pair.Key.Surface == this && pair.Key.IsVisible)
+            {
+                PlaceNative(pair.Key, pair.Value, pair.Key.AbsoluteBounds);
+            }
+            else
+            {
+                RemoveNative(pair.Key);
+            }
+        }
+
+        foreach (var owner in _snapshotProxies.ToArray())
+        {
+            owner.RefreshSnapshotPlacement();
+        }
+
+        RefreshNativeRegions();
+    }
+
     private void RestoreNativeRegion(System.Windows.Forms.Control child)
     {
         if (_nativeRegionStates.Remove(child))

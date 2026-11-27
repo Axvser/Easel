@@ -2,9 +2,10 @@
 
 ## The one-HWND model
 
-`VisualHost : System.Windows.Forms.Control` owns the only HWND. It measures and arranges the root
-`VisualElement`, paints the whole visual tree into its double buffer, and routes pointer/keyboard/text input to
-the deepest hit element. No visual element creates a window.
+`VisualHost : System.Windows.Forms.Control` is the HWND the visual tree draws through. It measures and arranges
+the root `VisualElement`, paints the whole visual tree into its double buffer, and routes pointer/keyboard/text
+input to the deepest hit element. A visual element never creates a top-level window; child HWNDs come only from
+native islands (and the focused native editor).
 
 ```csharp
 Application.Run(new VisualForm { Root = new MyShellView() });
@@ -202,10 +203,15 @@ handles IME, but the editor is a child HWND clipped to the scroll viewport; it c
 `HorizontalScrollBarVisibility` / `VerticalScrollBarVisibility` to `Auto`, `Visible`, `Hidden` or `Disabled`.
 With `CanContentScroll=true` and content implementing `IScrollInfo`, extent/offset come from the content.
 
+Live native islands move with the content: when the presenter's offset changes, it re-places every
+`NativeElement` and snapshot input proxy from the element's current `AbsoluteBounds`. A custom pan/camera host
+that moves content outside the normal arrange pass must call `VisualHost.RefreshNativePlacements()` afterwards;
+otherwise the HWND keeps its old screen rectangle while the visual content scrolls.
+
 `VisualPopup` opens in the surface overlay, above the root tree and not clipped by ancestor
 `ScrollViewer.Clip`. Set `PlacementTarget`, `Placement`, `HorizontalOffset`, `VerticalOffset`, `StaysOpen`;
-`Opened`/`Closed` report lifecycle. The overlay content resolves resources only from its own dictionary and
-`VisualHost.Resources`.
+`Opened`/`Closed` report lifecycle. The overlay content resolves resources from its own dictionary,
+`VisualHost.Resources` and `EaselApplication.Resources`; it does not see the root tree's element chain.
 
 ## DPI
 
@@ -246,8 +252,8 @@ Application.Run(new MainWindow());          // Window : VisualForm
 ## Lifetime
 
 `VisualHost.ClosePopups()` and replacing `Root` release popups and native islands. `VisualElement.Dispose()`
-disposes descendants, bitmap caches, resource subscriptions and its native editor/child. Dispose a preview tree
-when you replace it, as the gallery does:
+disposes descendants, bitmap caches, resource subscriptions and its native editor/child. Dispose a replaced tree
+yourself:
 
 ```csharp
 var previous = host.Root as VisualElement;
