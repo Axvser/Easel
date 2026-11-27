@@ -1,0 +1,117 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativeEmbedCard"
+    Width="840"
+    Spacing="10">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock
+          Text="Easel inside a native container"
+          Foreground="{StaticResource Text}"
+          FontSize="20"
+          FontWeight="SemiBold" />
+      <TextBlock
+          Text="The native GroupBox owns the HWND; its display rectangle hosts a nested visual surface with ProgressBars, text and a visual button. A native button lives in the same visual StackPanel."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource AccentGradient}"
+        CornerRadius="8"
+        Padding="8,3"
+        VerticalAlignment="Center">
+      <TextBlock Text="NATIVE CONTAINER" Foreground="{StaticResource AccentText}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <Grid Height="240">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="200" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="4">
+      <TextBlock Text="NATIVE LISTBOX" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+      <native:ListBox
+          x:Name="meterList"
+          Height="216"
+          BorderStyle="None"
+          SelectedIndexChanged="OnMeterSelected" />
+    </StackPanel>
+
+    <native:GroupBox
+        x:Name="readoutGroup"
+        Grid.Column="1"
+        Text="Live readout"
+        Height="240"
+        Margin="12,0,0,0">
+      <StackPanel Spacing="7">
+
+        <TextBlock
+            x:Name="meterTitle"
+            Text="Select a meter"
+            Foreground="{StaticResource Text}"
+            FontSize="16"
+            FontWeight="SemiBold" />
+
+        <TextBlock
+            x:Name="meterSubtitle"
+            Text="Nested visual surface inside the native GroupBox."
+            Foreground="{StaticResource Muted}"
+            FontSize="10"
+            Wrap="True" />
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="88" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Flow" Foreground="{StaticResource Text}" FontSize="10" VerticalAlignment="Center" />
+          <ProgressBar x:Name="flowBar" Grid.Column="1" Height="8" Maximum="100" Value="0" />
+        </Grid>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="88" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Pressure" Foreground="{StaticResource Text}" FontSize="10" VerticalAlignment="Center" />
+          <ProgressBar x:Name="pressureBar" Grid.Column="1" Height="8" Maximum="100" Value="0" />
+        </Grid>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="88" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="Temperature" Foreground="{StaticResource Text}" FontSize="10" VerticalAlignment="Center" />
+          <ProgressBar x:Name="temperatureBar" Grid.Column="1" Height="8" Maximum="100" Value="0" />
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+          <Button Text="Boost flow" Height="28" Click="OnBoostClick" />
+          <native:Button Text="Next meter" Width="96" Height="28" Click="OnNextClick" />
+        </StackPanel>
+
+        <TextBlock
+            x:Name="readoutStatus"
+            Text="Native and visual controls stay live."
+            Foreground="{StaticResource Muted}"
+            FontSize="9"
+            Wrap="True" />
+      </StackPanel>
+    </native:GroupBox>
+  </Grid>
+
+</local:ThemedStackPanel>

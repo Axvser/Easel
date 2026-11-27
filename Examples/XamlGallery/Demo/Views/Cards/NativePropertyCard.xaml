@@ -1,0 +1,92 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativePropertyCard"
+    Width="840"
+    Spacing="10">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock
+          Text="Property editing"
+          Foreground="{StaticResource Text}"
+          FontSize="20"
+          FontWeight="SemiBold" />
+      <TextBlock
+          Text="A native PropertyGrid edits a plain CLR settings object through categories and descriptions. The visual summary and the visual buttons share the same object; the grid is refreshed after a programmatic write."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource EmeraldGradient}"
+        CornerRadius="8"
+        Padding="8,3"
+        VerticalAlignment="Center">
+      <TextBlock Text="CLR PROPERTIES" Foreground="{StaticResource AccentText}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <Grid Height="280">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="360" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <native:PropertyGrid
+        x:Name="settingsGrid"
+        Width="360"
+        Height="280"
+        ToolbarVisible="False"
+        PropertyValueChanged="OnPropertyValueChanged" />
+
+    <StackPanel Grid.Column="1" Margin="14,0,0,0" Spacing="8">
+      <TextBlock Text="VISUAL SUMMARY" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+
+      <Border
+          Background="{StaticResource SurfaceAlt}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="8"
+          Padding="12,10">
+        <StackPanel Spacing="4">
+          <TextBlock
+              x:Name="settingsTitle"
+              Text="Pump A  ·  Line 1"
+              Foreground="{StaticResource Text}"
+              FontSize="16"
+              FontWeight="SemiBold" />
+          <TextBlock
+              x:Name="settingsLine"
+              Text="Capacity 120  ·  alarm at 75%"
+              Foreground="{StaticResource Muted}"
+              FontSize="10"
+              Wrap="True" />
+          <TextBlock Text="ALARM LEVEL" Foreground="{StaticResource Muted}" FontSize="8" Margin="0,4,0,0" />
+          <ProgressBar x:Name="alarmBar" Height="8" Maximum="100" Value="75" />
+        </StackPanel>
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Text="Reset defaults" Height="30" Click="OnResetClick" />
+        <Button Text="Double capacity" Height="30" Click="OnDoubleCapacityClick" />
+      </StackPanel>
+
+      <TextBlock
+          x:Name="dirtyText"
+          Text="Edit a property in the native grid."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+  </Grid>
+
+</local:ThemedStackPanel>

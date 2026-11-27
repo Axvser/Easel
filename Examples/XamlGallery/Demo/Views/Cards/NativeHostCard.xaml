@@ -3,13 +3,73 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:Demo.Views"
     x:Class="Demo.Views.NativeHostCard"
-    Spacing="8">
+    Width="840"
+    Spacing="10">
 
-  <TextBlock Text="The code-behind form of a native island: the host keeps one rectangle above the visual tree. Declare &lt;native:…&gt; in XAML for layout participation."
-             Width="360"
-             Foreground="{StaticResource Muted}"
-             Wrap="True" />
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
 
-  <NativeControlHost x:Name="host" Width="190" Height="32" />
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock
+          Text="NativeControlHost"
+          Foreground="{StaticResource Text}"
+          FontSize="20"
+          FontWeight="SemiBold" />
+      <TextBlock
+          Text="Use the host when a control is built entirely in code — an existing factory, a plug-in or a control configured after construction. The host keeps one rectangle in the visual layout and owns the child."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource SunsetGradient}"
+        CornerRadius="8"
+        Padding="8,3"
+        VerticalAlignment="Center">
+      <TextBlock Text="CODE-BEHIND" Foreground="{StaticResource AccentText}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <Grid Height="184">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <NativeControlHost
+        x:Name="host"
+        Height="184"
+        HorizontalAlignment="Stretch" />
+
+    <StackPanel Grid.Column="1" Width="200" Margin="14,0,0,0" Spacing="8" VerticalAlignment="Center">
+      <TextBlock Text="WHAT TO TRY" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+      <TextBlock
+          Text="Select a row in the native list; the visual status follows the native selection."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+      <Button Text="Add build" Height="30" Click="OnAddClick" />
+      <Button Text="Clear list" Height="30" Click="OnClearClick" />
+    </StackPanel>
+  </Grid>
+
+  <Border
+      Background="{StaticResource SurfaceAlt}"
+      BorderBrush="{StaticResource Border}"
+      BorderThickness="1"
+      CornerRadius="8"
+      Padding="12,8">
+    <TextBlock
+        x:Name="hostStatus"
+        Text="The ListView is created and configured in code, then assigned to NativeControlHost.Child."
+        Foreground="{StaticResource Muted}"
+        FontSize="10"
+        Wrap="True" />
+  </Border>
 
 </local:ThemedStackPanel>

@@ -2,10 +2,10 @@
 
 namespace Demo.Views;
 
-/// <summary>A native TextBox bound two-way to <see cref="Name"/>; the visual TextBlock shows the same source.</summary>
+/// <summary>A native TextBox bound two-way to <see cref="Note"/>; the visual preview shows the same source.</summary>
 public sealed partial class NativeBindingCard : ThemedStackPanel, INotifyPropertyChanged
 {
-    private string _name = "type here";
+    private string _note = "Call the customer before the noon cut-off.";
     private PropertyChangedEventHandler? _propertyChanged;
 
     /// <summary>Creates the view and runs the generated initializer.</summary>
@@ -15,19 +15,19 @@ public sealed partial class NativeBindingCard : ThemedStackPanel, INotifyPropert
         InitializeComponent();
     }
 
-    /// <summary>The source both the native field and the visual label bind to.</summary>
-    public string Caption
+    /// <summary>The source both the native field and the visual preview bind to.</summary>
+    public string Note
     {
-        get => _name;
+        get => _note;
         set
         {
-            if (_name == value)
+            if (_note == value)
             {
                 return;
             }
 
-            _name = value;
-            _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Caption)));
+            _note = value;
+            _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Note)));
         }
     }
 

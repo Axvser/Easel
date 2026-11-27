@@ -3,30 +3,81 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="clr-namespace:Demo.Views"
     x:Class="Demo.Views.NativeBindingCard"
-    Spacing="8">
+    Width="840"
+    Spacing="10">
 
-  <TextBlock
-      Text="A native WinForms TextBox bound two-way through the proxy dependency property. The visual TextBlock follows the same source."
-      Width="400"
-      HorizontalAlignment="Left"
-      Foreground="{StaticResource Muted}"
-      Wrap="True" />
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
 
-  <native:TextBox
-      x:Name="nativeText"
-      Width="280"
-      Height="30"
-      HorizontalAlignment="Left"
-      Text="{Binding Caption, Mode=TwoWay}" />
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock
+          Text="Native binding"
+          Foreground="{StaticResource Text}"
+          FontSize="20"
+          FontWeight="SemiBold" />
+      <TextBlock
+          Text="The native TextBox has no dependency properties, so Text binds through a proxy dependency property on the wrapper. The visual preview reads the same source."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
 
-  <TextBlock x:Name="mirror" Text="{Binding Caption}" FontSize="14" HorizontalAlignment="Left" />
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource SignalGradient}"
+        CornerRadius="8"
+        Padding="8,3"
+        VerticalAlignment="Center">
+      <TextBlock Text="PROXY DP" Foreground="{StaticResource AccentText}" FontSize="8" />
+    </Border>
+  </Grid>
 
-  <TextBlock
-      Text="Type in the native field: TextChanged writes the proxy property, the binding updates the source, and the visual TextBlock re-renders."
-      Width="400"
-      HorizontalAlignment="Left"
-      Foreground="{StaticResource Muted}"
-      FontSize="11"
-      Wrap="True" />
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="380" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="5">
+      <TextBlock Text="CUSTOMER NOTE" Foreground="{StaticResource Muted}" FontSize="8" />
+      <native:TextBox
+          x:Name="noteField"
+          Width="360"
+          Height="30"
+          HorizontalAlignment="Left"
+          Text="{Binding Note, Mode=TwoWay}" />
+      <TextBlock
+          Text="Type in the native field: TextChanged writes the proxy property, the binding updates this view model, and the visual preview re-renders."
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource SurfaceAlt}"
+        BorderBrush="{StaticResource Border}"
+        BorderThickness="1"
+        CornerRadius="8"
+        Padding="12,10"
+        Margin="14,0,0,0">
+      <StackPanel Spacing="4">
+        <TextBlock Text="VISUAL PREVIEW" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+        <TextBlock
+            x:Name="mirror"
+            Text="{Binding Note}"
+            Foreground="{StaticResource Text}"
+            FontSize="12"
+            Wrap="True" />
+        <TextBlock
+            Text="Same source, two trees."
+            Foreground="{StaticResource Muted}"
+            FontSize="9" />
+      </StackPanel>
+    </Border>
+  </Grid>
 
 </local:ThemedStackPanel>

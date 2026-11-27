@@ -1,0 +1,120 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.NativeWorkspaceCard"
+    Width="840"
+    Spacing="6">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="2">
+      <TextBlock
+          Text="Order workspace"
+          Foreground="{StaticResource Text}"
+          FontSize="20"
+          FontWeight="SemiBold" />
+      <TextBlock
+          Text="Native controls laid out by the visual Grid; sort or edit the rows, then apply the fields."
+          Width="700"
+          Foreground="{StaticResource Muted}"
+          FontSize="10"
+          Wrap="True" />
+    </StackPanel>
+
+    <Border
+        Grid.Column="1"
+        Background="{StaticResource AuroraGradient}"
+        CornerRadius="8"
+        Padding="8,3"
+        VerticalAlignment="Center">
+      <TextBlock Text="NATIVE CONTROLS" Foreground="{StaticResource AccentText}" FontSize="8" />
+    </Border>
+  </Grid>
+
+  <native:ToolStrip x:Name="toolStrip" Height="27" />
+
+  <Grid Height="185">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="190" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="4">
+      <TextBlock Text="WORKSPACE" Foreground="{StaticResource Accent}" FontSize="8" FontWeight="SemiBold" />
+      <native:TreeView x:Name="navTree" Height="165" BorderStyle="None" AfterSelect="OnNavSelect" />
+    </StackPanel>
+
+    <native:DataGridView
+        x:Name="ordersGrid"
+        Grid.Column="1"
+        Height="185"
+        Margin="12,0,0,0"
+        AllowUserToAddRows="False"
+        AutoSizeColumnsMode="Fill"
+        BorderStyle="None"
+        EnableHeadersVisualStyles="False"
+        RowHeadersVisible="False"
+        SelectionMode="FullRowSelect" />
+  </Grid>
+
+  <StackPanel Orientation="Horizontal" Spacing="10" Height="30">
+    <TextBlock Text="QTY" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+    <native:NumericUpDown
+        x:Name="qtyField"
+        Width="86"
+        Minimum="1"
+        Maximum="999"
+        ValueChanged="OnQtyChanged" />
+
+    <TextBlock Text="DUE" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+    <native:DateTimePicker
+        x:Name="dueField"
+        Width="150"
+        Format="Short"
+        ValueChanged="OnDueChanged" />
+
+    <TextBlock Text="STATUS" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+    <native:ComboBox x:Name="statusField" Width="126" SelectedIndexChanged="OnStatusChanged" />
+
+    <Button
+        Text="Apply to order"
+        Height="30"
+        VerticalAlignment="Center"
+        Click="OnApplyClick" />
+  </StackPanel>
+
+  <Grid Height="24">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+      <TextBlock
+          x:Name="detailTitle"
+          Text="No row selected"
+          Foreground="{StaticResource Text}"
+          FontSize="11"
+          FontWeight="SemiBold" />
+      <TextBlock
+          x:Name="detailLine"
+          Text="Pick a row in the native grid."
+          Width="380"
+          Foreground="{StaticResource Muted}"
+          FontSize="10" />
+    </StackPanel>
+
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+      <TextBlock Text="QUANTITY" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+      <ProgressBar x:Name="qtyBar" Width="110" Height="8" Maximum="200" Value="0" />
+    </StackPanel>
+  </Grid>
+
+  <native:StatusStrip x:Name="statusStrip" Height="24" AutoSize="False" />
+
+</local:ThemedStackPanel>

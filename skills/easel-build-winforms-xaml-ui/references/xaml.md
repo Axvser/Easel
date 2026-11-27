@@ -60,17 +60,23 @@ Write the built-in `native:` prefix; no `xmlns:native` declaration is needed. Th
 </native:GroupBox>
 ```
 
-- Layout attributes (`Margin`, `Width`/`Height`, `Min`/`Max`, `HorizontalAlignment`, `VerticalAlignment`,
-  `Visibility`, `IsEnabled`, `DataContext`, attached properties) write the wrapper `NativeElement`, so they use
-  the normal measure/arrange pass.
+- Layout and composition attributes write the wrapper `NativeElement`, so they use the normal measure/arrange
+  pass: `Margin`, `Width`/`Height`, `Min`/`Max`, `HorizontalAlignment`, `VerticalAlignment`, `Visibility`,
+  `IsEnabled`, `DataContext`, `CornerRadius`, `BorderBrush`, `BorderThickness`, `Opacity`, `IsSnapshot`, and
+  attached properties (`Grid.Row`, `DockPanel.Dock`, `Canvas.Left`, `Panel.ZIndex`).
 - Every other attribute (`Text`, `BackColor`, `Padding`, `AutoSize`, `Tag`, …) and any event writes the native
-  control.
+  control. A visual-only property the native control does not have (`Foreground`, `Transform`, `Dock`) is
+  reported instead of silently dropped.
 - A native element hosts one visual root (`Content`). Several native children are allowed and are wrapped in an implicit vertical `StackPanel` in document order; nest an explicit panel when another layout is needed.
 - `x:Name` is the wrapper; `Name.Native` is the typed control.
 - Code-behind can host a control on any element: `element.AddNative(control)` returns the `NativeElement` wrapper. The wrapper is a normal child of a panel; on an element that does not lay out children it fills the padded content box (set `Width`/`Height`/`Margin`/alignment on the wrapper to place it). `element.NativeChildren` enumerates, removes (`RemoveNative`) and reorders (`Move`) the islands; a panel's layout still wins for its own children.
 - A native CLR property binding goes through `NativePropertyBinding.For(type, property)`: the binding writes a proxy property on the wrapper and the control is updated. `Mode=TwoWay`/`OneWayToSource` reports back through `INotifyPropertyChanged` or the conventional `XxxChanged` event; a control with neither calls `NativePropertyBinding.NotifyChanged(control, nameof(...))` (or `wrapper.NotifyNativePropertyChanged(...)`) after changing the value — nothing polls. The native `Enter`/`Leave` raise the wrapper's logical `GotFocus`/`LostFocus`, so `UpdateSourceTrigger=LostFocus` behaves exactly like a visual target.
 - `Opacity`, `Transform`, `Effect`, an opacity mask or a 3D transform on the element or an ancestor switches the island to the snapshot path automatically; `IsSnapshot="True"` forces it. A live HWND rejects `WS_EX_LAYERED` and affine transforms. In a Form, snapshot mode creates an almost invisible input proxy (`Opacity = 1/255`, a fully transparent window is click-through) so real mouse/keyboard/IME reach the control: opacity/translation are exact, a scale re-lays the control out at the scaled size (hit areas match), and rotation keeps the transformed polygon interactive (whole-control hits exact, item positions approximate). Call `RefreshSnapshot()` after changing the control from code that raises no native notifications.
 - `CornerRadius` rounds the live window through its window region (aliased); a transparent native background is painted with the element's visual background while hosted, because `WS_CLIPCHILDREN`/`WS_EX_COMPOSITED` make the parent redraw unreliable. An open popup cuts its rectangle out of the island's region — and out of the snapshot input proxy — so it can cover the island and still receive clicks.
+
+Prefer hosting the real control: use `native:` for a control authored in XAML, or `NativeControlHost.Child` for one a factory or service returns already configured. An existing WinForms control does not need a wrapper rewrite or a visual reimplementation. The traffic can also go the other way: a native container's `Content` holds an ordinary Easel subtree (its nested surface takes input and inherits `DataContext`, resources and styles), so new visual controls and old native controls can share one page.
+
+`IsSnapshot` is an escape hatch, not a presentation style: the automatic switch already covers opacity, transform, effect, opacity mask and 3D. Set it only for what a child HWND cannot express otherwise (anti-aliased arbitrary-shape clipping). Do not use it to round corners, fade a control or stage a Gallery card — the Gallery's `Native` group shows hosted legacy workspaces, native containers with visual content and code-created hosts instead.
 
 ## Elements, children and properties
 
@@ -158,9 +164,10 @@ resources.MergedDictionaries.Add(theme);
 `Source="…xaml"` is not supported** — there is no runtime loader. Merge a compiled type or code-built dictionary.
 
 Standalone dictionaries also support `x:String`, `x:Int32`, `x:Int64`, `x:Double`, `x:Single`, `x:Decimal`,
-`x:Boolean`, `x:Color`, `x:FontWeight`, `x:Thickness`, `x:PointF`, brushes and styles/templates. An implicit style (no `x:Key`) inside a standalone
-dictionary is stored by its `TargetType` key but is **not** auto-applied to the visual tree; declare implicit
-styles on a visual element's `Resources` or `Styles`.
+`x:Boolean`, `x:Color`, `x:FontWeight`, `x:Thickness`, `x:PointF`, brushes and styles/templates. An implicit
+style (no `x:Key`) inside a standalone dictionary is stored by its `TargetType` key but is **not** auto-applied
+from a view's or the host's merged dictionary; declare implicit styles on a visual element's `Resources` or
+`Styles`.
 
 ### Static vs dynamic
 
@@ -350,7 +357,6 @@ practice.
 - `{DynamicResource}` in style/trigger setter values or trigger-action properties.
 - `DataTrigger`/`MultiTrigger` (use a `Trigger` on a DP, or convert in the view model).
 - Elements from non-Easel assemblies without a `clr-namespace` prefix; unprefixed local types.
-- Live native controls inside transformed/blended subtrees (set `IsSnapshot="True"`).
 - Anti-aliased arbitrary-shape clipping of a live HWND (`IsSnapshot` + a visual `Clip`, or `CornerRadius` which is aliased).
 - `DateTime` literals, arbitrary object constructors without a public parameterless constructor.
 - Implicit styles from a standalone dictionary applied automatically (declare them on a visual element instead).
