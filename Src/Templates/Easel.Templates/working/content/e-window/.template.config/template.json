@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "Window"
+  ],
+  "identity": "Easel.Window",
+  "name": "Easel Window",
+  "description": "A XAML-declared window that runs with Application.Run.",
+  "shortName": "e-window",
+  "sourceName": "TemplateClass",
+  "defaultName": "MainForm",
+  "preferDefaultName": true,
+  "preferNameDirectory": false,
+  "tags": {
+    "language": "C#",
+    "type": "item"
+  },
+  "symbols": {
+    "namespace": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Namespace for the generated window.",
+      "defaultValue": "MyApp",
+      "replaces": "TemplateNamespace"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.xaml"
+    },
+    {
+      "path": "TemplateClass.xaml.cs"
+    }
+  ]
+}

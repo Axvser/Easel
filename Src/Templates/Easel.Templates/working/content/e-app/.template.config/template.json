@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Axvser",
+  "classifications": [
+    "Easel",
+    "WinForms",
+    "XAML",
+    "App"
+  ],
+  "identity": "Easel.App",
+  "name": "Easel App",
+  "description": "A complete Easel WinForms app: project file, App entry point and MainForm window.",
+  "shortName": "e-app",
+  "sourceName": "TemplateClass",
+  "defaultName": "EaselApp",
+  "preferDefaultName": true,
+  "preferNameDirectory": true,
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "symbols": {
+    "easelVersion": {
+      "type": "parameter",
+      "datatype": "text",
+      "description": "Version of the WinForms.Easel packages.",
+      "defaultValue": "3.0.0",
+      "replaces": "EaselVersion"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "TemplateClass.csproj"
+    }
+  ],
+  "postActions": [
+    {
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true,
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore'"
+        }
+      ]
+    }
+  ]
+}

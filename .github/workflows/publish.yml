@@ -381,7 +381,7 @@ jobs:
           $zip = [IO.Compression.ZipFile]::OpenRead($file)
           $entries = @($zip.Entries | ForEach-Object FullName)
           $zip.Dispose()
-          foreach ($shortName in @("e-usercontrol", "e-resource", "e-theme", "e-style", "e-controltemplate", "e-datatemplate")) {
+          foreach ($shortName in @("e-app", "e-usercontrol", "e-window", "e-resource", "e-theme", "e-style", "e-controltemplate", "e-datatemplate")) {
             if (-not ($entries -contains "content/$shortName/.template.config/template.json")) {
               throw "WinForms.Easel.Templates nupkg has no content/$shortName/.template.config/template.json; refusing to publish it."
             }

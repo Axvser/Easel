@@ -25,10 +25,12 @@ dotnet new install WinForms.Easel.Templates
 | --- | --- |
 | `WinForms.Easel` | `VisualHost`, `VisualElement` controls, visuals, brushes, resources, theme, animation engine |
 | `WinForms.Easel.Generator` | XAML compiler (+ `EASEL_XAML*` diagnostics) and dependency-property generator (+ `EASEL_XAMLP*`) |
-| `WinForms.Easel.Templates` | `dotnet new` items: `e-usercontrol`, `e-resource`, `e-theme`, `e-style`, `e-controltemplate`, `e-datatemplate` |
+| `WinForms.Easel.Templates` | `dotnet new`: project `e-app`; items `e-usercontrol`, `e-window`, `e-resource`, `e-theme`, `e-style`, `e-controltemplate`, `e-datatemplate` |
 
 ```powershell
+dotnet new e-app -n MyApp
 dotnet new e-usercontrol -n SettingsView --namespace MyApp.Views
+dotnet new e-window -n MainForm --namespace MyApp
 dotnet new e-resource -n AppResources --namespace MyApp
 dotnet new e-theme -n AppTheme --namespace MyApp
 dotnet new e-style -n AppStyles --namespace MyApp
@@ -103,6 +105,35 @@ var form = new Form { Text = "My app", ClientSize = new Size(1200, 800) };
 form.Controls.Add(new MyShellView()); // creates a dock-filled VisualHost
 Application.Run(form);
 ```
+
+## Application resources
+
+`EaselApplication.Resources` is the last dictionary in every element's resource chain (element → ancestors →
+host → application); `EaselApplication.Styles` is the last implicit-style collection before the theme default.
+A keyless `<Style TargetType="T">` in an application dictionary is implicit for exact `T`. Merge an application
+dictionary before the first window, so `{StaticResource}` resolves while XAML is built:
+
+```xml
+<ResourceDictionary x:Class="MyApp.App" xmlns="…" xmlns:x="…">
+  <SolidColorBrush x:Key="AppAccent" Color="#FF4C8DFF" />
+  <Style TargetType="TextBlock">          <!-- no x:Key: implicit for exact TextBlock -->
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <x:String x:Key="StartupTheme">Dark</x:String>  <!-- Dark / Light / HighContrast / System -->
+</ResourceDictionary>
+```
+
+```csharp
+ApplicationConfiguration.Initialize();
+var app = new App();                                  // : ResourceDictionary
+app.ApplyStartupTheme();                              // the e-app helper: Theme.Mode from the key
+EaselApplication.Resources.MergedDictionaries.Add(app);
+Application.Run(new MainForm());
+```
+
+The `e-app` project template starts with only the `StartupTheme` key in `App.xaml`; add resources and styles
+there as needed (split them into merged dictionaries when the file grows). `HighContrast` is a built-in XAML
+theme too (`Themes/HighContrastTheme.xaml`); `System` follows Windows high contrast.
 
 Every window hosts exactly one `VisualHost`; a second `Add` on the same collection throws. `Remove(view)` removes
 and disposes the host created by `Add`. `VisualHost` remains the only WinForms `Control` inside the visual tree,
