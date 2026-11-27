@@ -1,15 +1,18 @@
+using System.Diagnostics;
 using System.Windows.Forms;
 
 namespace IndustrialWorkbench.ViewModels;
 
 /// <summary>
-/// The workbench's simulation model: it owns a 150 ms WinForms timer that drifts the plant values, rotates the
-/// machinery, appends trend samples and cycles the alarm queue. Controls bind to the properties; user-driven
-/// properties (<see cref="Setpoint"/>, <see cref="PumpOn"/>, <see cref="ValveOpen"/>) feed back into the simulation.
+/// The workbench's simulation model: a 16 ms WinForms timer drives the visible animation, while plant values are
+/// time-scaled so the simulation speed does not depend on the frame rate. Controls bind to the properties;
+/// user-driven properties (<see cref="Setpoint"/>, <see cref="PumpOn"/>, <see cref="ValveOpen"/>) feed back into
+/// the simulation.
 /// </summary>
 public sealed class WorkbenchViewModel : ObservableObject, IDisposable
 {
     private const int TrendLength = 72;
+    private const double LegacyTickSeconds = 0.15d;
     private static readonly (string Message, int Severity)[] AlarmQueue =
     [
         ("泵组 P-204 振动偏高 · 建议检查轴承", 1),
@@ -19,9 +22,14 @@ public sealed class WorkbenchViewModel : ObservableObject, IDisposable
     ];
 
     private readonly System.Windows.Forms.Timer _timer;
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly Random _random = new(20261127);
     private readonly DateTime _started = DateTime.Now;
     private double _t;
+    private double _lastTickSeconds;
+    private double _trendAccumulator;
+    private double _alarmAccumulator;
+    private double _productionAccumulator;
     private int _tick;
     private int _alarmIndex;
     private int _ackCountdown = -1;
@@ -64,9 +72,10 @@ public sealed class WorkbenchViewModel : ObservableObject, IDisposable
         _trendA = Enumerable.Repeat(58d, TrendLength).ToArray();
         _trendB = Enumerable.Repeat(35d, TrendLength).ToArray();
 
-        _timer = new System.Windows.Forms.Timer { Interval = 150 };
+        _timer = new System.Windows.Forms.Timer { Interval = 16 };
         _timer.Tick += OnTick;
         _timer.Start();
+        _lastTickSeconds = _clock.Elapsed.TotalSeconds;
     }
 
     /// <summary>The site name shown in the factory status bar.</summary>
@@ -76,7 +85,7 @@ public sealed class WorkbenchViewModel : ObservableObject, IDisposable
     public string LineName => "LINE A · 净水机组";
 
     /// <summary>The simulated refresh interval label.</summary>
-    public string UpdateInterval => "150 ms";
+    public string UpdateInterval => "16 ms · 60 fps";
 
     /// <summary>Elapsed runtime, refreshed every tick.</summary>
     public string RuntimeText
@@ -342,60 +351,79 @@ public sealed class WorkbenchViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _tick++;
-        _t += 0.15d;
-        RuntimeText = (DateTime.Now - _started).ToString(@"hh\:mm\:ss");
-        Pulse += 0.32d;
-        FlowPhase += 0.25d * (0.8d + (FlowRate / 45d));
+        var now = _clock.Elapsed.TotalSeconds;
+        var dt = Math.Clamp(now - _lastTickSeconds, 0.001d, 0.1d);
+        _lastTickSeconds = now;
+        var step = dt / LegacyTickSeconds;
+        _t += step;
+        Pulse += 0.32d * step;
+        FlowPhase += 0.25d * step * (0.8d + (FlowRate / 45d));
 
-        Simulate();
-        UpdateAlarm();
-        UpdateTrend();
-        UpdateIndicators();
+        Simulate(step);
+
+        _productionAccumulator += dt;
+        if (_productionAccumulator >= 1.2d)
+        {
+            _productionAccumulator -= 1.2d;
+            ProductionTotal += (int)Math.Round(Throughput * 0.02d);
+        }
+
+        _trendAccumulator += dt;
+        if (_trendAccumulator >= LegacyTickSeconds)
+        {
+            _trendAccumulator -= LegacyTickSeconds;
+            UpdateTrend();
+        }
+
+        _alarmAccumulator += dt;
+        if (_alarmAccumulator >= LegacyTickSeconds)
+        {
+            _alarmAccumulator -= LegacyTickSeconds;
+            _tick++;
+            RuntimeText = (DateTime.Now - _started).ToString(@"hh\:mm\:ss");
+            FlowLabel = $"主给水 · {FlowRate:0.0} m³/h";
+            FanSpeedText = $"{FanSpeed:0} rpm";
+            UpdateAlarm();
+            UpdateIndicators();
+        }
     }
 
-    private void Simulate()
+    private void Simulate(double step)
     {
         var noise = (_random.NextDouble() - 0.5d) * 4d;
 
         if (IsEmergency)
         {
-            Pressure = Smooth(Pressure, 4d, 0.12d);
-            Temperature = Smooth(Temperature, 52d, 0.06d);
-            FlowRate = Smooth(FlowRate, 0d, 0.20d);
-            TankLevel = Smooth(TankLevel, Math.Max(4d, TankLevel - 0.3d), 0.3d);
-            FanSpeed = Smooth(FanSpeed, 0d, 0.20d);
-            Throughput = Smooth(Throughput, 0d, 0.20d);
+            Pressure = Smooth(Pressure, 4d, 0.12d, step);
+            Temperature = Smooth(Temperature, 52d, 0.06d, step);
+            FlowRate = Smooth(FlowRate, 0d, 0.20d, step);
+            TankLevel = Smooth(TankLevel, Math.Max(4d, TankLevel - 0.3d), 0.3d, step);
+            FanSpeed = Smooth(FanSpeed, 0d, 0.20d, step);
+            Throughput = Smooth(Throughput, 0d, 0.20d, step);
         }
         else
         {
             var demand = PumpOn && ValveOpen ? 18d + (Setpoint * 0.8d) : 0d;
-            FlowRate = Smooth(FlowRate, demand, 0.12d);
+            FlowRate = Smooth(FlowRate, demand, 0.12d, step);
 
             var targetSpeed = PumpOn ? 540d + (Setpoint * 12d) : 0d;
-            FanSpeed = Smooth(FanSpeed, targetSpeed, 0.10d);
+            FanSpeed = Smooth(FanSpeed, targetSpeed, 0.10d, step);
 
             var pressureTarget = PumpOn
                 ? (25d + (Setpoint * 0.55d) + (Math.Sin(_t * 0.7d) * 3d) + noise)
                 : 8d + (Math.Sin(_t) * 1.2d);
-            Pressure = Smooth(Pressure, Math.Clamp(pressureTarget, 0d, 100d), 0.15d);
+            Pressure = Smooth(Pressure, Math.Clamp(pressureTarget, 0d, 100d), 0.15d, step);
 
             var temperatureTarget = 54d + (PumpOn ? 18d : 0d) + (Math.Sin(_t * 0.33d) * 4d);
-            Temperature = Smooth(Temperature, Math.Clamp(temperatureTarget, 30d, 130d), 0.08d);
+            Temperature = Smooth(Temperature, Math.Clamp(temperatureTarget, 30d, 130d), 0.08d, step);
 
             var tankTarget = 58d + (Math.Sin(_t * 0.15d) * 12d) - (FlowRate * 0.06d);
-            TankLevel = Smooth(TankLevel, Math.Clamp(tankTarget, 0d, 100d), 0.06d);
+            TankLevel = Smooth(TankLevel, Math.Clamp(tankTarget, 0d, 100d), 0.06d, step);
 
-            Throughput = Smooth(Throughput, 220d + (FlowRate * 24d), 0.15d);
+            Throughput = Smooth(Throughput, 220d + (FlowRate * 24d), 0.15d, step);
         }
 
-        FanAngle = (FanAngle + (FanSpeed * 0.02d)) % 360d;
-        FlowLabel = $"主给水 · {FlowRate:0.0} m³/h";
-        FanSpeedText = $"{FanSpeed:0} rpm";
-        if (_tick % 8 == 0)
-        {
-            ProductionTotal += (int)Math.Round(Throughput * 0.02d);
-        }
+        FanAngle = (FanAngle + (FanSpeed * 0.02d * step)) % 360d;
     }
 
     private void UpdateAlarm()
@@ -453,8 +481,8 @@ public sealed class WorkbenchViewModel : ObservableObject, IDisposable
         RunStateText = IsRunning ? "RUNNING" : IsEmergency ? "E-STOP" : "STOPPED";
     }
 
-    private static double Smooth(double current, double target, double factor)
-        => current + ((target - current) * factor);
+    private static double Smooth(double current, double target, double factor, double step)
+        => current + ((target - current) * (1d - Math.Pow(1d - factor, step)));
 
     private static double[] Shift(double[] series, double value)
     {

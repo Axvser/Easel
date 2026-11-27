@@ -58,7 +58,7 @@ Demo/
 
 ## 仿真与交互
 
-`WorkbenchViewModel` 用一个 150 ms 的 `System.Windows.Forms.Timer` 平滑推进压力、温度、流量、罐位、风扇角度与趋势样本。旋钮 `Setpoint`、拨杆 `PumpOn`、阀门 `ValveOpen` 通过 `Mode=TwoWay` 写回模型并影响后续仿真（例如关闭阀门后流量归零）。
+`WorkbenchViewModel` 用一个 16 ms（约 60 fps）的 `System.Windows.Forms.Timer` 推进可见动画；仿真值按真实时间缩放，所以提高帧率不会加快工艺过程。趋势与报警仍按 150 ms 采样，避免每帧重排数组。旋钮 `Setpoint`、拨杆 `PumpOn`、阀门 `ValveOpen` 通过 `Mode=TwoWay` 写回模型并影响后续仿真（例如关闭阀门后流量归零）。
 
 自绘控件的值变了只失效自己（`AffectsRender`），不重绘整棵树。首页控件墙用固定设计尺寸（1056 宽）包在 `Viewbox` 里，任何窗口尺寸都能完整看到全部控件；详情页则按可用空间铺开。
 
