@@ -253,7 +253,17 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     }
 
     /// <summary>Resets the realized window so the next arrange realizes from scratch.</summary>
-    protected void InvalidateRealizedWindow() => _firstRealizedIndex = -1;
+    protected void InvalidateRealizedWindow()
+    {
+        // 先把当前窗口按真实索引退回池：若只把 FirstRealizedIndex 置 -1，下一次 Arrange 已经不知道旧窗口
+        // 从哪开始，RecycleItem 收到的索引会从 -1 起算，和元素实际显示的行对不上。
+        if (_firstRealizedIndex >= 0)
+        {
+            ClearRealizedRowsToPool();
+        }
+
+        _firstRealizedIndex = -1;
+    }
 
     /// <inheritdoc />
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -497,8 +507,24 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
                 _usingOwnScroll = true;
                 var viewport = vertical ? presenter.ViewportHeight : presenter.ViewportWidth;
                 var fallback = vertical ? scroll.Bounds.Height : scroll.Bounds.Width;
-                return ((float)(vertical ? _ownVerticalOffset : _ownHorizontalOffset),
-                        viewport > 0f ? viewport : fallback);
+                var effectiveViewport = viewport > 0f ? viewport : fallback;
+
+                // 源变短 / ItemExtent 变大后，逻辑偏移可能已经落到新范围之外。ScrollViewer 在逻辑滚动模式下
+                // 只把偏移转发给内容，不会替它夹取；这里不夹取就会算出 first == last == count，窗口全空。
+                var maxOffset = Math.Max(0d, TotalExtent - effectiveViewport);
+                if (vertical)
+                {
+                    if (_ownVerticalOffset > maxOffset + 0.01d)
+                    {
+                        _ownVerticalOffset = maxOffset;
+                    }
+                }
+                else if (_ownHorizontalOffset > maxOffset + 0.01d)
+                {
+                    _ownHorizontalOffset = maxOffset;
+                }
+
+                return ((float)(vertical ? _ownVerticalOffset : _ownHorizontalOffset), effectiveViewport);
             }
 
             _usingOwnScroll = false;

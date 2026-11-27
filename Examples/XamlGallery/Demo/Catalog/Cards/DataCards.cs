@@ -65,6 +65,13 @@ internal static class DataCards
             "A date field whose calendar opens in the overlay.",
             "<DatePicker Width=\"220\" />",
             _ => new DatePickerCard()),
+        Card(
+            "data.virtualizing-panel",
+            "Data",
+            "VirtualizingPanel · 100k log",
+            "A custom VirtualizingPanel subclass windows a 100,000-row log and switches to 1,000,000 rows; scrolling rebinds pooled rows instead of creating them.",
+            "<local:VirtualLogPanel ItemsSource=\"{Binding Rows}\" ItemExtent=\"28\" />",
+            _ => new VirtualizationPanelCard()),
     ];
 
     private static GalleryCard Card(

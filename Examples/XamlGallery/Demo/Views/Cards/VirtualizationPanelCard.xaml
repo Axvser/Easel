@@ -1,0 +1,231 @@
+<local:ThemedStackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.VirtualizationPanelCard"
+    Width="820"
+    Spacing="10">
+
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Spacing="3">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Windowed event log"
+                   Foreground="{StaticResource Text}"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+        <Border Background="{StaticResource SignalGradient}"
+                CornerRadius="8"
+                Padding="8,3"
+                VerticalAlignment="Center">
+          <TextBlock Text="GENERIC BASE"
+                     Foreground="{StaticResource AccentText}"
+                     FontSize="8" />
+        </Border>
+      </StackPanel>
+      <TextBlock x:Name="sourceLabel"
+                 Text="100,000 rows · only the visible window exists"
+                 Foreground="{StaticResource Muted}"
+                 FontSize="10" />
+    </StackPanel>
+
+    <StackPanel Grid.Column="1"
+                Orientation="Horizontal"
+                Spacing="6"
+                VerticalAlignment="Center">
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="8,4">
+        <TextBlock Text="RECYCLED ROWS"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="8" />
+      </Border>
+      <Border Background="{StaticResource SurfaceAlt}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="8,4">
+        <TextBlock Text="ITEMEXTENT 28"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="8" />
+      </Border>
+    </StackPanel>
+  </Grid>
+
+  <Grid Height="30">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+      <Button Text="Top" Height="28" Click="OnTopClicked" />
+      <Button Text="Middle" Height="28" Click="OnMiddleClicked" />
+      <Button Text="Bottom" Height="28" Click="OnBottomClicked" />
+      <Button Text="Random" Height="28" Click="OnRandomClicked" />
+      <Button Text="Select center" Height="28" Click="OnSelectClicked" />
+    </StackPanel>
+
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+      <Button Text="0 rows" Height="28" Click="OnEmptyClicked" />
+      <Button Text="100k" Height="28" Click="OnHundredThousandClicked" />
+      <Button Text="1M" Height="28" Click="OnMillionClicked" />
+    </StackPanel>
+  </Grid>
+
+  <StackPanel Orientation="Horizontal" Spacing="8">
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="VISIBLE ROWS" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="visibleText" Text="—" Foreground="{StaticResource Text}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="FIRST REALIZED" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="firstText" Text="—" Foreground="{StaticResource Text}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="REALIZED COUNT" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="realizedText" Text="—" Foreground="{StaticResource Text}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="CREATED" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="createdText" Text="0" Foreground="{StaticResource Positive}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="REUSED" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="reusedText" Text="0" Foreground="{StaticResource Signal}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+    <Border Background="{StaticResource SurfaceAlt}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,6"
+            Width="118">
+      <StackPanel Spacing="1">
+        <TextBlock Text="RECYCLED" Foreground="{StaticResource Muted}" FontSize="7" />
+        <TextBlock x:Name="recycledText" Text="0" Foreground="{StaticResource Warning}" FontSize="15" FontWeight="SemiBold" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+  <ScrollViewer x:Name="viewer"
+                Height="364"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                ScrollChanged="OnScrollChanged">
+    <local:VirtualLogPanel x:Name="panel"
+                           ItemsSource="{Binding Rows}"
+                           ItemExtent="28">
+      <local:VirtualLogPanel.ItemTemplate>
+        <DataTemplate>
+          <Border Background="{Binding RowBrush}"
+                  BorderBrush="{StaticResource Border}"
+                  BorderThickness="0,0,0,1"
+                  Padding="10,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="52" />
+                <ColumnDefinition Width="96" />
+                <ColumnDefinition Width="56" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="66" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0"
+                         Text="{Binding Number}"
+                         Foreground="{StaticResource Muted}"
+                         FontSize="9"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Timestamp}"
+                         Foreground="{StaticResource Muted}"
+                         FontSize="9"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2"
+                         Text="{Binding Level}"
+                         Foreground="{Binding LevelBrush}"
+                         FontSize="8"
+                         FontWeight="SemiBold"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="3"
+                         Text="{Binding Message}"
+                         Foreground="{StaticResource Text}"
+                         FontSize="9"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4"
+                         Text="{Binding Elapsed}"
+                         Foreground="{StaticResource Muted}"
+                         FontSize="9"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </local:VirtualLogPanel.ItemTemplate>
+    </local:VirtualLogPanel>
+  </ScrollViewer>
+
+  <Grid Height="18">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+    <TextBlock x:Name="status"
+               Grid.Column="0"
+               Text="Scroll or jump to realize a window"
+               Foreground="{StaticResource Muted}"
+               FontSize="9"
+               VerticalAlignment="Center" />
+    <TextBlock x:Name="selectionText"
+               Grid.Column="1"
+               Text="No row selected"
+               Foreground="{StaticResource Muted}"
+               FontSize="9"
+               VerticalAlignment="Center" />
+  </Grid>
+
+  <TextBlock Text="The panel reports the full extent (source rows × 28 px) to the ScrollViewer but keeps only the rows touching the viewport. Scrolling returns the leaving rows to a pool and rebinds them; the created counter stays flat while the reused counter climbs. Click a row to select it."
+             Foreground="{StaticResource Muted}"
+             FontSize="9"
+             Wrap="True" />
+
+</local:ThemedStackPanel>
