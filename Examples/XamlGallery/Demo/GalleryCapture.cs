@@ -201,7 +201,7 @@ internal static class GalleryCapture
         if (group is not null)
         {
             return cards
-                .Where(card => string.Equals(card.Group, group, StringComparison.OrdinalIgnoreCase))
+                .Where(card => InSectionOrGroup(card, group))
                 .Select(static card => card.Id)
                 .ToList();
         }
@@ -230,9 +230,14 @@ internal static class GalleryCapture
         }
 
         return session.Cards
-            .FirstOrDefault(card => string.Equals(card.Group, group, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(card => InSectionOrGroup(card, group))
             ?.Id;
     }
+
+    // --group 接受分区名（Scenarios / Easel native / WinForms native）或组名（Industrial / Data …）。
+    private static bool InSectionOrGroup(GalleryCard card, string name)
+        => string.Equals(card.Group, name, StringComparison.OrdinalIgnoreCase)
+           || string.Equals(GalleryTaxonomy.SectionOf(card.Group), name, StringComparison.OrdinalIgnoreCase);
 
     private static string? ReadOption(string[] args, string name)
     {

@@ -1,0 +1,264 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Industrial.ProcessFlowView"
+    Background="{StaticResource Surface}"
+    Width="540"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="REACTOR TRAIN · LINE 2"
+                   Foreground="{StaticResource Text}"
+                   FontSize="18"
+                   FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Status}"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="9" />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="10"
+                  VerticalAlignment="Center">
+        <Border Background="{StaticResource Raised}" CornerRadius="8" Padding="10,4">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource Warning}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Phase}" Foreground="{StaticResource Warning}" FontSize="9" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <TextBlock Text="FLOW" Foreground="{StaticResource Muted}" FontSize="8" />
+          <TextBlock Text="{Binding FlowText}" Foreground="{StaticResource Text}" FontSize="11" FontWeight="SemiBold" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </Border>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="16">
+    <StackPanel Spacing="12">
+
+      <Border Background="{StaticResource Raised}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="8">
+          <Grid>
+            <TextBlock Text="Process mimic" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <Border Background="{StaticResource Surface}" CornerRadius="7" Padding="8,3" HorizontalAlignment="Right">
+              <TextBlock Text="LIVE" Foreground="{StaticResource Signal}" FontSize="8" />
+            </Border>
+          </Grid>
+
+          <Canvas Width="480" Height="244">
+
+            <Line X1="85" Y1="204" X2="85" Y2="216" Stroke="{StaticResource Muted}" StrokeThickness="4" Opacity="0.55" />
+            <Line X1="245" Y1="204" X2="245" Y2="216" Stroke="{StaticResource Muted}" StrokeThickness="4" Opacity="0.55" />
+            <Line X1="405" Y1="204" X2="405" Y2="216" Stroke="{StaticResource Muted}" StrokeThickness="4" Opacity="0.55" />
+            <Line X1="85" Y1="216" X2="405" Y2="216" Stroke="{StaticResource Muted}" StrokeThickness="4" Opacity="0.55" />
+
+            <Border Canvas.Left="30"
+                    Canvas.Top="64"
+                    Width="110"
+                    Height="140"
+                    Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    ClipToBounds="True">
+              <Grid>
+                <Border VerticalAlignment="Bottom"
+                        Height="{Binding FeedFillHeight}"
+                        Margin="4,0,4,4"
+                        CornerRadius="3"
+                        Background="{StaticResource SignalGradient}"
+                        Opacity="0.55" />
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding FeedText}" Foreground="{StaticResource Text}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                  <TextBlock Text="FEED" Foreground="{StaticResource Muted}" FontSize="8" HorizontalAlignment="Center" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Canvas.Left="190"
+                    Canvas.Top="44"
+                    Width="110"
+                    Height="160"
+                    Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    ClipToBounds="True">
+              <Grid>
+                <Border VerticalAlignment="Bottom"
+                        Height="{Binding ReactorFillHeight}"
+                        Margin="4,0,4,4"
+                        CornerRadius="3"
+                        Background="{StaticResource Warning}"
+                        Opacity="0.55" />
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding ReactorText}" Foreground="{StaticResource Text}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                  <TextBlock Text="REACTOR" Foreground="{StaticResource Muted}" FontSize="8" HorizontalAlignment="Center" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Canvas.Left="350"
+                    Canvas.Top="84"
+                    Width="110"
+                    Height="120"
+                    Background="{StaticResource Surface}"
+                    BorderBrush="{StaticResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    ClipToBounds="True">
+              <Grid>
+                <Border VerticalAlignment="Bottom"
+                        Height="{Binding ProductFillHeight}"
+                        Margin="4,0,4,4"
+                        CornerRadius="3"
+                        Background="{StaticResource Positive}"
+                        Opacity="0.45" />
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="2">
+                  <TextBlock Text="{Binding ProductText}" Foreground="{StaticResource Text}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" />
+                  <TextBlock Text="PRODUCT" Foreground="{StaticResource Muted}" FontSize="8" HorizontalAlignment="Center" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Canvas Canvas.Left="85" Canvas.Top="212" Width="320" Height="8">
+              <Ellipse Canvas.Left="{Binding FlowDot1X}" Canvas.Top="1" Width="6" Height="6" Fill="{StaticResource Signal}" />
+              <Ellipse Canvas.Left="{Binding FlowDot2X}" Canvas.Top="1" Width="6" Height="6" Fill="{StaticResource Signal}" Opacity="0.7" />
+              <Ellipse Canvas.Left="{Binding FlowDot3X}" Canvas.Top="1" Width="6" Height="6" Fill="{StaticResource Signal}" Opacity="0.45" />
+            </Canvas>
+
+            <Ellipse Canvas.Left="150" Canvas.Top="206" Width="20" Height="20" Fill="{StaticResource Raised}" Stroke="{StaticResource Signal}" StrokeThickness="2" />
+            <Ellipse Canvas.Left="154" Canvas.Top="210" Width="12" Height="12" Fill="{StaticResource Signal}" />
+            <TextBlock Canvas.Left="144" Canvas.Top="230" Text="P-101" Foreground="{StaticResource Muted}" FontSize="8" />
+
+            <Ellipse Canvas.Left="310" Canvas.Top="206" Width="20" Height="20" Fill="{StaticResource Raised}" Stroke="{StaticResource Positive}" StrokeThickness="2" />
+            <Ellipse Canvas.Left="314" Canvas.Top="210" Width="12" Height="12" Fill="{StaticResource Positive}" />
+            <TextBlock Canvas.Left="304" Canvas.Top="230" Text="P-102" Foreground="{StaticResource Muted}" FontSize="8" />
+
+            <TextBlock Canvas.Left="30" Canvas.Top="24" Text="T-101" Foreground="{StaticResource Muted}" FontSize="8" />
+            <TextBlock Canvas.Left="190" Canvas.Top="14" Text="R-201" Foreground="{StaticResource Muted}" FontSize="8" />
+            <TextBlock Canvas.Left="350" Canvas.Top="58" Text="T-301" Foreground="{StaticResource Muted}" FontSize="8" />
+
+          </Canvas>
+        </StackPanel>
+      </Border>
+
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="14"
+                Margin="0,0,12,0">
+          <StackPanel Spacing="9">
+            <TextBlock Text="Batch recipe" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <ItemsControl ItemsSource="{Binding Steps}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="10" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Grid.Column="0" Width="6" Height="6" Fill="{Binding StateBrush}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource Text}" FontSize="9" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="7" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Spacing="4">
+              <Grid>
+                <TextBlock Text="Batch progress" Foreground="{StaticResource Muted}" FontSize="8" />
+                <TextBlock Text="{Binding BatchProgressText}" Foreground="{StaticResource Text}" FontSize="8" HorizontalAlignment="Right" />
+              </Grid>
+              <ProgressBar Height="7" Value="{Binding BatchProgress}" FillBrush="{StaticResource Signal}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="14">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Reactor values" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <Grid>
+              <TextBlock Text="TEMPERATURE" Foreground="{StaticResource Muted}" FontSize="8" />
+              <TextBlock Text="{Binding TemperatureText}" Foreground="{StaticResource Text}" FontSize="10" HorizontalAlignment="Right" />
+            </Grid>
+            <Grid>
+              <TextBlock Text="PRESSURE" Foreground="{StaticResource Muted}" FontSize="8" />
+              <TextBlock Text="{Binding PressureText}" Foreground="{StaticResource Text}" FontSize="10" HorizontalAlignment="Right" />
+            </Grid>
+            <Grid>
+              <TextBlock Text="TRANSFER FLOW" Foreground="{StaticResource Muted}" FontSize="8" />
+              <TextBlock Text="{Binding FlowText}" Foreground="{StaticResource Text}" FontSize="10" HorizontalAlignment="Right" />
+            </Grid>
+            <Border Background="{StaticResource Surface}" CornerRadius="7" Padding="8,6" Margin="0,2,0,0">
+              <StackPanel Spacing="2">
+                <TextBlock Text="CONTROL LOOP" Foreground="{StaticResource Muted}" FontSize="7" />
+                <TextBlock Text="TIC-201 · auto · setpoint 185 °C" Foreground="{StaticResource Signal}" FontSize="8" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Background="{StaticResource Raised}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" VerticalAlignment="Center" />
+            <TextBlock Text="P-101 feed pump" Foreground="{StaticResource Muted}" FontSize="9" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" VerticalAlignment="Center" />
+            <TextBlock Text="P-102 transfer pump" Foreground="{StaticResource Muted}" FontSize="9" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="7">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource Signal}" VerticalAlignment="Center" />
+            <TextBlock Text="XV-201 discharge open" Foreground="{StaticResource Muted}" FontSize="9" VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</local:ThemedDockPanel>

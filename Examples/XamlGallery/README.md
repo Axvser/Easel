@@ -14,8 +14,10 @@ that only carries data and view behaviour. The shell itself is `Views/GalleryVis
 
 The window is a three-pane workbench:
 
-- **Demos** (left): a visual `TreeView` rooted at **Demos**, with a filter box. The root holds the
-  component groups and the `Scenarios` group.
+- **Catalog** (left): a visual `TreeView` over the filter box, layered as **section → group → card**.
+  **Scenarios** leads with industrial/HMI pages, then application pages and visual studies; **Easel native**
+  holds the component groups (input and data first, since an HMI is built from them); **WinForms native**
+  holds the interop cards.
 - **Preview** (center): the selected view plus its `Usage` snippet. The snippet is XAML, not C#.
 - **Properties** (right): the editable dependency properties of the view root, discovered by reflection;
   strings, numbers, booleans, enums and colours are editable.
@@ -36,9 +38,10 @@ Useful switches:
 # open and close the window without interaction
 dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --smoke
 
-# open one entry, a group, or a starting palette (Dark+, Light+, high contrast, follow system)
-dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --entry scenario.dashboard
-dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --group Scenarios --light
+# open one entry, a group, a section, or a starting palette (Dark+, Light+, high contrast, follow system)
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --entry scenario.production-line
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --group Industrial --light
+dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --group Scenarios
 dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --group Graphics --contrast
 dotnet run --project Examples/XamlGallery/Demo/Demo.csproj -- --system
 
@@ -57,6 +60,7 @@ catalog order, waits for layout, renders the window into a bitmap with `PrintWin
 `VisualSurface.RenderTo`), and closes. `--dump` writes a visual tree with bounds and colours next to
 each PNG. `--preview-only` hides the title, side panes and status strip for a content-only capture.
 `--light` / `--contrast` start the process in those palettes; `--system` starts in follow-system mode.
+`--group` accepts either a group (`Industrial`, `Data`) or a section (`Scenarios`, `Easel native`).
 
 ## Themes
 
@@ -83,7 +87,23 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 
 ## Demos
 
-### Scenarios — complete pages
+The catalog is a hierarchy: **Scenarios**, **Easel native** and **WinForms native**, each split into groups.
+Industrial work leads the scenario section and the Easel-native groups are ordered by how close they are to an
+HMI screen (input, data and graphics first; basics and generated visuals last).
+
+### Scenarios · Industrial
+
+| Card | Shows |
+| --- | --- |
+| Production line | A shop-floor overview: OEE ring, KPI tiles, six station rows with live cycle bars, a throughput sparkline and an alarm feed. |
+| Process flow | A tank-and-pipe mimic: vessel levels, pump states, moving flow dots, a recipe step list and reactor values. |
+| Alarm center | Severity counts, filter buttons, an item-templated alarm list where each row owns an `ACK` command, and an event log. |
+| Machine panel | A CNC operator panel: X/Y/Z/A DROs, spindle-load ring, feed override slider, jog commands and an E-stop latch. |
+
+Each industrial page binds to a view model and advances its values from a `System.Windows.Forms.Timer`; all
+shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view model and bound from XAML.
+
+### Scenarios · Applications
 
 | Card | Shows |
 | --- | --- |
@@ -92,29 +112,44 @@ the thread that selected the mode, rebuilding the gallery without a restart.
 | Music player | Three real embedded MP3 tracks through WPF `MediaPlayer`, a 3D-tilted album card, a masked strip and transport/seek controls. |
 | Video player | A real embedded H.264/AAC clip in a WPF `MediaElement`, hosted in the single `NativeControlHost` island with transport, seek and time labels. |
 | Chat | An `ItemsControl` with a message-bubble `DataTemplate`, a two-way composer and a send command. |
+
+### Scenarios · Visual studies
+
+| Card | Shows |
+| --- | --- |
 | Gradient studio | Inline and resource linear/radial brushes on borders, text, shapes and an opacity mask. |
 | Composition lab | A live `ContainerVisual` tree with group opacity, a drop shadow, an opacity mask and a bitmap cache; sliders write `Visual.Opacity` and `Visual.Transform`. |
 | 3D showcase | `Rotate3DTransform` in perspective; sliders drive the angles and camera depth of a live card. |
 
-### Component groups
+### Easel native — component groups
 
 | Group | Shows |
 | --- | --- |
-| Basics | The implicit fallback appearance, authored as visual XAML: representative controls with no style, background or foreground set. |
+| Input | `Button`/`RepeatButton` (XAML `Click` handlers), toggles, `Slider`, `ProgressBar`, `NativeControlHost`. |
+| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualList` at 5,000 rows with a realized-range readout; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
+| Graphics | Shapes, `VisualPresenter` with a XAML-declared `ContainerVisual`, opacity and clip, gradient brushes, visual composition, 3D transforms. |
+| Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
+| Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
+| Styling | Implicit/explicit `VisualStyle`, `VisualTrigger`, `VisualControlTemplate` with `ContentPresenter`, resources, and a `DynamicResource` vs `StaticResource` comparison — all declared in XAML. |
 | Layout | `StackPanel`, `DockPanel`, `Grid`, `WrapPanel`, `Canvas`, `UniformGrid`, `Viewbox`, `GridSplitter`, `GroupBox`, `Expander`, `TabControl` — each a XAML view with attached properties. |
 | Text | `TextBlock`, `TextBox`, password/multiline editing, a XAML-templated `TextBox` with `UseNativeEditor=false`, `RichTextBox`, `Image`. |
-| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualList` at 5,000 rows with a realized-range readout; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
-| Input | `Button`/`RepeatButton` (XAML `Click` handlers), toggles, `Slider`, `ProgressBar`, `NativeControlHost`. |
-| Graphics | Shapes, `VisualPresenter` with a XAML-declared `ContainerVisual`, opacity and clip, gradient brushes, visual composition, 3D transforms. |
 | Overlay | `VisualPopup`, `VisualMenu`, `VisualContextMenu`. |
-| Styling | Implicit/explicit `VisualStyle`, `VisualTrigger`, `VisualControlTemplate` with `ContentPresenter`, resources, and a `DynamicResource` vs `StaticResource` comparison — all declared in XAML. |
-| Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
 | Theme | Palette swatches, typography, the three-mode palette rebuild, and a XAML resource dictionary with keyed styles, a trigger, a control template and a data template. |
+| Basics | The implicit fallback appearance, authored as visual XAML: representative controls with no style, background or foreground set. |
 | Visuals | A generated XAML view with a XAML click handler. |
-| Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
+
+### WinForms native
+
+The four interop cards: native elements in one layout pass, native property binding, snapshot composition and
+`NativeControlHost`.
 
 ## New in this revision
 
+- **Industrial-first sections** — the catalog is now **Scenarios → Easel native → WinForms native**, and the
+  industrial pages, input and data groups lead their sections. The shell shows the section/group breadcrumb
+  above the preview and the status bar names all three levels.
+- **Industrial scenario pages** — production line, process flow, alarm center and machine panel, each driven by
+  a timer-backed view model and drawn with bound `Path`/`Polyline`/`Polygon` geometry.
 - **DataGrid and native drag** — a row-virtualized two-dimensional table with sortable headers, badge/check/
   progress cells, row numbers, in-place column resize and themed selection. Rows drag out through the Windows
   OLE loop and two grids exchange the same row objects through `Easel.DataGrid.Rows`; `DropZone` accepts files,

@@ -45,24 +45,28 @@ internal static class ScenarioCards
                 "Gradient studio",
                 "The full gradient language: inline and resource linear/radial brushes, gradient text, borders, fills and an opacity mask.",
                 "<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"1,1\">…",
-                _ => new GradientStudioView()),
+                _ => new GradientStudioView(),
+                "Visual studies"),
             Card(
                 "scenario.composition",
                 "Composition lab",
                 "A live Visual tree: overlapping ShapeVisuals, group opacity, an opacity mask, a drop shadow and a cached layer.",
                 "<VisualPresenter.Content><ContainerVisual>…",
-                _ => new CompositionLabView()),
+                _ => new CompositionLabView(),
+                "Visual studies"),
             Card(
                 "scenario.transforms-3d",
                 "3D showcase",
                 "Rotate3DTransform in perspective, with sliders driving the angles and camera depth of live cards.",
                 "<Rotate3DTransform AngleX=\"-16\" AngleY=\"24\" Depth=\"700\" />",
-                _ => new Showcase3DView()),
+                _ => new Showcase3DView(),
+                "Visual studies"),
         ];
     }
 
     private static GalleryCard Card(
         string id, string title, string summary, string usage,
-        Func<GalleryModel, Easel.Visuals.VisualElement> create)
-        => new(new GalleryCardInfo(id, "Scenarios", title, summary, usage), create);
+        Func<GalleryModel, Easel.Visuals.VisualElement> create,
+        string group = "Applications")
+        => new(new GalleryCardInfo(id, group, title, summary, usage), create);
 }

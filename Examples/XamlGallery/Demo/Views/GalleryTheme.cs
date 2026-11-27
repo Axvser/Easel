@@ -120,7 +120,24 @@ internal static class GalleryTheme
         radialCover.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x7B, 0x2F, 0xF7), 0d));
         radialCover.GradientStops.Add(new GradientStop(Color.FromArgb(0xFF, 0x00, 0xD2, 0xFF), 1d));
         resources["RadialCover"] = radialCover;
+
+        // 工业语义色：正常/警告/危险/信号。与调色板无关，HMI 页面的状态色不能随主题变。
+        resources["Signal"] = Solid(Color.FromArgb(0xFF, 0x22, 0xD3, 0xEE));
+        resources["Positive"] = Solid(Color.FromArgb(0xFF, 0x22, 0xC5, 0x5E));
+        resources["Warning"] = Solid(Color.FromArgb(0xFF, 0xF5, 0x9E, 0x0B));
+        resources["Danger"] = Solid(Color.FromArgb(0xFF, 0xEF, 0x44, 0x44));
+        resources["HmiGrid"] = Solid(Color.FromArgb(0x2E, 0x94, 0xA3, 0xB8));
+        resources["HmiTrack"] = Solid(Color.FromArgb(0x3D, 0x94, 0xA3, 0xB8));
+        resources["SignalGradient"] = Linear(
+            (Color.FromArgb(0xFF, 0x22, 0xD3, 0xEE), 0d),
+            (Color.FromArgb(0xFF, 0x02, 0x84, 0xC7), 1d));
+        resources["DangerGradient"] = Linear(
+            (Color.FromArgb(0xFF, 0xEF, 0x44, 0x44), 0d),
+            (Color.FromArgb(0xFF, 0x99, 0x1B, 0x1B), 1d));
     }
+
+    /// <summary>Builds a solid brush from a colour.</summary>
+    public static SolidColorBrush Solid(Color color) => new(color);
 
     /// <summary>Builds a left-to-right or diagonal gradient from colour stops.</summary>
     public static LinearGradientBrush Linear(params (Color Color, double Offset)[] stops)

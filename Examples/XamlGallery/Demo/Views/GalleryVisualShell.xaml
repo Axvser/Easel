@@ -34,7 +34,7 @@
       <StackPanel Grid.Column="0" Spacing="3">
         <TextBlock Text="Modern WinForms Gallery"
                    Style="{StaticResource Heading}" />
-        <TextBlock Text="A XAML-first WinForms runtime · one HWND · one visual tree · MVVM view models"
+        <TextBlock Text="Scenarios · Easel native · WinForms native — one HWND, one visual tree, MVVM view models"
                    Style="{StaticResource Caption}" />
       </StackPanel>
 
@@ -43,6 +43,11 @@
                   Spacing="10"
                   HorizontalAlignment="Right"
                   VerticalAlignment="Center">
+        <Border Background="{StaticResource SignalGradient}"
+                CornerRadius="10"
+                Padding="10,4">
+          <TextBlock Text="industrial first" Foreground="{StaticResource AccentText}" FontSize="9" />
+        </Border>
         <Border Background="{StaticResource AccentGradient}"
                 CornerRadius="10"
                 Padding="10,4">
@@ -121,6 +126,11 @@
   <Border Background="{StaticResource Window}">
     <DockPanel LastChildFill="True" Margin="18" Background="{StaticResource Window}">
       <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,10">
+        <TextBlock x:Name="PreviewBreadcrumb"
+                   Foreground="{StaticResource Signal}"
+                   FontSize="9"
+                   FontWeight="SemiBold"
+                   Text="{Binding Breadcrumb}" />
         <TextBlock x:Name="PreviewTitle"
                    Foreground="{StaticResource Text}"
                    FontSize="18"

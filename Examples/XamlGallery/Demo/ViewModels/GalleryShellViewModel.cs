@@ -2,7 +2,7 @@ using Demo.Mvvm;
 
 namespace Demo;
 
-/// <summary>The gallery shell state: filter text, visible groups, selected card and the derived chrome text.</summary>
+/// <summary>The gallery shell state: filter text, visible sections and groups, selected card and derived chrome text.</summary>
 /// <remarks>
 /// The view model owns only catalog metadata and strings. The visual factory, tree-item construction, preview
 /// disposal and inspector rows stay in the view; switching the palette rebuilds the view with this same instance.
@@ -12,7 +12,7 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
     private readonly IReadOnlyList<GalleryCardInfo> _cards;
     private readonly IThemeService _theme;
     private readonly List<GalleryCardInfo> _visible = [];
-    private readonly List<GalleryCardGroup> _groups = [];
+    private readonly List<GalleryCardSection> _sections = [];
     private bool _hadMatches;
 
     private string _filterText = string.Empty;
@@ -72,20 +72,25 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         _theme.Changed += OnThemeChanged;
     }
 
-    /// <summary>Raised after the filter changed the visible groups.</summary>
+    /// <summary>Raised after the filter changed the visible sections and groups.</summary>
     public event EventHandler? CatalogChanged;
 
     /// <summary>Raised when the preview should show a card, or clear itself for <see langword="null"/>.</summary>
     public event EventHandler<GalleryCardInfo?>? PreviewChanged;
 
-    /// <summary>The groups that match the current filter, in first-appearance order.</summary>
-    public IReadOnlyList<GalleryCardGroup> VisibleGroups => _groups;
+    /// <summary>The sections and groups that match the current filter, in catalog order.</summary>
+    public IReadOnlyList<GalleryCardSection> VisibleSections => _sections;
 
     /// <summary>Whether anything matches the filter.</summary>
     public bool HasMatches => _visible.Count > 0;
 
     /// <summary>The preview title.</summary>
     public string Title => !HasMatches ? "No matches" : SelectedCard?.Title ?? string.Empty;
+
+    /// <summary>The section and group above the preview title.</summary>
+    public string Breadcrumb => !HasMatches
+        ? string.Empty
+        : SelectedCard is { } card ? $"{card.Section} / {card.Group}" : string.Empty;
 
     /// <summary>The preview summary.</summary>
     public string Summary => !HasMatches
@@ -98,9 +103,9 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
     /// <summary>The status-bar text.</summary>
     public string StatusText => !HasMatches
         ? "No matches"
-        : SelectedCard is { } card ? $"{card.Group} · {card.Id}" : "Ready";
+        : SelectedCard is { } card ? $"{card.Section} · {card.Group} · {card.Id}" : "Ready";
 
-    /// <summary>The four theme choices shown by the selector.</summary>
+    /// <summary>The theme choices shown by the selector.</summary>
     public IReadOnlyList<string> ThemeOptions => _theme.Options;
 
     /// <summary>Selects a card by id; a card hidden by the filter clears the filter first.</summary>
@@ -179,30 +184,47 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
     private void RaiseComputed()
     {
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Breadcrumb));
         OnPropertyChanged(nameof(Summary));
         OnPropertyChanged(nameof(Usage));
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(HasMatches));
     }
 
+    // 先按分区分组、再按分区内顺序排队；卡片在组内保持 CardCatalog 的先后。
     private void ApplyFilterCore()
     {
         var filter = _filterText.Trim();
         _visible.Clear();
-        _groups.Clear();
-        foreach (var group in _cards.GroupBy(static card => card.Group, StringComparer.Ordinal))
-        {
-            var matches = group.Where(card => Matches(card, filter)).ToList();
-            if (matches.Count == 0)
+        _sections.Clear();
+
+        var groups = _cards
+            .GroupBy(static card => card.Group, StringComparer.Ordinal)
+            .Select(group => new
             {
-                continue;
+                Name = group.Key,
+                Section = GalleryTaxonomy.SectionOf(group.Key),
+                Cards = group.Where(card => Matches(card, filter)).ToList(),
+            })
+            .Where(group => group.Cards.Count > 0)
+            .OrderBy(group => GalleryTaxonomy.SectionRank(group.Section))
+            .ThenBy(group => GalleryTaxonomy.GroupRank(group.Name))
+            .GroupBy(group => group.Section);
+
+        foreach (var section in groups)
+        {
+            var visibleGroups = section
+                .Select(group => new GalleryCardGroup(group.Name, group.Cards))
+                .ToList();
+            foreach (var group in visibleGroups)
+            {
+                _visible.AddRange(group.Cards);
             }
 
-            _visible.AddRange(matches);
-            _groups.Add(new GalleryCardGroup(group.Key, matches));
+            _sections.Add(new GalleryCardSection(section.Key, visibleGroups));
         }
 
-        OnPropertyChanged(nameof(VisibleGroups));
+        OnPropertyChanged(nameof(VisibleSections));
         OnPropertyChanged(nameof(HasMatches));
     }
 
@@ -211,5 +233,6 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
            || card.Id.Contains(filter, StringComparison.OrdinalIgnoreCase)
            || card.Title.Contains(filter, StringComparison.OrdinalIgnoreCase)
            || card.Summary.Contains(filter, StringComparison.OrdinalIgnoreCase)
-           || card.Group.Contains(filter, StringComparison.OrdinalIgnoreCase);
+           || card.Group.Contains(filter, StringComparison.OrdinalIgnoreCase)
+           || card.Section.Contains(filter, StringComparison.OrdinalIgnoreCase);
 }

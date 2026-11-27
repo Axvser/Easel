@@ -175,21 +175,24 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
         _entryItems.Clear();
         CatalogTree.Items.Clear();
 
-        var demos = new VC.TreeViewItem { Header = "Demos", IsExpanded = true };
-        foreach (var group in _vm.VisibleGroups)
+        foreach (var section in _vm.VisibleSections)
         {
-            var groupItem = new VC.TreeViewItem { Header = group.Name, IsExpanded = true };
-            foreach (var info in group.Cards)
+            var sectionItem = new VC.TreeViewItem { Header = section.Name, IsExpanded = true };
+            foreach (var group in section.Groups)
             {
-                var item = new VC.TreeViewItem { Header = info.Title };
-                _entryItems[item] = info.Id;
-                groupItem.Items.Add(item);
+                var groupItem = new VC.TreeViewItem { Header = group.Name, IsExpanded = true };
+                foreach (var info in group.Cards)
+                {
+                    var item = new VC.TreeViewItem { Header = info.Title };
+                    _entryItems[item] = info.Id;
+                    groupItem.Items.Add(item);
+                }
+
+                sectionItem.Items.Add(groupItem);
             }
 
-            demos.Items.Add(groupItem);
+            CatalogTree.Items.Add(sectionItem);
         }
-
-        CatalogTree.Items.Add(demos);
 
         var selected = _vm.SelectedCard is { } card
             ? _entryItems.FirstOrDefault(pair => pair.Value == card.Id).Key

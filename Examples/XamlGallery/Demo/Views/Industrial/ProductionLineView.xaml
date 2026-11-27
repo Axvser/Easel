@@ -1,0 +1,282 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.Industrial.ProductionLineView"
+    Background="{StaticResource Surface}"
+    Width="540"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12">
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Spacing="3">
+        <TextBlock Text="LINE A · BODY SHOP"
+                   Foreground="{StaticResource Text}"
+                   FontSize="18"
+                   FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Status}"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="9" />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="12"
+                  VerticalAlignment="Center">
+        <Border Background="{StaticResource Raised}" CornerRadius="8" Padding="10,4">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse Width="7" Height="7" Fill="{StaticResource Positive}" VerticalAlignment="Center" />
+            <TextBlock Text="RUNNING" Foreground="{StaticResource Positive}" FontSize="9" FontWeight="SemiBold" />
+          </StackPanel>
+        </Border>
+        <StackPanel Spacing="1" VerticalAlignment="Center">
+          <TextBlock Text="LAST SAMPLE" Foreground="{StaticResource Muted}" FontSize="8" />
+          <TextBlock Text="{Binding Updated}" Foreground="{StaticResource Text}" FontSize="11" FontWeight="SemiBold" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </Border>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="16">
+    <StackPanel Spacing="12">
+
+      <WrapPanel Orientation="Horizontal" Spacing="8">
+
+        <Border Width="114"
+                Height="132"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="12">
+          <StackPanel Spacing="3" VerticalAlignment="Center">
+            <TextBlock Text="OEE" Foreground="{StaticResource Muted}" FontSize="8" />
+            <Grid Width="64" Height="64" HorizontalAlignment="Left">
+              <Path Data="{Binding OeeTicks}" Stroke="{StaticResource HmiTrack}" StrokeThickness="1" />
+              <Path Data="{Binding OeeArc}" Stroke="{StaticResource Signal}" StrokeThickness="4" />
+            </Grid>
+            <TextBlock Text="{Binding OeeText}" Foreground="{StaticResource Text}" FontSize="16" FontWeight="Bold" />
+          </StackPanel>
+        </Border>
+
+        <Border Width="114"
+                Height="132"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="12">
+          <StackPanel Spacing="4" VerticalAlignment="Center">
+            <TextBlock Text="THROUGHPUT" Foreground="{StaticResource Muted}" FontSize="8" />
+            <TextBlock Text="{Binding ThroughputText}" Foreground="{StaticResource Text}" FontSize="16" FontWeight="Bold" />
+            <ProgressBar Height="6" Maximum="160" Value="{Binding Throughput}" FillBrush="{StaticResource Signal}" />
+            <TextBlock Text="parts per hour" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+        </Border>
+
+        <Border Width="114"
+                Height="132"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="12">
+          <StackPanel Spacing="4" VerticalAlignment="Center">
+            <TextBlock Text="SCRAP" Foreground="{StaticResource Muted}" FontSize="8" />
+            <TextBlock Text="{Binding ScrapText}" Foreground="{StaticResource Text}" FontSize="16" FontWeight="Bold" />
+            <ProgressBar Height="6" Maximum="2" Value="{Binding Scrap}" FillBrush="{StaticResource Warning}" />
+            <TextBlock Text="of produced" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+        </Border>
+
+        <Border Width="114"
+                Height="132"
+                Background="{StaticResource Raised}"
+                BorderBrush="{StaticResource Border}"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="12">
+          <StackPanel Spacing="4" VerticalAlignment="Center">
+            <TextBlock Text="DOWNTIME" Foreground="{StaticResource Muted}" FontSize="8" />
+            <TextBlock Text="{Binding DowntimeText}" Foreground="{StaticResource Text}" FontSize="16" FontWeight="Bold" />
+            <ProgressBar Height="6" Maximum="30" Value="{Binding Downtime}" FillBrush="{StaticResource Danger}" />
+            <TextBlock Text="minutes · shift" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+
+      <Border Background="{StaticResource Raised}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="10">
+          <Grid>
+            <TextBlock Text="Stations" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="cycle time · live state"
+                       Foreground="{StaticResource Muted}"
+                       FontSize="8"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Center" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Stations}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource Surface}"
+                        CornerRadius="7"
+                        Padding="10,7"
+                        Margin="0,0,0,5">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="64" />
+                      <ColumnDefinition Width="66" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="48" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="{StaticResource Text}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                      <Ellipse Width="6" Height="6" Fill="{Binding StateBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="8" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ProgressBar Grid.Column="2"
+                                 Height="5"
+                                 Maximum="60"
+                                 Value="{Binding Cycle}"
+                                 FillBrush="{Binding StateBrush}"
+                                 VerticalAlignment="Center"
+                                 Margin="8,0,12,0" />
+                    <TextBlock Grid.Column="3" Text="{Binding CycleText}" Foreground="{StaticResource Text}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{StaticResource Raised}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="16">
+        <StackPanel Spacing="8">
+          <Grid>
+            <TextBlock Text="Throughput trend" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <Border Background="{StaticResource Surface}"
+                    CornerRadius="7"
+                    Padding="8,3"
+                    HorizontalAlignment="Right">
+              <TextBlock Text="LAST 30 MIN" Foreground="{StaticResource Signal}" FontSize="8" />
+            </Border>
+          </Grid>
+
+          <Grid Height="118">
+            <Canvas Width="470" Height="118" HorizontalAlignment="Left">
+              <Line X1="0" Y1="20" X2="470" Y2="20" Stroke="{StaticResource HmiGrid}" StrokeThickness="1" />
+              <Line X1="0" Y1="52" X2="470" Y2="52" Stroke="{StaticResource HmiGrid}" StrokeThickness="1" />
+              <Line X1="0" Y1="84" X2="470" Y2="84" Stroke="{StaticResource HmiGrid}" StrokeThickness="1" />
+              <Line X1="0" Y1="116" X2="470" Y2="116" Stroke="{StaticResource HmiGrid}" StrokeThickness="1" />
+              <Polygon Points="{Binding ThroughputAreaPoints}" Fill="{StaticResource SignalGradient}" Opacity="0.28" />
+              <Polyline Points="{Binding ThroughputPoints}" Stroke="{StaticResource Signal}" StrokeThickness="2.2" />
+            </Canvas>
+          </Grid>
+
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Spacing="1">
+              <TextBlock Text="CURRENT" Foreground="{StaticResource Muted}" FontSize="7" />
+              <TextBlock Text="{Binding ThroughputText}" Foreground="{StaticResource Text}" FontSize="11" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="1">
+              <TextBlock Text="TARGET" Foreground="{StaticResource Muted}" FontSize="7" />
+              <TextBlock Text="120.0/h" Foreground="{StaticResource Text}" FontSize="11" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="1">
+              <TextBlock Text="SHIFT PEAK" Foreground="{StaticResource Muted}" FontSize="7" />
+              <TextBlock Text="136.8/h" Foreground="{StaticResource Text}" FontSize="11" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Background="{StaticResource Raised}"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="14">
+        <StackPanel Spacing="8">
+          <Grid>
+            <TextBlock Text="Alarm feed" Foreground="{StaticResource Text}" FontSize="13" FontWeight="SemiBold" />
+            <Border Background="{StaticResource Surface}"
+                    CornerRadius="7"
+                    Padding="8,3"
+                    HorizontalAlignment="Right">
+              <TextBlock Text="3 OPEN" Foreground="{StaticResource Warning}" FontSize="8" />
+            </Border>
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Alarms}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource Surface}"
+                        CornerRadius="7"
+                        Padding="9,7"
+                        Margin="0,0,0,5">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="3" />
+                      <ColumnDefinition Width="52" />
+                      <ColumnDefinition Width="58" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="70" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{Binding SeverityBrush}" CornerRadius="2" />
+                    <TextBlock Grid.Column="1" Text="{Binding Time}" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    <TextBlock Grid.Column="2" Text="{Binding Tag}" Foreground="{StaticResource Text}" FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="{Binding Message}" Foreground="{StaticResource Text}" FontSize="9" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="4" Text="{Binding Severity}" Foreground="{Binding SeverityBrush}" FontSize="8" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Grid>
+        <StackPanel Orientation="Horizontal" Spacing="14">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Ellipse Width="6" Height="6" Fill="{StaticResource Positive}" VerticalAlignment="Center" />
+            <TextBlock Text="running" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Ellipse Width="6" Height="6" Fill="{StaticResource Warning}" VerticalAlignment="Center" />
+            <TextBlock Text="attention" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <Ellipse Width="6" Height="6" Fill="{StaticResource Danger}" VerticalAlignment="Center" />
+            <TextBlock Text="fault" Foreground="{StaticResource Muted}" FontSize="8" />
+          </StackPanel>
+        </StackPanel>
+        <TextBlock Text="ONE VISUAL TREE · LIVE SIMULATOR"
+                   Foreground="{StaticResource Muted}"
+                   FontSize="8"
+                   HorizontalAlignment="Right" />
+      </Grid>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</local:ThemedDockPanel>
