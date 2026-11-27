@@ -38,6 +38,8 @@ public class VisualHost : System.Windows.Forms.Control
     private readonly Dictionary<NativeElement, System.Windows.Forms.Control> _nativeChildren = [];
     private readonly Dictionary<NativeElement, int> _nativeTreeOrder = [];
     private readonly HashSet<NativeElement> _placedNative = [];
+    private readonly HashSet<NativeElement> _autoNativeChildren = [];
+    private readonly HashSet<NativeElement> _snapshotProxies = [];
     private readonly Dictionary<NativeElement, (System.Windows.Forms.Control Child, Rectangle Physical, bool Show, RectangleF Visible)> _pendingPlacements = [];
     private readonly List<NativeElement> _frozenNatives = [];
     private bool _rendering;
@@ -57,6 +59,9 @@ public class VisualHost : System.Windows.Forms.Control
     private bool _layoutInProgress;
     private bool _paintingFullDamage;
     private Size _layoutSize;
+
+    // 每趟完整布局递增；AddNative 的岛用它判断宿主这一趟有没有亲自排过自己。
+    internal int LayoutPass { get; private set; }
 
     // 每开始一趟布局递增。Grid 用它区分「同一趟里被父级第二遍收紧」与「下一趟换了约束」。
     internal static int LayoutGeneration { get; private set; }
@@ -1603,11 +1608,18 @@ public class VisualHost : System.Windows.Forms.Control
     }
 
     // bounds 是逻辑单位；原生 HWND 必须按物理客户区像素摆放。
-    internal void PlaceNative(NativeElement owner, System.Windows.Forms.Control child, Rectangle bounds)
+    internal void PlaceNative(NativeElement owner, System.Windows.Forms.Control child, RectangleF bounds)
     {
         if (owner.IsFrozen)
         {
             // 冻结期间岛不参与原生摆放；松手时自己重新摆回。
+            return;
+        }
+
+        if (owner.RequiresSnapshotComposition)
+        {
+            // 组合（透明度/旋转/效果/遮罩）无法作用在子 HWND 上；转快照路径，位图跟着视觉管线走。
+            owner.EnterSnapshotComposition();
             return;
         }
 
@@ -1641,7 +1653,7 @@ public class VisualHost : System.Windows.Forms.Control
         QueueOrApplyNative(
             owner,
             child,
-            ToPhysical(Rectangle.Round(bounds)),
+            ToPhysical(bounds),
             show: owner.IsVisible && owner.Visibility == XamlVisibility.Visible,
             visible);
     }
@@ -1700,7 +1712,7 @@ public class VisualHost : System.Windows.Forms.Control
         // 可见交集用窗口区域表达，而不是把窗口本身缩小：缩小会连原生内容一起重排
         // （视频会被缩放、文本框会重折行），拖动分割条时就会看到画面尺寸跳变。
         var actual = child.Bounds;
-        var physicalVisible = Rectangle.Intersect(actual, ToPhysical(Rectangle.Round(visible)));
+        var physicalVisible = Rectangle.Intersect(actual, ToPhysical(visible));
         var localVisible = new Rectangle(
             physicalVisible.X - actual.X,
             physicalVisible.Y - actual.Y,
@@ -1752,30 +1764,7 @@ public class VisualHost : System.Windows.Forms.Control
             return;
         }
 
-        var childBounds = child.Bounds;
-        var client = new Rectangle(0, 0, child.Width, child.Height);
-        var cuts = new List<Rectangle>();
-        foreach (var popup in _openPopups)
-        {
-            var logical = popup.Bounds;
-            if (logical.Width <= 0f || logical.Height <= 0f)
-            {
-                continue;
-            }
-
-            var physical = ToPhysical(Rectangle.Round(logical));
-            var relative = new Rectangle(
-                physical.X - childBounds.X,
-                physical.Y - childBounds.Y,
-                physical.Width,
-                physical.Height);
-            var overlap = Rectangle.Intersect(relative, client);
-            if (overlap.Width > 0 && overlap.Height > 0)
-            {
-                cuts.Add(overlap);
-            }
-        }
-
+        var cuts = CollectPopupCuts(child.Bounds);
         var corner = (float)(owner.CornerRadius * DpiScale);
         var current = (Width: child.Width, Height: child.Height, Radius: corner, Clip: clip, Cuts: cuts.ToArray());
         if (_nativeRegionStates.TryGetValue(child, out var previous)
@@ -1790,7 +1779,42 @@ public class VisualHost : System.Windows.Forms.Control
 
         _nativeRegionStates[child] = current;
         NativeWindowRegion.Apply(child, corner, current.Cuts, clip);
+        // 圆角/挖洞会把原本由岛覆盖的像素还给父窗口；不补画，改半径或关弹层后旧像素会留在角上。
+        Invalidate(Rectangle.Inflate(child.Bounds, 1, 1));
     }
+
+    // 以 target（表面客户区物理坐标）为坐标系，返回被弹层覆盖的矩形；调用方把它们从窗口区域里减掉。
+    internal List<Rectangle> CollectPopupCuts(Rectangle target)
+    {
+        var cuts = new List<Rectangle>();
+        foreach (var popup in _openPopups)
+        {
+            var logical = popup.Bounds;
+            if (logical.Width <= 0f || logical.Height <= 0f)
+            {
+                continue;
+            }
+
+            var physical = ToPhysical(logical);
+            var relative = new Rectangle(
+                physical.X - target.X,
+                physical.Y - target.Y,
+                physical.Width,
+                physical.Height);
+            var overlap = Rectangle.Intersect(relative, new Rectangle(0, 0, target.Width, target.Height));
+            if (overlap.Width > 0 && overlap.Height > 0)
+            {
+                cuts.Add(overlap);
+            }
+        }
+
+        return cuts;
+    }
+
+    // 快照岛的可视部分由一个独立顶层输入代理承载；弹层打开/关闭时它的窗口区域也要重算。
+    internal void RegisterSnapshotProxy(NativeElement element) => _snapshotProxies.Add(element);
+
+    internal void UnregisterSnapshotProxy(NativeElement element) => _snapshotProxies.Remove(element);
 
     internal void RefreshNativeRegions()
     {
@@ -1798,6 +1822,11 @@ public class VisualHost : System.Windows.Forms.Control
         {
             Rectangle? clip = _nativeRegionStates.TryGetValue(pair.Value, out var state) ? state.Clip : null;
             ApplyNativeRegion(pair.Key, pair.Value, clip);
+        }
+
+        foreach (var proxy in _snapshotProxies)
+        {
+            proxy.RefreshProxyRegion();
         }
     }
 
@@ -1860,9 +1889,35 @@ public class VisualHost : System.Windows.Forms.Control
         {
             Controls.Remove(child);
         }
+
+        // 摘掉的岛不会再画自己，它原先占的像素必须由父窗口补画。
+        Invalidate(Rectangle.Inflate(child.Bounds, 1, 1));
     }
 
-    // 岛与岛之间的 z 序按 Panel.ZIndex，再按第一次进入树的顺序；岛整体仍在所有视觉内容之上。
+    internal void RegisterAutoNative(NativeElement child) => _autoNativeChildren.Add(child);
+
+    internal void UnregisterAutoNative(NativeElement child) => _autoNativeChildren.Remove(child);
+
+    private void ArrangeAutoNativeChildren()
+    {
+        if (_autoNativeChildren.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var child in _autoNativeChildren.ToArray())
+        {
+            if (!ReferenceEquals(child.Surface, this))
+            {
+                _autoNativeChildren.Remove(child);
+                continue;
+            }
+
+            child.ArrangeInOwnerContentBox(LayoutPass);
+        }
+    }
+
+    // 岛与岛之间的 z 序按 Panel.ZIndex，再按视觉树里的先后；岛整体仍在所有视觉内容之上。
     internal void ReorderNativeChildren()
     {
         if (_nativeChildren.Count < 2)
@@ -1870,9 +1925,12 @@ public class VisualHost : System.Windows.Forms.Control
             return;
         }
 
+        var treeOrder = BuildNativeTreeOrder();
         var ordered = _nativeChildren
             .OrderBy(static pair => Easel.Visuals.Controls.Panel.GetZIndex(pair.Key))
-            .ThenBy(pair => _nativeTreeOrder.TryGetValue(pair.Key, out var order) ? order : int.MaxValue)
+            .ThenBy(pair => treeOrder.TryGetValue(pair.Key, out var index)
+                ? index
+                : _nativeTreeOrder.TryGetValue(pair.Key, out var seen) ? 1_000_000 + seen : int.MaxValue)
             .ToList();
         for (var index = 0; index < ordered.Count; index++)
         {
@@ -1887,6 +1945,40 @@ public class VisualHost : System.Windows.Forms.Control
                 Controls.SetChildIndex(child, index);
             }
         }
+    }
+
+    // 视觉树先序里每个岛的位置；集合重排或改 ZIndex 后，子 HWND 的次序要跟着变。
+    private Dictionary<NativeElement, int> BuildNativeTreeOrder()
+    {
+        var order = new Dictionary<NativeElement, int>();
+        var next = 0;
+        void Walk(Visual visual)
+        {
+            if (visual is NativeElement native)
+            {
+                order[native] = next++;
+            }
+
+            if (visual is ContainerVisual container)
+            {
+                var children = container.Children;
+                for (var index = 0; index < children.Count; index++)
+                {
+                    if (children[index] is { } child)
+                    {
+                        Walk(child);
+                    }
+                }
+            }
+        }
+
+        if (_root is not null)
+        {
+            Walk(_root);
+        }
+
+        Walk(_overlay);
+        return order;
     }
 
     /// <inheritdoc />
@@ -2307,6 +2399,11 @@ public class VisualHost : System.Windows.Forms.Control
                 child.Visible = false;
             }
         }
+
+        foreach (var proxy in _snapshotProxies)
+        {
+            proxy.SetProxySuppressed(true);
+        }
     }
 
     private void RestoreNativeIslands()
@@ -2321,10 +2418,15 @@ public class VisualHost : System.Windows.Forms.Control
             return;
         }
 
+        foreach (var proxy in _snapshotProxies)
+        {
+            proxy.SetProxySuppressed(false);
+        }
+
         // 隐藏期间布局可能变过；恢复时按元素当前排列矩形重新摆放，而不是沿用旧 Bounds。
         foreach (var pair in _nativeChildren.ToArray())
         {
-            PlaceNative(pair.Key, pair.Value, Rectangle.Round(pair.Key.AbsoluteBounds));
+            PlaceNative(pair.Key, pair.Value, pair.Key.AbsoluteBounds);
         }
 
         RefreshNativeRegions();
@@ -2372,12 +2474,16 @@ public class VisualHost : System.Windows.Forms.Control
             {
                 Controls.Remove(child);
             }
+
+            Invalidate(Rectangle.Inflate(child.Bounds, 1, 1));
         }
 
         _nativeChildren.Clear();
         _nativeTreeOrder.Clear();
         _placedNative.Clear();
         _nativeRegionStates.Clear();
+        _autoNativeChildren.Clear();
+        _snapshotProxies.Clear();
     }
 
     private void UpdateHover(PointF? point, VisualElement? target)
@@ -2432,6 +2538,23 @@ public class VisualHost : System.Windows.Forms.Control
             (int)Math.Floor(rectangle.Y * scale),
             Math.Max(1, (int)Math.Ceiling(rectangle.Width * scale)),
             Math.Max(1, (int)Math.Ceiling(rectangle.Height * scale)));
+    }
+
+    // 逻辑矩形 → 物理像素：起点向下取整、终点向上取整，岛至少覆盖元素画到的每个像素。
+    // 先 Round 再缩放会让右/下边缩进 1px（1.5 倍屏上很常见），露出岛后面的一条底色。
+    private Rectangle ToPhysical(RectangleF logical)
+    {
+        var scale = DpiScale;
+        if (scale <= 0f)
+        {
+            scale = 1f;
+        }
+
+        var left = (int)Math.Floor(logical.X * scale);
+        var top = (int)Math.Floor(logical.Y * scale);
+        var right = (int)Math.Ceiling(logical.Right * scale);
+        var bottom = (int)Math.Ceiling(logical.Bottom * scale);
+        return new Rectangle(left, top, Math.Max(1, right - left), Math.Max(1, bottom - top));
     }
 
     private static Rectangle ToLogical(Rectangle rectangle, float scale)
@@ -2493,6 +2616,7 @@ public class VisualHost : System.Windows.Forms.Control
         // 先认领这一趟：measure/arrange 里再有 InvalidateMeasure（滚动条折叠/展开就是这种）
         // 会把 _layoutValid 打回 false，下一帧继续排版，而不是被本次结尾的 true 吞掉。
         _layoutValid = true;
+        LayoutPass++;
         _placedNative.Clear();
         if (_rootElement is { } elementRoot)
         {
@@ -2517,6 +2641,9 @@ public class VisualHost : System.Windows.Forms.Control
             dialog.Reposition(size);
         }
 
+        // 宿主自己不摆放的子级（AddNative 到非面板元素）由这里补一次内容区排版，再进入原生落位扫描。
+        ArrangeAutoNativeChildren();
+
         // A host that was collapsed or removed from the tree never reaches ArrangeOverride, so its HWND would stay
         // floating above the surface. Anything not visited by this pass is detached — unless it is still live in this
         // tree and merely skipped the pass because its arranged size did not change.
@@ -2529,7 +2656,7 @@ public class VisualHost : System.Windows.Forms.Control
 
             if (pair.Key.Surface == this && pair.Key.IsVisible)
             {
-                PlaceNative(pair.Key, pair.Value, Rectangle.Round(pair.Key.AbsoluteBounds));
+                PlaceNative(pair.Key, pair.Value, pair.Key.AbsoluteBounds);
             }
             else
             {

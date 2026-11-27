@@ -109,7 +109,7 @@ internal static class NativeWindowRegion
     }
 
     /// <summary>Clips the window to a polygon (the transformed element outline).</summary>
-    internal static void SetPolygon(Control child, Point[] points)
+    internal static void SetPolygon(Control child, Point[] points, Rectangle[]? cuts = null)
     {
         const int winding = 2;
         if (!child.IsHandleCreated || points.Length < 3)
@@ -121,6 +121,21 @@ internal static class NativeWindowRegion
         if (region == IntPtr.Zero)
         {
             return;
+        }
+
+        if (cuts is { Length: > 0 })
+        {
+            foreach (var cut in cuts)
+            {
+                var hole = CreateRectRgn(cut.Left, cut.Top, cut.Right, cut.Bottom);
+                if (hole == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                CombineRgn(region, region, hole, RgnDiff);
+                DeleteObject(hole);
+            }
         }
 
         if (SetWindowRgn(child.Handle, region, true) == 0)

@@ -23,20 +23,23 @@ namespace Easel.Visuals.Controls;
 /// and inherited font/enabled values from this element.
 /// </para>
 /// <para>
-/// The native HWND still cannot be transformed, alpha-blended or clipped to a shape by the outer tree, and it always
-/// paints above the visual content around it. Those are window-system limits, not layout limits. Snapshot mode
-/// (<see cref="IsSnapshot"/>) paints a bitmap in the visual pass when composition is required; an almost invisible
-/// input proxy keeps real mouse, keyboard and IME input alive in a Form.
+/// The native HWND cannot be transformed, alpha-blended or clipped to a shape by the outer tree, and it always
+/// paints above the visual content around it. Those are window-system limits, not layout limits. When the element or
+/// an ancestor requires composition that a child window cannot express (opacity, rotation or skew, an effect, an
+/// opacity mask or a 3D transform), the element switches to its snapshot path automatically: the bitmap joins the
+/// visual pass and an almost invisible input proxy keeps real mouse, keyboard and IME input alive in a Form.
+/// <see cref="IsSnapshot"/> forces that path.
 /// </para>
 /// </remarks>
 public class NativeElement : VisualElement
 {
-    /// <summary>Whether the element paints a bitmap snapshot of the control instead of showing its HWND.</summary>
+    /// <summary>Whether the element always paints a bitmap snapshot of the control instead of showing its HWND.</summary>
     /// <remarks>
     /// A snapshot takes part in the normal visual pass, so <see cref="VisualElement.Opacity"/>,
-    /// <see cref="VisualElement.Transform"/> and clip apply. The window is detached while snapshot mode is on, so the
-    /// control loses live input, IME and focus. Use it for read-only or purely visual content; call
-    /// <see cref="RefreshSnapshot"/> after changing it.
+    /// <see cref="VisualElement.Transform"/> and clip apply. The element already switches to this path by itself when
+    /// the element or an ancestor cannot be expressed by a child window; set this property to force it for read-only
+    /// or purely visual content. An input proxy keeps real input alive in a Form. Call <see cref="RefreshSnapshot"/>
+    /// after changing the control from code that raises no native notifications.
     /// </remarks>
     public static readonly DependencyProperty IsSnapshotProperty = DependencyProperty.Register(
         nameof(IsSnapshot), typeof(bool), typeof(NativeElement),
@@ -55,12 +58,25 @@ public class NativeElement : VisualElement
     private List<IDisposable>? _twoWaySubscriptions;
     private Size _declaredSize;
     private bool _placing;
+    private bool _filling;
+    private int _arrangedPass = -1;
+    private bool _everArrangedByOwner;
+    private bool _usingSnapshotComposition;
+    private VisualHost? _autoHost;
+    private VisualHost? _proxyHost;
+    private bool _themeSubscribed;
+    private Color? _savedTransparentBackColor;
+    private bool _applyingBackColor;
+    private bool _proxySuppressed;
 
     /// <summary>Creates an element with no native control yet.</summary>
     public NativeElement()
     {
         IsHitTestVisible = false;
         SurfaceChanged += OnSurfaceChanged;
+        SurfaceRootChanged += OnSurfaceRootChanged;
+        Theme.Changed += OnThemeChanged;
+        _themeSubscribed = true;
     }
 
     /// <summary>Creates an element over <paramref name="native"/>.</summary>
@@ -158,6 +174,24 @@ public class NativeElement : VisualElement
     // 表面扫描也会摆放岛（为跳过 ArrangeOverride 的移动补课）；那种 SizeChanged 不是调用方改的声明尺寸。
     internal bool IsBeingPlaced { get; set; }
 
+    // AddNative 创建的岛：宿主自己不排版子级时，由宿主在每趟布局末尾把它摆到内容区。
+    internal bool UseOwnerContentBox
+    {
+        get => _useOwnerContentBox;
+        set
+        {
+            if (_useOwnerContentBox == value)
+            {
+                return;
+            }
+
+            _useOwnerContentBox = value;
+            SyncAutoRegistration();
+        }
+    }
+
+    private bool _useOwnerContentBox;
+
     internal NativeSnapshotProxy? InputProxy => _inputProxy;
 
     /// <summary>Whether this island is frozen to a bitmap for the duration of a pointer gesture.</summary>
@@ -190,7 +224,7 @@ public class NativeElement : VisualElement
             return;
         }
 
-        if (IsSnapshot)
+        if (UseSnapshotPath)
         {
             // 快照模式：摘掉 HWND，位图由视觉管线绘制，Opacity/Transform/Clip 这才生效。
             // 先让输入代理把控件铺到变换后的包围盒，再按这个尺寸抓快照。
@@ -206,7 +240,8 @@ public class NativeElement : VisualElement
             // 摆放权归视觉布局：Anchor/Dock 会把控件重新挪回 WinForms 自己的 LayoutEngine。
             _native.Anchor = AnchorStyles.None;
             _native.Dock = DockStyle.None;
-            Surface?.PlaceNative(this, _native, Rectangle.Round(AbsoluteBounds));
+            ApplyNativeBackground();
+            Surface?.PlaceNative(this, _native, AbsoluteBounds);
         }
         finally
         {
@@ -214,6 +249,119 @@ public class NativeElement : VisualElement
         }
 
         PlaceContentSurface();
+    }
+
+    // 宿主亲自调用过 Arrange 就由宿主决定摆放；否则（Border/ContentControl/普通 VisualElement）
+    // 由宿主在每趟布局末尾把它摆进内容区。
+    internal void ArrangeInOwnerContentBox(int layoutPass)
+    {
+        if (!UseOwnerContentBox)
+        {
+            return;
+        }
+
+        if (_arrangedPass == layoutPass)
+        {
+            _everArrangedByOwner = true;
+            return;
+        }
+
+        if (_everArrangedByOwner || ParentElement is not { } owner)
+        {
+            return;
+        }
+
+        var padding = owner.Padding;
+        var border = owner.BorderThickness;
+        var box = new RectangleF(
+            padding.Left + border.Left,
+            padding.Top + border.Top,
+            Math.Max(0f, owner.Bounds.Width - padding.Horizontal - border.Horizontal),
+            Math.Max(0f, owner.Bounds.Height - padding.Vertical - border.Vertical));
+        _filling = true;
+        try
+        {
+            Measure(new Size((int)Math.Ceiling(box.Width), (int)Math.Ceiling(box.Height)));
+            Arrange(box);
+        }
+        finally
+        {
+            _filling = false;
+        }
+    }
+
+    internal override void OnArrangeEntered()
+    {
+        // 自己补摆的那次不算“宿主排过版”，否则下一趟会停掉补摆。
+        if (!_filling)
+        {
+            _arrangedPass = Surface?.LayoutPass ?? -1;
+        }
+    }
+
+    // 透明度、旋转/斜切、效果与遮罩都无法作用在子 HWND 上；这些条件出现时改走快照，
+    // 否则岛会以不透明矩形留在原处，看起来和周围视觉树脱节。
+    internal bool RequiresSnapshotComposition
+    {
+        get
+        {
+            for (VisualElement? current = this; current is not null; current = current.ParentElement)
+            {
+                if (current.Opacity < 1d
+                    || current.Effect is not null
+                    || current.OpacityMask is not null
+                    || current.Transform3D is { IsIdentity: false })
+                {
+                    return true;
+                }
+
+                if (current.HasTransform && !current.Transform.IsIdentity)
+                {
+                    // 元素自己的平移/缩放不会被绝对包围盒吸收，只有祖先的轴对齐变换可以；
+                    // 祖先的旋转/斜切则必须位图化。
+                    var elements = current.Transform.Elements;
+                    var axisAligned = Math.Abs(elements[1]) < 0.0001f && Math.Abs(elements[2]) < 0.0001f;
+                    if (ReferenceEquals(current, this) || !axisAligned)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private bool UseSnapshotPath => IsSnapshot || _usingSnapshotComposition;
+
+    internal void EnterSnapshotComposition()
+    {
+        if (_usingSnapshotComposition)
+        {
+            return;
+        }
+
+        _usingSnapshotComposition = true;
+        Surface?.RemoveNative(this);
+        RestoreNativeBackground();
+        _snapshotDirty = true;
+        InvalidateArrange();
+        InvalidateVisual();
+    }
+
+    private void ExitSnapshotComposition()
+    {
+        if (!_usingSnapshotComposition)
+        {
+            return;
+        }
+
+        _usingSnapshotComposition = false;
+        DisposeInputProxy();
+        ApplyNativeBackground();
+        _snapshotDirty = true;
+        InvalidateArrange();
+        InvalidateVisual();
     }
 
     /// <inheritdoc />
@@ -271,10 +419,12 @@ public class NativeElement : VisualElement
             if (IsSnapshot)
             {
                 Surface?.RemoveNative(this);
+                RestoreNativeBackground();
             }
             else
             {
                 DisposeInputProxy();
+                ApplyNativeBackground();
             }
 
             _snapshotDirty = true;
@@ -283,16 +433,71 @@ public class NativeElement : VisualElement
             return;
         }
 
+        // 这些属性会改变“活体 HWND 还能不能正确表达这个元素”，需要在活体与快照路径间切换。
+        if (ReferenceEquals(e.Property, OpacityProperty)
+            || ReferenceEquals(e.Property, TransformProperty)
+            || ReferenceEquals(e.Property, EffectProperty)
+            || ReferenceEquals(e.Property, OpacityMaskProperty)
+            || ReferenceEquals(e.Property, Transform3DProperty))
+        {
+            UpdateCompositionMode();
+        }
+
+        if (ReferenceEquals(e.Property, BackgroundProperty))
+        {
+            // 底色变了，快照与代理的背景跟着重取。
+            _snapshotDirty = true;
+            InvalidateVisual();
+        }
+
         if (ReferenceEquals(e.Property, Easel.Visuals.Controls.Panel.ZIndexProperty))
         {
             Surface?.ReorderNativeChildren();
         }
     }
 
+    private void UpdateCompositionMode()
+    {
+        if (IsSnapshot || RequiresSnapshotComposition == _usingSnapshotComposition)
+        {
+            return;
+        }
+
+        if (_usingSnapshotComposition)
+        {
+            ExitSnapshotComposition();
+        }
+        else
+        {
+            EnterSnapshotComposition();
+        }
+
+        _snapshotDirty = true;
+        InvalidateVisual();
+    }
+
+    // 主题切换会让快照底色与代理窗体底色过期；重新取色并重抓一帧。
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        _snapshotDirty = true;
+        ApplyNativeBackground();
+        if (_contentSurface is not null && _native is { } native)
+        {
+            var background = native.BackColor;
+            if (background.A != 255)
+            {
+                _contentSurface.BackColor = ResolveCompositionBackground();
+            }
+        }
+
+        UpdateInputProxy();
+        InvalidateVisual();
+    }
+
     /// <inheritdoc />
     protected override void OnRender(Graphics graphics)
     {
-        if ((!IsSnapshot && !IsFrozen) || _snapshot is null)
+        if ((!UseSnapshotPath && !IsFrozen) || _snapshot is null)
         {
             return;
         }
@@ -312,6 +517,13 @@ public class NativeElement : VisualElement
                     graphics.SetClip(path, CombineMode.Intersect);
                 }
 
+                // 先铺一层与“岛背后”相同的底色：位图边缘落在半个物理像素上时，
+                // GDI+ 的抗锯齿会与这层混合，而不是与邻接的另一种颜色形成一条缝。
+                using (var backdrop = new SolidBrush(ResolveCompositionBackground()))
+                {
+                    graphics.FillRectangle(backdrop, bounds);
+                }
+
                 graphics.DrawImage(_snapshot, bounds);
                 PaintSnapshotBorder(graphics, bounds);
             }
@@ -326,6 +538,9 @@ public class NativeElement : VisualElement
             return;
         }
 
+        // 祖先的变换/透明度撤销后回到活体路径；否则岛会一直停在位图上、拿不到焦点。
+        UpdateCompositionMode();
+
         // 祖先滚动了、变换动画推进了：输入代理跟着元素的屏幕矩形走，快照按新尺寸重抓。
         UpdateInputProxy();
         CaptureSnapshot();
@@ -335,7 +550,7 @@ public class NativeElement : VisualElement
     // 快速拖动分割条时画面会落后于卡片。冻结后位图走视觉管线，和卡片严格同帧。
     internal bool FreezeForGesture()
     {
-        if (IsSnapshot || IsFrozen || _native is null || _native.IsDisposed || !_native.IsHandleCreated)
+        if (UseSnapshotPath || IsFrozen || _native is null || _native.IsDisposed || !_native.IsHandleCreated)
         {
             return false;
         }
@@ -378,7 +593,7 @@ public class NativeElement : VisualElement
         _snapshot = null;
         if (Surface is { } surface && _native is { IsDisposed: false })
         {
-            surface.PlaceNative(this, _native, Rectangle.Round(AbsoluteBounds));
+            surface.PlaceNative(this, _native, AbsoluteBounds);
         }
 
         InvalidateVisual();
@@ -483,6 +698,13 @@ public class NativeElement : VisualElement
             }
 
             var bitmap = new Bitmap(width, height);
+            // 透明底色的控件（Label/Panel 的 Transparent）不会画满位图；先铺岛背后的颜色，
+            // 否则未绘制区域保留位图的黑色/代理底色，形成一块“不属于表面”的深色矩形。
+            using (var backdrop = Graphics.FromImage(bitmap))
+            {
+                backdrop.Clear(ResolveCompositionBackground());
+            }
+
             _native.DrawToBitmap(bitmap, new Rectangle(0, 0, width, height));
             _snapshot?.Dispose();
             _snapshot = bitmap;
@@ -548,6 +770,10 @@ public class NativeElement : VisualElement
             scale = 1f;
         }
 
+        // 弹层画在宿主里，代理窗口却盖在它上面；把弹层矩形从两个窗口的区域里挖掉，
+        // 弹层才既可见、也能收到点击（代理窗口仍然吃不到那些像素）。
+        var cuts = Surface?.CollectPopupCuts(physical) ?? [];
+
         if (HasRotatedTransform())
         {
             var corners = new[]
@@ -566,15 +792,18 @@ public class NativeElement : VisualElement
                     (int)Math.Round(surfacePoint.Y * scale) - physical.Y);
             }
 
-            NativeWindowRegion.SetPolygon(_native, points);
-            NativeWindowRegion.SetPolygon(_inputProxy, points);
+            var cutArray = cuts.ToArray();
+            NativeWindowRegion.SetPolygon(_native, points, cutArray);
+            NativeWindowRegion.SetPolygon(_inputProxy, points, cutArray);
             return;
         }
 
-        if (CornerRadius > 0f)
+        var corner = CornerRadius > 0f ? (float)(CornerRadius * scale) : 0f;
+        if (corner > 0f || cuts.Count > 0)
         {
-            NativeWindowRegion.Apply(_native, (float)(CornerRadius * scale), []);
-            NativeWindowRegion.Apply(_inputProxy, (float)(CornerRadius * scale), []);
+            var cutArray = cuts.ToArray();
+            NativeWindowRegion.Apply(_native, corner, cutArray);
+            NativeWindowRegion.Apply(_inputProxy, corner, cutArray);
             return;
         }
 
@@ -582,9 +811,29 @@ public class NativeElement : VisualElement
         NativeWindowRegion.Restore(_inputProxy);
     }
 
+    internal void RefreshProxyRegion()
+    {
+        if (_inputProxy is null || _inputProxy.IsDisposed)
+        {
+            return;
+        }
+
+        ApplyProxyRegion();
+    }
+
+    // 对话框遮罩要盖住原生岛；快照岛的可见内容在宿主里，浮在上面的是代理窗口，一并收起。
+    internal void SetProxySuppressed(bool suppressed)
+    {
+        _proxySuppressed = suppressed;
+        if (_inputProxy is { IsDisposed: false } proxy)
+        {
+            proxy.Visible = !suppressed;
+        }
+    }
+
     private void UpdateInputProxy()
     {
-        if (!IsSnapshot || _native is null || _native.IsDisposed || !HasVisibleOpacity())
+        if (!UseSnapshotPath || _native is null || _native.IsDisposed || !HasVisibleOpacity())
         {
             DisposeInputProxy();
             return;
@@ -609,6 +858,8 @@ public class NativeElement : VisualElement
             DisposeInputProxy();
             _inputProxy = new NativeSnapshotProxy(this, _native);
             _inputProxy.ShowFor(owner);
+            _proxyHost = surface;
+            surface.RegisterSnapshotProxy(this);
         }
 
         if (!ReferenceEquals(_native.Parent, _inputProxy))
@@ -617,6 +868,9 @@ public class NativeElement : VisualElement
             _inputProxy.Controls.Add(_native);
             _native.Visible = true;
         }
+
+        // 代理窗体是透明控件绘制透过区域的底：用岛背后的视觉底色，抓出来的位图才和周围同色。
+        _inputProxy.BackColor = ResolveCompositionBackground();
 
         var client = new RectangleF(0f, 0f, surface.LogicalClientSize.Width, surface.LogicalClientSize.Height);
         var bounds = RectangleF.Intersect(AbsoluteBounds, client);
@@ -634,7 +888,7 @@ public class NativeElement : VisualElement
             (int)Math.Ceiling(bounds.Height * scale));
         _proxyPhysicalBounds = physical;
         _inputProxy.Place(surface.RectangleToScreen(physical));
-        _inputProxy.Visible = true;
+        _inputProxy.Visible = !_proxySuppressed;
         ApplyProxyRegion();
     }
 
@@ -663,6 +917,8 @@ public class NativeElement : VisualElement
         var proxy = _inputProxy;
         _inputProxy = null;
         _proxyPhysicalBounds = null;
+        _proxyHost?.UnregisterSnapshotProxy(this);
+        _proxyHost = null;
         if (_native is not null && !_native.IsDisposed)
         {
             NativeWindowRegion.Restore(_native);
@@ -685,7 +941,9 @@ public class NativeElement : VisualElement
     {
         base.OnParentChanged(oldParent, newParent);
 
-        if (IsSnapshot)
+        SyncAutoRegistration();
+        ApplyNativeBackground();
+        if (UseSnapshotPath)
         {
             UpdateInputProxy();
         }
@@ -700,7 +958,9 @@ public class NativeElement : VisualElement
     // 挂到另一个表面时资源链/样式链的最后一站变了，嵌套表面要重挂一次。
     private void OnSurfaceChanged(object? sender, EventArgs e)
     {
-        if (IsSnapshot)
+        SyncAutoRegistration();
+        ApplyNativeBackground();
+        if (UseSnapshotPath)
         {
             UpdateInputProxy();
         }
@@ -715,13 +975,122 @@ public class NativeElement : VisualElement
         PlaceContentSurface();
     }
 
+    private void OnSurfaceRootChanged(object? sender, EventArgs e)
+    {
+        SyncAutoRegistration();
+        ApplyNativeBackground();
+        if (UseSnapshotPath)
+        {
+            UpdateInputProxy();
+        }
+    }
+
+    // 宿主自己不排版子级时，由宿主在每趟布局末尾按内容区摆放本岛。
+    private void SyncAutoRegistration()
+    {
+        var surface = UseOwnerContentBox ? Surface : null;
+        if (ReferenceEquals(_autoHost, surface))
+        {
+            return;
+        }
+
+        _autoHost?.UnregisterAutoNative(this);
+        _autoHost = surface;
+        _autoHost?.RegisterAutoNative(this);
+    }
+
+    // 岛“看起来属于表面”的底色：自身或最近的不透明视觉背景，其次宿主底色，最后主题底色。
+    private Color ResolveCompositionBackground()
+    {
+        for (VisualElement? current = this; current is not null; current = current.ParentElement)
+        {
+            if (current.Background?.ApproximateColor is Color inherited && inherited.A > 0)
+            {
+                return Color.FromArgb(255, inherited.R, inherited.G, inherited.B);
+            }
+        }
+
+        if (Surface?.BackColor is Color surfaceColor && surfaceColor.A > 0)
+        {
+            return Color.FromArgb(255, surfaceColor.R, surfaceColor.G, surfaceColor.B);
+        }
+
+        var fallback = Theme.Current.ControlBackground;
+        return Color.FromArgb(255, fallback.R, fallback.G, fallback.B);
+    }
+
+    // 透明底色的原生控件靠父窗口补画背景；宿主一旦设了 WS_CLIPCHILDREN/WS_EX_COMPOSITED，
+    // 那层补画就不可靠（实测整块变成系统控件色）。托管期间换成不透明的“表面底色”，摘下时还原。
+    private void ApplyNativeBackground()
+    {
+        if (_native is null || _native.IsDisposed || _applyingBackColor || UseSnapshotPath)
+        {
+            return;
+        }
+
+        var resolved = ResolveCompositionBackground();
+        if (_savedTransparentBackColor is null)
+        {
+            var current = _native.BackColor;
+            if (current.A >= 255)
+            {
+                return;
+            }
+
+            _savedTransparentBackColor = current;
+        }
+
+        if (_native.BackColor == resolved)
+        {
+            return;
+        }
+
+        _applyingBackColor = true;
+        try
+        {
+            _native.BackColor = resolved;
+        }
+        finally
+        {
+            _applyingBackColor = false;
+        }
+    }
+
+    private void RestoreNativeBackground()
+    {
+        if (_native is null || _native.IsDisposed || _savedTransparentBackColor is not { } saved)
+        {
+            return;
+        }
+
+        _savedTransparentBackColor = null;
+        _applyingBackColor = true;
+        try
+        {
+            _native.BackColor = saved;
+        }
+        finally
+        {
+            _applyingBackColor = false;
+        }
+    }
+
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
             DisposeInputProxy();
+            _autoHost?.UnregisterAutoNative(this);
+            _autoHost = null;
             SurfaceChanged -= OnSurfaceChanged;
+            SurfaceRootChanged -= OnSurfaceRootChanged;
+            if (_themeSubscribed)
+            {
+                Theme.Changed -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
             Surface?.RemoveNative(this);
             DetachNative(_native);
             ReleaseContentSurface();
@@ -793,6 +1162,7 @@ public class NativeElement : VisualElement
         native.Leave += OnNativeLeave;
         native.Enabled = IsEnabled;
         AttachTwoWay(native);
+        ApplyNativeBackground();
     }
 
     private void DetachNative(Control? native)
@@ -803,6 +1173,7 @@ public class NativeElement : VisualElement
             return;
         }
 
+        RestoreNativeBackground();
         native.AutoSizeChanged -= OnNativePreferredChanged;
         native.TextChanged -= OnNativePreferredChanged;
         native.FontChanged -= OnNativePreferredChanged;
@@ -879,7 +1250,7 @@ public class NativeElement : VisualElement
 
     private void OnNativePreferredChanged(object? sender, EventArgs e)
     {
-        if (IsSnapshot)
+        if (UseSnapshotPath)
         {
             _snapshotDirty = true;
         }
@@ -917,7 +1288,7 @@ public class NativeElement : VisualElement
         PlaceContentSurface();
         // 子 HWND 的句柄可能晚于第一次摆放才创建；补一次窗口区域。
         Surface?.RefreshNativeRegions();
-        if (IsSnapshot)
+        if (UseSnapshotPath)
         {
             RefreshSnapshot();
         }
@@ -925,9 +1296,27 @@ public class NativeElement : VisualElement
 
     private void OnNativeBackColorChanged(object? sender, EventArgs e)
     {
+        if (!_applyingBackColor && _native is not null)
+        {
+            // 控件自己改成了透明：记住原值并换成不透明表面色；改成实色则视为调用方的选择。
+            if (_native.BackColor.A < 255)
+            {
+                _savedTransparentBackColor = null;
+                ApplyNativeBackground();
+            }
+            else
+            {
+                _savedTransparentBackColor = null;
+            }
+        }
+
         if (_contentSurface is not null && _native is not null)
         {
-            _contentSurface.BackColor = _native.BackColor;
+            // VisualHost 也不接受透明背景：透明落回表面底色。
+            var background = _native.BackColor;
+            _contentSurface.BackColor = background.A == 255
+                ? background
+                : ResolveCompositionBackground();
         }
     }
 
@@ -944,10 +1333,17 @@ public class NativeElement : VisualElement
         }
 
         _contentRoot = new ContentControl();
+        var nativeBackground = _native?.BackColor ?? Color.Empty;
+        if (nativeBackground.A != 255)
+        {
+            var fallback = Theme.Current.ControlBackground;
+            nativeBackground = Color.FromArgb(255, fallback.R, fallback.G, fallback.B);
+        }
+
         _contentSurface = new NativeContentHost
         {
             Root = _contentRoot,
-            BackColor = _native?.BackColor ?? Theme.Current.ControlBackground,
+            BackColor = nativeBackground,
             DpiScaleOverride = Surface?.DpiScaleOverride ?? 0f,
         };
 

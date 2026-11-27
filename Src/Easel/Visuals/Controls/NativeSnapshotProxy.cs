@@ -39,7 +39,9 @@ internal sealed class NativeSnapshotProxy : Form
         ControlBox = false;
         Opacity = 1d / 255d;
         // 代理窗体本身不可见；用控件的底色而不是洋红，PrintWindow 抓快照时不会把窗口底色带进按钮。
-        BackColor = native.BackColor;
+        // 透明底色会让 Form.BackColor 抛 ArgumentException（窗体不支持透明背景），落到主题底色。
+        var background = native.BackColor;
+        BackColor = background.A == 255 ? background : ResolveOpaqueBackground();
 
         Controls.Add(native);
         native.Dock = DockStyle.None;
@@ -121,5 +123,11 @@ internal sealed class NativeSnapshotProxy : Form
         }
 
         base.Dispose(disposing);
+    }
+
+    private Color ResolveOpaqueBackground()
+    {
+        var fallback = Theme.Current.ControlBackground;
+        return Color.FromArgb(255, fallback.R, fallback.G, fallback.B);
     }
 }

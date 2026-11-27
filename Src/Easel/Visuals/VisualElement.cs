@@ -62,7 +62,7 @@ public enum FontWeight
 /// local coordinates, and the inherited <see cref="Visual.Render"/> pass translates before drawing content.
 /// </para>
 /// </remarks>
-public abstract class VisualElement : ContainerVisual, IDisposable
+public abstract partial class VisualElement : ContainerVisual, IDisposable
 {
     /// <summary>The font used by text-bearing elements that do not set one.</summary>
     /// <summary>The fallback font; it follows the active <see cref="Theme"/> palette.</summary>
@@ -1079,6 +1079,8 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             _arrangeValid = false;
             return;
         }
+
+        OnArrangeEntered();
 
         var margin = Margin;
         var slot = new RectangleF(
@@ -2432,6 +2434,11 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// <summary>Arranges this element's children inside its own local size.</summary>
     /// <param name="finalSize">The arranged content size.</param>
     protected virtual void ArrangeOverride(Size finalSize)
+    {
+    }
+
+    // 每次 Arrange 被调用都会走到这里；NativeElement 用它判断宿主是否亲自摆放了自己。
+    internal virtual void OnArrangeEntered()
     {
     }
 
