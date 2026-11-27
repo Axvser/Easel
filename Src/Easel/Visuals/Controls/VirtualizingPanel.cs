@@ -329,8 +329,13 @@ public abstract class VirtualizingPanel : ItemsControl, IScrollInfo
     /// <summary>Called after an item visual left the visible range and before it enters the pool.</summary>
     /// <param name="index">The source index the visual showed.</param>
     /// <param name="element">The visual that left the range.</param>
+    /// <remarks>
+    /// The default clears the data context: a pooled visual must not keep the item it last showed alive. The engine
+    /// writes the new item when it binds the visual again through <see cref="BindRecycledItem"/>.
+    /// </remarks>
     protected virtual void RecycleItem(int index, VisualElement element)
     {
+        element.ClearValue(VisualElement.DataContextProperty);
     }
 
     /// <summary>Binds a pooled visual to a new source item.</summary>
@@ -399,9 +404,24 @@ public abstract class VirtualizingPanel : ItemsControl, IScrollInfo
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The base rebuild detaches and clears <see cref="Items"/> before calling back here, but the engine's
+    /// index-to-visual map still points at the old visuals. Those entries must be recycled into the pool (and the map
+    /// reset): otherwise the next arrange treats them as still realized, so a replaced source keeps showing the old
+    /// items, and a replaced factory never gets to dispose them.
+    /// </remarks>
     protected override void RealizeItems()
     {
         ClearRealizedRowsToPool();
+
+        foreach (var pair in _realized.ToArray())
+        {
+            RecycleItem(pair.Key, pair.Value);
+            _pool.Add(pair.Value);
+        }
+
+        _realized.Clear();
+        _orders.Clear();
         _firstRealizedIndex = -1;
     }
 
