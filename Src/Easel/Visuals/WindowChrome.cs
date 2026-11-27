@@ -57,8 +57,6 @@ public static class WindowChrome
     private const uint SWP_NOACTIVATE = 0x0010;
 
     private const uint MONITOR_DEFAULTTONEAREST = 2;
-    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     private const int DWMWCP_ROUND = 2;
 
@@ -698,15 +696,10 @@ public static class WindowChrome
                 return;
             }
 
+            NativeWindowTheme.ApplyDarkMode(_form);
+
             try
             {
-                var dark = Theme.EffectiveMode == ThemeMode.Light ? 0 : 1;
-                if (DwmSetWindowAttribute(_form.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int)) != 0)
-                {
-                    _ = DwmSetWindowAttribute(
-                        _form.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, ref dark, sizeof(int));
-                }
-
                 var corner = DWMWCP_ROUND;
                 _ = DwmSetWindowAttribute(
                     _form.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));

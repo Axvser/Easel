@@ -20,6 +20,10 @@ namespace Easel.Visuals;
 /// its handle is created. <see cref="System.Windows.Forms.Control.Width"/> and
 /// <see cref="System.Windows.Forms.Control.Height"/> set in code stay in physical pixels.
 /// </para>
+/// <para>
+/// The native title bar follows <see cref="Theme"/> where DWM is available; add a
+/// <see cref="Controls.VisualTitleBar"/> to the content for the custom Easel chrome instead.
+/// </para>
 /// </remarks>
 public class Window : VisualForm
 {

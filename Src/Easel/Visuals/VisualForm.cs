@@ -9,6 +9,7 @@ namespace Easel.Visuals;
 /// The form owns one dock-filled <see cref="VisualHost"/>. Set <see cref="Root"/> to any
 /// <see cref="VisualElement"/>; a non-container root is wrapped in a dock panel so it fills the client area.
 /// The root is not disposed when it is replaced; the caller owns the view and can move it to another host.
+/// The native title bar follows <see cref="Theme"/> where DWM is available.
 /// <see cref="Window"/> derives from this type so a window can be declared as a XAML root.
 /// </remarks>
 public class VisualForm : Form
@@ -91,6 +92,7 @@ public class VisualForm : Form
         if (!DesignMode)
         {
             EaselApplication.WarnIfNotPerMonitorV2();
+            NativeWindowTheme.ApplyDarkMode(this);
         }
     }
 
@@ -110,6 +112,7 @@ public class VisualForm : Form
     {
         BackColor = Theme.Current.WindowBackground;
         _surface.BackColor = Theme.Current.WindowBackground;
+        NativeWindowTheme.ApplyDarkMode(this);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
