@@ -3,19 +3,19 @@ using Easel;
 
 namespace Demo;
 
-/// <summary>Owns the requested palette mode and the four demo choices; forwards system-theme changes.</summary>
+/// <summary>Owns the requested palette mode and the five demo choices; forwards system-theme changes.</summary>
 public interface IThemeService : IDisposable
 {
-    /// <summary>The requested mode; <see cref="ThemeMode.System"/> follows Windows.</summary>
+    /// <summary>The underlying theme mode; the custom Midnight theme applies over <see cref="ThemeMode.Dark"/>.</summary>
     ThemeMode Mode { get; }
 
-    /// <summary>The palette mode actually in use (System resolves to Dark+/Light+/High contrast).</summary>
+    /// <summary>The palette mode actually in use (System resolves to Dark+/Light+/HighContrast).</summary>
     ThemeMode EffectiveMode { get; }
 
-    /// <summary>The selector labels: Dark+, Light+, High contrast, Follow system.</summary>
+    /// <summary>The selector labels: Dark+, Light+, High contrast, Midnight, Follow system.</summary>
     IReadOnlyList<string> Options { get; }
 
-    /// <summary>The selector index for the current requested mode.</summary>
+    /// <summary>The selector index for the current choice; a custom theme keeps its own index.</summary>
     int SelectedIndex { get; }
 
     /// <summary>Selects one of <see cref="Options"/>.</summary>
@@ -29,18 +29,21 @@ public interface IThemeService : IDisposable
 /// <summary>The gallery's palette service: sets the static theme and announces switches, including system follows.</summary>
 public sealed class ThemeService : IThemeService
 {
-    private static readonly Themes.HighContrastTheme CustomContrast = new();
+    private static readonly Themes.MidnightTheme CustomTheme = new();
+    private int _selectedIndex;
     private bool _disposed;
 
-    /// <summary>Creates the service, starts forwarding <see cref="Theme.Changed"/> and applies the custom theme if
-    /// the process started in high-contrast mode.</summary>
+    /// <summary>Creates the service and starts forwarding <see cref="Theme.Changed"/>.</summary>
     public ThemeService()
     {
-        Theme.Changed += OnThemeChanged;
-        if (Theme.Mode == ThemeMode.HighContrast)
+        _selectedIndex = Theme.Mode switch
         {
-            ApplyCustomContrast();
-        }
+            ThemeMode.Light => 1,
+            ThemeMode.HighContrast => 2,
+            ThemeMode.System => 4,
+            _ => 0,
+        };
+        Theme.Changed += OnThemeChanged;
     }
 
     /// <inheritdoc />
@@ -51,36 +54,43 @@ public sealed class ThemeService : IThemeService
 
     /// <inheritdoc />
     public IReadOnlyList<string> Options { get; } =
-        ["Dark+", "Light+", "High contrast", "Follow system"];
+        ["Dark+", "Light+", "High contrast", "Midnight", "Follow system"];
 
     /// <inheritdoc />
-    public int SelectedIndex => Theme.Mode switch
-    {
-        ThemeMode.Light => 1,
-        ThemeMode.HighContrast => 2,
-        ThemeMode.System => 3,
-        _ => 0,
-    };
+    public int SelectedIndex => _selectedIndex;
 
     /// <inheritdoc />
     public void SelectIndex(int index)
     {
-        if (index == 2)
+        if (index < 0 || index >= Options.Count)
         {
-            // The demo's high-contrast option is a custom ResourceDictionary, not a library fallback.
-            ApplyCustomContrast();
+            return;
+        }
+
+        _selectedIndex = index;
+        if (index == 3)
+        {
+            // The demo owns this palette; the other modes use the library's XAML themes.
+            ApplyCustomTheme();
             return;
         }
 
         Demo.Views.GalleryTheme.UseCustom(null);
-        var mode = index switch
+        switch (index)
         {
-            0 => ThemeMode.Dark,
-            1 => ThemeMode.Light,
-            3 => ThemeMode.System,
-            _ => Mode,
-        };
-        Theme.Mode = mode;
+            case 0:
+                Theme.ApplyPalette(ThemeMode.Dark, Theme.CreateDark());
+                break;
+            case 1:
+                Theme.ApplyPalette(ThemeMode.Light, Theme.CreateLight());
+                break;
+            case 2:
+                Theme.ApplyPalette(ThemeMode.HighContrast, Theme.CreateHighContrast());
+                break;
+            case 4:
+                Theme.Mode = ThemeMode.System;
+                break;
+        }
     }
 
     /// <inheritdoc />
@@ -114,9 +124,9 @@ public sealed class ThemeService : IThemeService
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private static void ApplyCustomContrast()
+    private static void ApplyCustomTheme()
     {
-        Demo.Views.GalleryTheme.UseCustom(CustomContrast);
-        Theme.ApplyPalette(ThemeMode.HighContrast, ThemePalette.FromResourceDictionary(CustomContrast));
+        Demo.Views.GalleryTheme.UseCustom(CustomTheme);
+        Theme.ApplyPalette(ThemeMode.Dark, ThemePalette.FromResourceDictionary(CustomTheme));
     }
 }
