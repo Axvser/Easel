@@ -304,7 +304,7 @@ public static class Theme
     // The built-in palettes are XAML resources in Themes/; the static sources are created once and shared.
     private static readonly Themes.DarkTheme DarkSource = new();
     private static readonly Themes.LightTheme LightSource = new();
-    private static readonly ResourceDictionary HighContrastSource = CreatePaletteResourceDictionary(CreateHighContrast());
+    private static readonly Themes.HighContrastTheme HighContrastSource = new();
 
     private static ThemeMode _mode = ThemeMode.Dark;
     private static ThemeMode _systemMode = ThemeMode.Dark;
@@ -496,50 +496,15 @@ public static class Theme
     public static ThemePalette CreateLight() => ThemePalette.FromResourceDictionary(LightSource);
 
     /// <summary>The built-in high-contrast palette: pure black surfaces, white text and an amber accent.</summary>
-    public static ThemePalette CreateHighContrast() => new()
-    {
-        WindowBackground = Color.Black,
-        Surface = Color.FromArgb(0xFF, 0x0A, 0x0A, 0x0A),
-        SurfaceAlt = Color.FromArgb(0xFF, 0x16, 0x16, 0x16),
-        ControlBackground = Color.FromArgb(0xFF, 0x10, 0x10, 0x10),
-        ControlBorder = Color.FromArgb(0xFF, 0x6F, 0x6F, 0x6F),
-        ControlBorderHover = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
-        ControlHover = Color.FromArgb(0xFF, 0x1F, 0x1F, 0x1F),
-        ControlPressed = Color.FromArgb(0xFF, 0x2E, 0x2E, 0x2E),
-        Foreground = Color.White,
-        MutedForeground = Color.FromArgb(0xFF, 0xCF, 0xCF, 0xCF),
-        Accent = Color.FromArgb(0xFF, 0xFF, 0xB0, 0x00),
-        AccentForeground = Color.Black,
-        FocusRing = Color.FromArgb(0xFF, 0xFF, 0xD7, 0x00),
-        Caret = Color.FromArgb(0xFF, 0xFF, 0xD7, 0x00),
-        DisabledForeground = Color.FromArgb(0xFF, 0x8A, 0x8A, 0x8A),
-        DisabledBackground = Color.FromArgb(0xFF, 0x05, 0x05, 0x05),
-        Selection = Color.FromArgb(0xFF, 0x6B, 0x46, 0x00),
-        ScrollBarThumb = Color.FromArgb(0x66, 0xCF, 0xCF, 0xCF),
-        ScrollBarThumbHover = Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF),
-        ShapeStroke = Color.FromArgb(0x88, 0x5B, 0x8C, 0xFF),
-        ShadowColor = Color.Black,
-        FontFamily = "Segoe UI",
-        FontSize = 9.5f,
-        FontWeight = FontWeight.Normal,
-        CornerRadius = 2f,
-        InputCornerRadius = 2f,
-        ControlHeight = 30,
-    };
+    public static ThemePalette CreateHighContrast() => ThemePalette.FromResourceDictionary(HighContrastSource);
 
     /// <summary>Creates a copy of a built-in theme's resource dictionary (palette brushes and typography styles).</summary>
     /// <param name="mode">The theme; <see cref="ThemeMode.System"/> uses <see cref="EffectiveMode"/>.</param>
     /// <returns>A new dictionary the caller may add to or merge.</returns>
-    /// <remarks>Dark+ and Light+ come from the library's XAML dictionaries. High contrast is a runtime palette
-    /// and its dictionary is generated; applications that want their own high-contrast theme should author a
-    /// <c>ResourceDictionary</c> like the gallery does.</remarks>
+    /// <remarks>Dark+, Light+ and HighContrast come from the library's XAML dictionaries; applications that want
+    /// their own high-contrast theme should author a <c>ResourceDictionary</c> like the gallery does.</remarks>
     public static ResourceDictionary CreateResourceDictionary(ThemeMode mode)
     {
-        if (mode == ThemeMode.HighContrast)
-        {
-            return CreateHighContrastResourceDictionary();
-        }
-
         var source = SourceFor(mode == ThemeMode.System ? EffectiveMode : mode);
         var resources = new ResourceDictionary();
         foreach (var pair in source)
@@ -676,81 +641,7 @@ public static class Theme
     private static ResourceDictionary SourceFor(ThemeMode mode) => mode switch
     {
         ThemeMode.Light => LightSource,
+        ThemeMode.HighContrast => HighContrastSource,
         _ => DarkSource,
     };
-
-    private static ResourceDictionary CreateHighContrastResourceDictionary()
-        => CreatePaletteResourceDictionary(CreateHighContrast());
-
-    internal static ResourceDictionary CreatePaletteResourceDictionary(ThemePalette palette)
-    {
-        var resources = new ResourceDictionary();
-
-        void Brush(string key, Color color) => resources[key] = new SolidColorBrush(color);
-
-        Brush("Window", palette.WindowBackground);
-        Brush("Surface", palette.Surface);
-        Brush("Raised", palette.SurfaceAlt);
-        Brush("Input", palette.ControlBackground);
-        Brush("Border", palette.ControlBorder);
-        Brush("BorderHover", palette.ControlBorderHover);
-        Brush("Hover", palette.ControlHover);
-        Brush("Pressed", palette.ControlPressed);
-        Brush("Text", palette.Foreground);
-        Brush("Muted", palette.MutedForeground);
-        Brush("Accent", palette.Accent);
-        Brush("AccentText", palette.AccentForeground);
-        Brush("Focus", palette.FocusRing);
-        Brush("Caret", palette.Caret);
-        Brush("Selection", palette.Selection);
-        Brush("SelectedText", palette.Foreground);
-        Brush("Disabled", palette.DisabledBackground);
-        Brush("DisabledText", palette.DisabledForeground);
-        Brush("SurfaceAlt", palette.SurfaceAlt);
-        Brush("ScrollBarThumb", palette.ScrollBarThumb);
-        Brush("ScrollBarThumbHover", palette.ScrollBarThumbHover);
-        Brush("ShapeStroke", palette.ShapeStroke);
-        Brush("ShadowColor", palette.ShadowColor);
-
-        resources["ShapeStrokeThickness"] = (double)palette.ShapeStrokeThickness;
-        resources["ShadowOffset"] = palette.ShadowOffset;
-        resources["ShadowBlur"] = (double)palette.ShadowBlur;
-        resources["ShadowOpacity"] = palette.ShadowOpacity;
-        Brush("TextVisualForeground", palette.TextVisualForeground);
-        resources["TextVisualFontFamily"] = palette.TextVisualFontFamily;
-        resources["TextVisualFontSize"] = (double)palette.TextVisualFontSize;
-        resources["TextVisualFontWeight"] = palette.TextVisualFontWeight;
-
-        resources["FontFamily"] = palette.FontFamily;
-        resources["FontSize"] = (double)palette.FontSize;
-        resources["FontWeight"] = palette.FontWeight;
-        resources["CornerRadius"] = (double)palette.CornerRadius;
-        resources["InputCornerRadius"] = (double)palette.InputCornerRadius;
-        resources["ControlHeight"] = palette.ControlHeight;
-        resources["ControlBorderThickness"] = palette.ControlBorderThickness;
-        resources["FocusThickness"] = (double)palette.FocusThickness;
-        resources["FocusThicknessMedium"] = (double)palette.FocusThicknessMedium;
-        resources["FocusThicknessThin"] = (double)palette.FocusThicknessThin;
-        resources["ScrollBarThumbRadius"] = (double)palette.ScrollBarThumbRadius;
-        AddTypographyStyles(resources, palette.Foreground, palette.MutedForeground, palette.FontFamily);
-        return resources;
-    }
-
-    private static void AddTypographyStyles(ResourceDictionary resources, Color text, Color muted, string family)
-    {
-        VisualStyle Style(double size, FontWeight weight, Color color)
-        {
-            var style = new VisualStyle { TargetType = typeof(TextBlock) };
-            style.Setters.Add(new VisualSetter(VisualElement.FontFamilyProperty, family));
-            style.Setters.Add(new VisualSetter(VisualElement.FontSizeProperty, size));
-            style.Setters.Add(new VisualSetter(VisualElement.FontWeightProperty, weight));
-            style.Setters.Add(new VisualSetter(TextBlock.ForegroundProperty, new SolidColorBrush(color)));
-            return style;
-        }
-
-        resources["Heading"] = Style(19d, FontWeight.SemiBold, text);
-        resources["Subheading"] = Style(14d, FontWeight.SemiBold, text);
-        resources["Body"] = Style(10d, FontWeight.Normal, text);
-        resources["Caption"] = Style(9d, FontWeight.Normal, muted);
-    }
 }

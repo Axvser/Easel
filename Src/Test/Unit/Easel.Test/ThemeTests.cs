@@ -116,6 +116,16 @@ public sealed class ThemeTests
     }
 
     [TestMethod]
+    public void HighContrastDictionaryCarriesTheTypographyStyles()
+    {
+        var resources = Easel.Theme.CreateResourceDictionary(Easel.ThemeMode.HighContrast);
+
+        Assert.IsInstanceOfType<Easel.Visuals.VisualStyle>(resources["Heading"]);
+        Assert.IsInstanceOfType<Easel.Visuals.VisualStyle>(resources["Caption"]);
+        Assert.AreEqual(2d, resources["CornerRadius"]);
+    }
+
+    [TestMethod]
     public void ThemeModeChange_HighContrastSwapsThePalette()
     {
         var original = Easel.Theme.Mode;

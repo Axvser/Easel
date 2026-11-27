@@ -19,10 +19,11 @@ var palette = Theme.Current;        // the palette controls read now
 ```
 
 - `Theme.Changed` is raised when the mode, palette or followed system theme changes.
-- `Theme.Current` can be assigned a `ThemePalette` directly; like `ApplyPalette`, that changes palette reads, not
-  the host's resource dictionary.
+- `Theme.Current` can be assigned a `ThemePalette` directly; like `ApplyPalette`, that changes palette reads only.
 - `Theme.ApplyPalette(ThemeMode mode, ThemePalette palette)` activates a host-defined palette and reports the
-  given mode. It changes `Theme.Current`, not the host's resource dictionary.
+  given mode; `Theme.Current` changes. A live host re-syncs its `VisualHost.Resources` theme dictionary from the
+  **built-in** palette of that mode, so custom colours reach controls but not XAML `{DynamicResource}` keys —
+  merge a dictionary for those.
 - `Theme.RefreshSystemTheme()` re-reads Windows when `Mode == System`;
   `Theme.SystemThemeResolver` is internal test seam.
 - `Theme.Mode = ThemeMode.System` attaches a `SystemEvents.UserPreferenceChanged` listener once. The event is
@@ -55,12 +56,12 @@ defaults keyed by control type and apply when the control has no explicit style.
 They are the source of truth for the current role names and values. They carry palette brushes (`BorderHover` is the
 neutral interactive hover border), metrics (`CornerRadius`, `InputCornerRadius`, `ControlHeight`, typography tokens
 where present) and keyed typography styles
-(`Heading`, `Subheading`, `Body`, `Caption`). `Theme.CreateDark()` / `CreateLight()` read the files into a
-`ThemePalette`.
+(`Heading`, `Subheading`, `Body`, `Caption`). `Theme.CreateDark()` / `CreateLight()` / `CreateHighContrast()` read
+the files into a `ThemePalette`.
 
-`HighContrast` is a built-in palette mode but it is **not** a library XAML fallback; its resource dictionary is
-generated from the palette when an app asks for it. A custom high-contrast theme is a good demo of authoring
-your own dictionary.
+`HighContrast` is a built-in XAML dictionary too (`Themes/HighContrastTheme.xaml`), with the same keys as
+Dark+/Light+ and a black/amber palette. A custom theme (the gallery's `MidnightTheme.xaml`) is a good demo of
+authoring your own dictionary.
 
 Get a copy when an application wants its own dictionary to edit or merge:
 
@@ -99,6 +100,7 @@ The host's theme dictionary is `MergedDictionaries[0]` on `VisualHost.Resources`
 append a dictionary after it and define only the keys you change. Missing keys fall back to the active theme.
 
 ```csharp
+var surface = form.Surface;                          // the VisualForm's VisualHost
 var overrides = new ResourceDictionary
 {
     ["Accent"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x8A, 0x00)),
@@ -138,17 +140,18 @@ surface.Resources.MergedDictionaries.Add(overrides); // appended after the theme
   <Style.Setters>
     <Setter Property="FontSize" Value="19" />
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+    <Setter Property="Foreground" Value="{StaticResource Accent}" />
   </Style.Setters>
 </Style>
 ```
 
 The built-in `Heading`, `Subheading`, `Body` and `Caption` themselves form a `BasedOn` chain rooted at `Body`.
-`BasedOn` accepts only `{StaticResource Key}`. In a standalone `ResourceDictionary` it resolves against that
-dictionary and its own `MergedDictionaries` at load time, not the host theme; to derive from a built-in style,
-declare the derived style in the view's `Resources` (the owner chain reaches `VisualHost.Resources`), or put
-both styles in the same dictionary. A derived style that references a key which has not resolved yet throws
-`No resource named …` on the eager `BasedOn` read.
+`BasedOn` accepts only `{StaticResource Key}`, and it resolves eagerly when the dictionary loads: a standalone
+`ResourceDictionary` sees its own keys and `MergedDictionaries`; a visual element sees its own `Resources`, the
+ancestors already attached, and `EaselApplication.Resources`. The host theme is not reachable, because it is
+attached only after the view is parented. To derive from a built-in style, re-declare the base in the same
+dictionary (the gallery's `MidnightTheme.xaml` does this for `Body`/`Subheading`/`Heading`/`Caption`) or restate
+its setters. An unresolved key throws `No resource named …`.
 
 ### Full palette
 
@@ -187,13 +190,17 @@ intentionally departs from the theme.
 ## Switching at runtime
 
 `Theme.Mode`, assigning `Theme.Current` and `Theme.ApplyPalette(...)` raise `Theme.Changed`. The host syncs its theme
-dictionary brushes in place and invalidates the surface, so an ordinary switch needs no root rebuild:
+dictionary brushes in place and invalidates the surface, so an ordinary switch needs no root rebuild. `VisualForm`
+and `Window` repaint their own background and window frame from `Theme.Current`; a `VisualHost` inside a hand-built
+`Form` needs its own subscription:
 
 ```csharp
+var surface = form.Controls.Add(new ShellView()); // the dock-filled VisualHost
 Theme.Changed += (_, _) => surface.BackColor = Theme.Current.WindowBackground;
 ```
 
-- Existing controls re-read `Theme.Current`; templates that bound the host's theme brushes change with them.
+- Existing controls re-read `Theme.Current`; templates that bound the host's theme brushes follow the **built-in**
+  palette of the active mode, not a host-defined one.
 - Recreate (or refresh) a view only when it captured `Theme.Current` colors at construction or merged its own
   cloned theme dictionary. The gallery does this for a few previews and its `GalleryTheme` copies.
 - Native islands (`NativeElement`/`NativeControlHost`, and a `TextBox` with `UseNativeEditor=true`) choose their
@@ -211,6 +218,7 @@ Theme.Changed += (_, _) => surface.BackColor = Theme.Current.WindowBackground;
   property, a dictionary-internal reference) throws `No resource named …`.
 - `ThemePalette.FromResourceDictionary` with a dictionary missing keys yields transparent colors/fallback metrics;
   a merged partial overlay instead falls back to the active theme.
-- A custom dictionary with an implicit `<Style TargetType="…">` and no `x:Key` is stored by type in the
-  dictionary but is not automatically applied; declare implicit styles on a visual element's resources/styles.
+- A keyless `<Style TargetType="…">` in a resource dictionary is stored under its `TargetType`; it is applied only
+  from `EaselApplication.Resources` (exact type) or from a visual element's `Resources`/`Styles` where it is
+  declared, not from a view's or the host's merged dictionary.
 - `MergedDictionaries` has no file-URI `Source`; merge a compiled `ResourceDictionary` type or inline dictionary.
