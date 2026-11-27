@@ -67,8 +67,9 @@ public sealed class VisualNameScope
 /// <remarks>
 /// <para>
 /// The nearest dictionary wins: the element's own <see cref="VisualElement.Resources"/>, then each ancestor's, then
-/// <see cref="VisualHost.Resources"/>. A key missing from every dictionary throws instead of returning a default,
-/// because a silently default value turns a typo into a blank control far from the mistake.
+/// <see cref="VisualHost.Resources"/>, then <see cref="EaselApplication.Resources"/>. A key missing from every
+/// dictionary throws instead of returning a default, because a silently default value turns a typo into a blank
+/// control far from the mistake.
 /// </para>
 /// <para>
 /// Generated code applies resource-valued attributes before the element is parented, so a static reference is
@@ -100,6 +101,11 @@ public static class VisualResourceLookup
         }
 
         if (element.Surface is { } surface && surface.Resources.TryGetValue(key, out value))
+        {
+            return true;
+        }
+
+        if (EaselApplication.Resources.TryGetValue(key, out value))
         {
             return true;
         }
@@ -394,6 +400,12 @@ internal sealed class ResourceBinding : IDisposable
         if (surface is not null && surface.Resources.TryGetValue(_key, out value))
         {
             source = surface.Resources;
+            return true;
+        }
+
+        if (EaselApplication.Resources.TryGetValue(_key, out value))
+        {
+            source = EaselApplication.Resources;
             return true;
         }
 

@@ -90,6 +90,15 @@ host.Root = new ShellView();   // ShellView and its descendants bind to ShellVie
 `VisualHost.Post(Action)` marshals work to the host's UI thread: `BeginInvoke` when the control has a handle,
 otherwise the action runs inline (headless hosts and tests).
 
+## Application resources
+
+`EaselApplication.Resources` is consulted after the element chain and the host dictionary;
+`EaselApplication.Styles` follows the host's style collection and precedes the theme default. A keyless
+`<Style TargetType="T">` stored in an application dictionary is implicit for exact `T`. Both are
+process-wide and are not re-resolved when changed after a tree is built — merge dictionaries and add styles
+before creating the first window. The `e-app` template's `App.xaml` declares the `StartupTheme` key; the template
+merges that dictionary into `EaselApplication.Resources`, so brushes and styles added there become application-wide.
+
 ## Surface API
 
 | Member | Use |

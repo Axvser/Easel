@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
+using Easel.Visuals;
 
 namespace Easel;
 
@@ -25,6 +26,23 @@ public static class EaselApplication
 {
     private const int PerMonitorV2Context = -4;
     private static int _dpiWarningReported;
+
+    /// <summary>Resources shared by every Easel window and element in this process.</summary>
+    /// <remarks>
+    /// The lookup chain is element, ancestors, host, then this dictionary. Merge application dictionaries here
+    /// before creating the first window, so XAML <c>{StaticResource}</c> resolves while the tree is built. The
+    /// host's built-in theme lives in <see cref="VisualHost.Resources"/>, so an application key does not replace
+    /// a palette key of the same name.
+    /// </remarks>
+    public static ResourceDictionary Resources { get; } = new();
+
+    /// <summary>Implicit styles shared by every Easel element in this process.</summary>
+    /// <remarks>
+    /// An element's own <see cref="VisualElement.Styles"/> and its ancestors' collections win over the host's
+    /// <see cref="VisualHost.Styles"/>, which wins over this collection; the theme default is the final fallback.
+    /// Add styles before creating the first window: collections are resolved when the tree is built.
+    /// </remarks>
+    public static VisualStyleCollection Styles { get; } = new();
 
     /// <summary>Initializes the Windows Forms process for an Easel window.</summary>
     /// <remarks>

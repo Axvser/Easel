@@ -198,8 +198,9 @@ public class VisualHost : System.Windows.Forms.Control
     /// <summary>Styles applied implicitly to matching elements in this surface's visual tree.</summary>
     /// <remarks>
     /// An element's own <see cref="VisualElement.Styles"/> collection and its ancestors' collections take precedence
-    /// over this one; an explicit <see cref="VisualElement.Style"/> takes precedence over all of them. The tree is
-    /// re-resolved whenever this collection changes or the root is assigned.
+    /// over this one; <see cref="EaselApplication.Styles"/> follows it, and an explicit
+    /// <see cref="VisualElement.Style"/> takes precedence over all of them. The tree is re-resolved whenever this
+    /// collection changes or the root is assigned.
     /// </remarks>
     public VisualStyleCollection Styles => _styles;
 

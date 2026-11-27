@@ -886,10 +886,10 @@ public abstract class VisualElement : ContainerVisual, IDisposable
     /// <summary>Styles offered implicitly to this element and its descendants.</summary>
     /// <remarks>
     /// The nearest collection wins: this element's own collection is consulted first, then each ancestor's, then
-    /// <see cref="VisualHost.Styles"/>. Within a collection the first style whose
-    /// <see cref="VisualStyle.TargetType"/> accepts the element is used. The subtree is re-resolved when this
-    /// collection changes, when a child is added through <see cref="Add{T}"/>, and when the surface root is assigned
-    /// or replaced.
+    /// <see cref="VisualHost.Styles"/>, then <see cref="EaselApplication.Styles"/>. Within a collection the first
+    /// style whose <see cref="VisualStyle.TargetType"/> accepts the element is used. The subtree is re-resolved when
+    /// this collection changes, when a child is added through <see cref="Add{T}"/>, and when the surface root is
+    /// assigned or replaced.
     /// </remarks>
     public VisualStyleCollection Styles => _styles ??= CreateStyles();
 
@@ -2059,7 +2059,25 @@ public abstract class VisualElement : ContainerVisual, IDisposable
             }
         }
 
-        return Surface?.Styles.FindMatch(this) ?? Easel.Theme.FindDefaultStyle(this);
+        if (Surface?.Styles.FindMatch(this) is { } surfaceStyle)
+        {
+            return surfaceStyle;
+        }
+
+        if (EaselApplication.Styles.FindMatch(this) is { } applicationStyle)
+        {
+            return applicationStyle;
+        }
+
+        // 资源字典把无键 <Style TargetType="T"> 存成 [typeof(T)]；应用字典里的这类条目当作隐式样式。
+        if (EaselApplication.Resources.TryGetValue(GetType(), out var resource)
+            && resource is VisualStyle resourceStyle
+            && resourceStyle.Matches(this))
+        {
+            return resourceStyle;
+        }
+
+        return Easel.Theme.FindDefaultStyle(this);
     }
 
     /// <summary>Declares the theme colours a template paints when the element's own appearance properties are unset.</summary>
