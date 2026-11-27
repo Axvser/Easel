@@ -270,6 +270,8 @@ public sealed partial class TearOffView : ThemedDockPanel
         window.FormClosing += OnWindowClosing;
         window.Content = DetachablePanel;
         _window = window;
+        // 先建句柄再 Show：OnHandleCreated 写入的暗色标题栏/边框必须在首帧前生效，否则会先画一帧系统浅色。
+        _ = window.Handle;
         window.Show();
 
         if (adopt && DragBar.Surface is { } newSurface)
@@ -311,6 +313,12 @@ public sealed partial class TearOffView : ThemedDockPanel
             window.FormClosing -= OnWindowClosing;
         }
 
+        if (window is not null)
+        {
+            // 先隐藏再摘 content：隐藏窗口不会被合成器提交空白帧，摘面板时不会露出白边。
+            window.Hide();
+        }
+
         DetachablePanel.ParentElement?.RemoveChild(DetachablePanel);
         if (window is not null)
         {
@@ -324,8 +332,7 @@ public sealed partial class TearOffView : ThemedDockPanel
 
         if (window is not null)
         {
-            // 回坞发生在该窗口自己的 PointerReleased 里；先隐藏，消息泵下一轮再销毁宿主。
-            window.Hide();
+            // 回坞发生在该窗口自己的 PointerReleased 里；消息泵下一轮再销毁宿主。
             try
             {
                 window.BeginInvoke(new Action(() =>

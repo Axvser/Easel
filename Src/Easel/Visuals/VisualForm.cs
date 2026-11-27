@@ -22,6 +22,7 @@ public class VisualForm : Form
     {
         AutoScaleMode = AutoScaleMode.None;
         BackColor = Theme.Current.WindowBackground;
+        ForeColor = Theme.Current.Foreground;
         _surface = new VisualHost
         {
             Dock = DockStyle.Fill,
@@ -111,6 +112,7 @@ public class VisualForm : Form
     private void OnThemeChanged(object? sender, EventArgs e)
     {
         BackColor = Theme.Current.WindowBackground;
+        ForeColor = Theme.Current.Foreground;
         _surface.BackColor = Theme.Current.WindowBackground;
         NativeWindowTheme.ApplyDarkMode(this);
     }
