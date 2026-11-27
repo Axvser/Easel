@@ -128,6 +128,7 @@ internal static class GalleryTheme
         resources["Danger"] = Solid(Color.FromArgb(0xFF, 0xEF, 0x44, 0x44));
         resources["HmiGrid"] = Solid(Color.FromArgb(0x2E, 0x94, 0xA3, 0xB8));
         resources["HmiTrack"] = Solid(Color.FromArgb(0x3D, 0x94, 0xA3, 0xB8));
+        resources["SignalWash"] = Solid(Color.FromArgb(0x33, 0x22, 0xD3, 0xEE));
         resources["SignalGradient"] = Linear(
             (Color.FromArgb(0xFF, 0x22, 0xD3, 0xEE), 0d),
             (Color.FromArgb(0xFF, 0x02, 0x84, 0xC7), 1d));

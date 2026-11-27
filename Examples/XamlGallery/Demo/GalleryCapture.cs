@@ -179,7 +179,15 @@ internal static class GalleryCapture
                     if (HasFlag(args, "--detach") && session.PreviewContent is TearOffView tearOff)
                     {
                         var anchor = new Point(form.Left + (form.Width / 2), form.Top + 160);
-                        tearOff.DetachForCapture(anchor);
+                        var dragged = tearOff.DragOutForCapture();
+                        if (!dragged)
+                        {
+                            tearOff.DetachForCapture(anchor);
+                        }
+
+                        File.WriteAllText(
+                            Path.Combine(directory, name + "-drag.txt"),
+                            dragged ? "drag-out ok" : "drag-out failed; used programmatic detach");
                         Pump(form, 10);
                         Capture(form, form.Surface, Path.Combine(directory, name + "-detached-page.png"));
                         if (tearOff.DetachedWindow is { } detached)
@@ -187,7 +195,15 @@ internal static class GalleryCapture
                             Capture(detached, detached.Surface, Path.Combine(directory, name + "-detached.png"));
                         }
 
-                        tearOff.DockForCapture();
+                        var draggedIn = tearOff.DragInForCapture();
+                        if (!draggedIn)
+                        {
+                            tearOff.DockForCapture();
+                        }
+
+                        File.WriteAllText(
+                            Path.Combine(directory, name + "-drag-in.txt"),
+                            draggedIn ? "drag-in ok" : "drag-in failed; used programmatic dock");
                         Pump(form, 4);
                         Capture(form, form.Surface, Path.Combine(directory, name + "-docked-again.png"));
                     }

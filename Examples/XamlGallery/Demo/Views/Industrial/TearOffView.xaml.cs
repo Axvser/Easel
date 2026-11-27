@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Demo.ViewModels;
 using Easel.Visuals;
@@ -27,6 +28,7 @@ public sealed partial class TearOffView : ThemedDockPanel
     private bool _moved;
     private bool _disposed;
     private PointF _pressPosition;
+    private Point _pagePressScreen;
     private Point _windowPressScreen;
     private Point _windowPressLocation;
 
@@ -36,6 +38,7 @@ public sealed partial class TearOffView : ThemedDockPanel
         _viewModel = new ProductionLineViewModel();
         DataContext = _viewModel;
         InitializeComponent();
+        DragBar.Cursor = Cursors.SizeAll;
         _idleDockBorder = DockPlaceholder.BorderBrush;
         _idleDockBackground = DockPlaceholder.Background;
         _timer.Tick += OnTick;
@@ -47,6 +50,59 @@ public sealed partial class TearOffView : ThemedDockPanel
 
     /// <summary>Tears the panel out to <paramref name="screenPoint"/>; used by the capture runner.</summary>
     internal void DetachForCapture(Point screenPoint) => DetachAt(screenPoint);
+
+    /// <summary>Runs the real header drag gesture; used by the capture runner.</summary>
+    internal bool DragOutForCapture()
+    {
+        if (_isDetached || DragBar.Surface is not { } surface)
+        {
+            return false;
+        }
+
+        var bounds = DragBar.AbsoluteBounds;
+        var scale = surface.DpiScale;
+        var start = new PointF(
+            (bounds.X + 24f) * scale,
+            (bounds.Y + (bounds.Height / 2f)) * scale);
+        var end = new PointF(
+            (bounds.X + 72f) * scale,
+            (bounds.Y + (bounds.Height / 2f) + 14f) * scale);
+        surface.ProcessPointerDown(start, MouseButtons.Left);
+        surface.ProcessPointerMove(end);
+        surface.ProcessPointerUp(end, MouseButtons.Left);
+        return _isDetached;
+    }
+
+    /// <summary>Drags the floating window back over its slot; used by the capture runner.</summary>
+    internal bool DragInForCapture()
+    {
+        if (!_isDetached || _window is not { } window || DragBar.Surface is not { } surface)
+        {
+            return false;
+        }
+
+        var slot = DockSlotScreenBounds();
+        if (slot.IsEmpty)
+        {
+            return false;
+        }
+
+        var bounds = DragBar.AbsoluteBounds;
+        var scale = surface.DpiScale;
+        var headerCenter = new Point(
+            (int)Math.Round((bounds.X + (bounds.Width / 2f)) * scale),
+            (int)Math.Round((bounds.Y + (bounds.Height / 2f)) * scale));
+        var currentHeaderScreen = surface.PointToScreen(headerCenter);
+        var target = new Point(slot.X + (slot.Width / 2), slot.Y + 40);
+        window.Location = new Point(
+            window.Location.X + (target.X - currentHeaderScreen.X),
+            window.Location.Y + (target.Y - currentHeaderScreen.Y));
+
+        surface.ProcessPointerDown(headerCenter, MouseButtons.Left);
+        surface.ProcessPointerMove(new PointF(headerCenter.X + 12, headerCenter.Y + 4));
+        surface.ProcessPointerUp(new PointF(headerCenter.X + 12, headerCenter.Y + 4), MouseButtons.Left);
+        return !_isDetached;
+    }
 
     /// <summary>Docks the panel again; used by the capture runner.</summary>
     internal void DockForCapture() => DockBack();
@@ -94,6 +150,10 @@ public sealed partial class TearOffView : ThemedDockPanel
             _windowPressScreen = ToScreen(e);
             _windowPressLocation = window.Location;
         }
+        else
+        {
+            _pagePressScreen = ToScreen(e);
+        }
     }
 
     private void OnDragBarMoved(object? sender, VisualPointerEventArgs e)
@@ -116,6 +176,17 @@ public sealed partial class TearOffView : ThemedDockPanel
                 _windowPressLocation.X + (screen.X - _windowPressScreen.X),
                 _windowPressLocation.Y + (screen.Y - _windowPressScreen.Y));
             UpdateDockHint(screen);
+            return;
+        }
+
+        if (DragBar.Surface is { } surface)
+        {
+            var screen = ToScreen(e);
+            var scale = surface.DpiScale;
+            DetachablePanel.Transform = new Matrix(
+                1f, 0f, 0f, 1f,
+                (screen.X - _pagePressScreen.X) / scale,
+                (screen.Y - _pagePressScreen.Y) / scale);
         }
     }
 
@@ -147,8 +218,12 @@ public sealed partial class TearOffView : ThemedDockPanel
 
         if (moved)
         {
+            DetachablePanel.Transform = new Matrix();
             DetachAt(ToScreen(e));
+            return;
         }
+
+        DetachablePanel.Transform = new Matrix();
     }
 
     private void OnDetachClicked(object? sender, EventArgs e)
@@ -170,6 +245,7 @@ public sealed partial class TearOffView : ThemedDockPanel
             return;
         }
 
+        DetachablePanel.Transform = new Matrix();
         DockSlot.Child = null;
         DockPlaceholder.Visibility = XamlVisibility.Visible;
         DetachButton.Text = "DOCK";
@@ -220,6 +296,7 @@ public sealed partial class TearOffView : ThemedDockPanel
         }
 
         DockSlot.Child = DetachablePanel;
+        DetachablePanel.Transform = new Matrix();
         DockPlaceholder.Visibility = XamlVisibility.Collapsed;
         DetachButton.Text = "DETACH";
         UpdateDockHint(null);
@@ -253,7 +330,7 @@ public sealed partial class TearOffView : ThemedDockPanel
             ? Resources["Signal"] as XamlBrush
             : _idleDockBorder;
         DockPlaceholder.Background = hot
-            ? Resources["Raised"] as XamlBrush
+            ? Resources["SignalWash"] as XamlBrush
             : _idleDockBackground;
     }
 
