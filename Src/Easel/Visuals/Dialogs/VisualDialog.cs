@@ -37,9 +37,16 @@ public class VisualDialog : TemplatedControl
     private const float CardPadding = 24f;
     private const float MinimumCardWidth = 320f;
 
+    // net45 没有 RunContinuationsAsynchronously（4.6 起）；await 的续体仍经捕获的 UI 同步上下文回投。
+    private static readonly TaskCreationOptions CompletionOptions =
+#if NETFRAMEWORK
+        TaskCreationOptions.None;
+#else
+        TaskCreationOptions.RunContinuationsAsynchronously;
+#endif
+
     private readonly DialogOptions _options;
-    private readonly TaskCompletionSource<DialogResult> _completion =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<DialogResult> _completion = new(CompletionOptions);
     private readonly VisualElement _scrim;
     private readonly Border _card;
     private readonly List<PartHook> _partHooks = [];

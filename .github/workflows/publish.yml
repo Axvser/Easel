@@ -36,7 +36,7 @@ name: publish
 #   missing). Its nupkg is checked for every item before the push.
 #
 # Target frameworks:
-#   The runtime multi-targets net461 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
+#   The runtime multi-targets net45 / net5.0-windows / netcoreapp3.0 / net8.0-windows, so the
 #   test and publish jobs install the older SDKs for their Windows Desktop reference packs.
 #   CI is the only place that proves every target framework is in the package; the runtime pack
 #   is checked before the push.
@@ -186,7 +186,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # The runtime multi-targets net461/net5.0/netcoreapp3.0/net8.0; the older SDKs supply
+          # The runtime multi-targets net45/net5.0/netcoreapp3.0/net8.0; the older SDKs supply
           # their Windows Desktop targeting packs. The test project runs on .NET 10.
           dotnet-version: |
             10.0.x
@@ -206,6 +206,11 @@ jobs:
 
       - name: Test
         run: dotnet test Src/Test/Unit/Easel.Test/Easel.Test.csproj -c Debug --no-build --logger "console;verbosity=normal"
+
+      # The fixture keeps the net45 target and the C# 7.3 generation path honest: no LangVersion
+      # is set, and its XAML, compiled binding and attached accessor must compile and run.
+      - name: Legacy net45 fixture
+        run: dotnet run --project Src/Test/Legacy/Legacy.csproj -c Debug
 
   publish:
     needs: [version, test]
@@ -357,7 +362,7 @@ jobs:
           $zip = [IO.Compression.ZipFile]::OpenRead($file)
           $entries = @($zip.Entries | ForEach-Object FullName)
           $zip.Dispose()
-          foreach ($tfm in @("net461", "net5.0-windows", "netcoreapp3.0", "net8.0-windows")) {
+          foreach ($tfm in @("net45", "net5.0-windows", "netcoreapp3.0", "net8.0-windows")) {
             if (-not ($entries | Where-Object { $_ -like "lib/$tfm*/*.dll" })) {
               throw "WinForms.Easel nupkg has no lib/$tfm* assembly; refusing to publish it."
             }

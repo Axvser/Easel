@@ -19,6 +19,9 @@
   <Folder Name="/Test/GcAnalysis/">
     <Project Path="Src/Test/GcAnalysis/Easel.GcAnalysis.csproj" />
   </Folder>
+  <Folder Name="/Test/Legacy/">
+    <Project Path="Src/Test/Legacy/Legacy.csproj" />
+  </Folder>
   <Folder Name="/Examples/">
     <Project Path="Examples/XamlGallery/Demo/Demo.csproj" />
   </Folder>

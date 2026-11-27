@@ -7,7 +7,7 @@ namespace Easel;
 /// <para>
 /// The layout follows <c>System.Numerics.Matrix4x4</c>: <c>M11</c> is the first row and column, and the
 /// translation sits in <c>M41</c>, <c>M42</c> and <c>M43</c>. The runtime defines the type itself so the
-/// <c>netframework4.6.1</c> target does not need an extra package.
+/// <c>net45</c> target does not need an extra package.
 /// </para>
 /// <para>
 /// Composition is <c>v · (A · B) = (v · A) · B</c>: <see cref="Multiply"/> applies <c>a</c> first.

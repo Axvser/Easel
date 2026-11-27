@@ -51,9 +51,10 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         var attribute = context.Attributes[0];
         var owner = property.ContainingType;
         var location = declaration.Identifier.GetLocation();
+        var nullableAware = UsesNullableAnnotations(context.SemanticModel.Compilation);
 
         SyntaxHelpers.TryGetAttributeName(attribute, property.Name, out var dpName);
-        var model = new PropertyModel(owner, property, dpName, location);
+        var model = new PropertyModel(owner, property, dpName, nullableAware, location);
 
         if (!declaration.Modifiers.Any(SyntaxKind.PartialKeyword)
             || declaration.AccessorList is null
@@ -88,7 +89,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         }
 
         var defaultValue = SyntaxHelpers.GetNamedString(attribute, "DefaultValue");
-        model.MetadataOptions = MetadataOptions(attribute, owner, location, out var callbackDiagnostic);
+        model.MetadataOptions = MetadataOptions(attribute, owner, location, nullableAware, out var callbackDiagnostic);
         if (callbackDiagnostic is not null)
         {
             model.Diagnostic = callbackDiagnostic;
@@ -109,14 +110,14 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
             return model;
         }
 
-        if (!LiteralFactory.TryCreate(property.Type, defaultValue, out var expression, out _))
+        if (!LiteralFactory.TryCreate(property.Type, defaultValue, nullableAware, out var expression, out _))
         {
             model.Warning = Diagnostic.Create(
                 Diagnostics.UnsupportedValue,
                 location,
                 defaultValue ?? string.Empty,
                 property.Type.ToDisplayString());
-            expression = $"default({SyntaxHelpers.TypeName(property.Type)})";
+            expression = $"default({SyntaxHelpers.TypeName(property.Type, nullableAware)})";
         }
 
         model.DefaultExpression = expression;
@@ -150,24 +151,24 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
             }
 
             var members = new CodeBuilder();
-            var typeName = SyntaxHelpers.TypeName(model.Property.Type);
+            var typeName = SyntaxHelpers.TypeName(model.Property.Type, model.NullableAware);
 
             members.Line($"/// <summary>The backing dependency property for <see cref=\"{model.Property.Name}\"/>.</summary>");
             members.Line($"public static readonly {SyntaxHelpers.Fqn("DependencyProperty")} {model.DpName}Property =");
             members.Line($"    {SyntaxHelpers.Fqn("DependencyProperty")}.Register(");
             members.Line($"        {SyntaxHelpers.Quote(model.DpName)},");
             members.Line($"        typeof({SyntaxHelpers.TypeNameForTypeof(model.Property.Type)}),");
-            members.Line($"        typeof({SyntaxHelpers.TypeName(model.Owner)}),");
+            members.Line($"        typeof({SyntaxHelpers.TypeName(model.Owner, model.NullableAware)}),");
             members.Line($"        new {SyntaxHelpers.Fqn("PropertyMetadata")}({model.DefaultExpression}){model.MetadataOptions});");
             members.Line();
 
             members.Line("/// <summary>The CLR wrapper over the generated dependency property.</summary>");
             members.Line("[global::System.ComponentModel.DesignerSerializationVisibility(global::System.ComponentModel.DesignerSerializationVisibility.Hidden)]");
             members.Open($"{SyntaxHelpers.AccessibilityText(model.Property.DeclaredAccessibility)} partial {typeName} {model.Property.Name}");
-            members.Line($"get => ({typeName})GetValue({model.DpName}Property)!;");
+            members.Line($"get => ({typeName})GetValue({model.DpName}Property){(model.NullableAware ? "!" : string.Empty)};");
             members.Line($"set => SetValue({model.DpName}Property, value);");
             members.Close();
-            var code = Header + SyntaxHelpers.WrapInPartialType(model.Owner, members.ToString());
+            var code = Header(model.NullableAware) + SyntaxHelpers.WrapInPartialType(model.Owner, members.ToString());
             var hint = $"XamlProperty.{SyntaxHelpers.SanitizeIdentifier(model.Owner.ToDisplayString())}.{model.Property.Name}.g.cs";
             context.AddSource(hint, SourceText.From(code, Encoding.UTF8));
         }
@@ -186,18 +187,19 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         var owner = method.ContainingType;
         var location = declaration.Identifier.GetLocation();
         var isGetter = !method.ReturnsVoid;
+        var nullableAware = UsesNullableAnnotations(context.SemanticModel.Compilation);
 
         var inferred = method.Name.Length > 3 && (method.Name.StartsWith("Get") || method.Name.StartsWith("Set"))
             ? method.Name.Substring(3)
             : method.Name;
 
         SyntaxHelpers.TryGetAttributeName(attribute, inferred, out var propertyName);
-        var model = new AttachedModel(owner, method, propertyName, isGetter, location)
+        var model = new AttachedModel(owner, method, propertyName, isGetter, nullableAware, location)
         {
             DefaultValue = SyntaxHelpers.GetNamedString(attribute, "DefaultValue"),
         };
 
-        model.MetadataOptions = MetadataOptions(attribute, owner, location, out var callbackDiagnostic);
+        model.MetadataOptions = MetadataOptions(attribute, owner, location, nullableAware, out var callbackDiagnostic);
         if (callbackDiagnostic is not null)
         {
             model.Diagnostic = callbackDiagnostic;
@@ -298,6 +300,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         foreach (var group in groups.Values)
         {
             var owner = group[0].Owner;
+            var nullableAware = group[0].NullableAware;
             var members = new CodeBuilder();
             var byName = new Dictionary<string, (AttachedModel? Getter, AttachedModel? Setter)>(StringComparer.Ordinal);
 
@@ -366,14 +369,14 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
                     continue;
                 }
 
-                if (!LiteralFactory.TryCreate(propertyType, defaultValue, out var defaultExpression, out _))
+                if (!LiteralFactory.TryCreate(propertyType, defaultValue, nullableAware, out var defaultExpression, out _))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(
                         Diagnostics.UnsupportedValue,
                         location,
                         defaultValue ?? string.Empty,
                         propertyType.ToDisplayString()));
-                    defaultExpression = $"default({SyntaxHelpers.TypeName(propertyType)})";
+                    defaultExpression = $"default({SyntaxHelpers.TypeName(propertyType, nullableAware)})";
                 }
 
                 members.Line($"/// <summary>The backing attached dependency property for <c>{dpName}</c>.</summary>");
@@ -381,7 +384,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
                 members.Line($"    {SyntaxHelpers.Fqn("DependencyProperty")}.RegisterAttached(");
                 members.Line($"        {SyntaxHelpers.Quote(dpName)},");
                 members.Line($"        typeof({SyntaxHelpers.TypeNameForTypeof(propertyType)}),");
-                members.Line($"        typeof({SyntaxHelpers.TypeName(owner)}),");
+                members.Line($"        typeof({SyntaxHelpers.TypeName(owner, nullableAware)}),");
                 members.Line($"        new {SyntaxHelpers.Fqn("PropertyMetadata")}({defaultExpression}){metadataOptions});");
                 members.Line();
 
@@ -389,11 +392,11 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
                 {
                     var parameter = getter.Method.Parameters[0];
                     members.Line(
-                        $"{SyntaxHelpers.AccessibilityText(getter.Method.DeclaredAccessibility)} static partial "
-                        + $"{SyntaxHelpers.TypeName(getter.Method.ReturnType)} {getter.Method.Name}"
-                        + $"({SyntaxHelpers.TypeName(parameter.Type)} {parameter.Name})");
+                        $"{AccessibilityPrefix(getter.Method)}static partial "
+                        + $"{SyntaxHelpers.TypeName(getter.Method.ReturnType, nullableAware)} {getter.Method.Name}"
+                        + $"({SyntaxHelpers.TypeName(parameter.Type, nullableAware)} {parameter.Name})");
                     members.Line(
-                        $"    => ({SyntaxHelpers.TypeName(getter.Method.ReturnType)}){dpName}Property.GetValue({parameter.Name})!;");
+                        $"    => ({SyntaxHelpers.TypeName(getter.Method.ReturnType, nullableAware)}){dpName}Property.GetValue({parameter.Name}){(nullableAware ? "!" : string.Empty)};");
                     members.Line();
                 }
 
@@ -402,14 +405,14 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
                     var target = setter.Method.Parameters[0];
                     var value = setter.Method.Parameters[1];
                     members.Line(
-                        $"{SyntaxHelpers.AccessibilityText(setter.Method.DeclaredAccessibility)} static partial void {setter.Method.Name}"
-                        + $"({SyntaxHelpers.TypeName(target.Type)} {target.Name}, {SyntaxHelpers.TypeName(value.Type)} {value.Name})");
+                        $"{AccessibilityPrefix(setter.Method)}static partial void {setter.Method.Name}"
+                        + $"({SyntaxHelpers.TypeName(target.Type, nullableAware)} {target.Name}, {SyntaxHelpers.TypeName(value.Type, nullableAware)} {value.Name})");
                     members.Line($"    => {dpName}Property.SetValue({target.Name}, {value.Name});");
                     members.Line();
                 }
             }
 
-            var code = Header + SyntaxHelpers.WrapInPartialType(owner, members.ToString());
+            var code = Header(nullableAware) + SyntaxHelpers.WrapInPartialType(owner, members.ToString());
             var hint = $"XamlAttached.{SyntaxHelpers.SanitizeIdentifier(owner.ToDisplayString())}.g.cs";
             context.AddSource(hint, SourceText.From(code, Encoding.UTF8));
         }
@@ -420,6 +423,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         AttributeData attribute,
         INamedTypeSymbol owner,
         Location location,
+        bool nullableAware,
         out Diagnostic? callbackDiagnostic)
     {
         callbackDiagnostic = null;
@@ -447,7 +451,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         var callbackName = SyntaxHelpers.GetNamedString(attribute, "ChangedCallback");
         if (!string.IsNullOrWhiteSpace(callbackName))
         {
-            if (!TryResolveChangedCallback(owner, callbackName!, out var reference, out var error))
+            if (!TryResolveChangedCallback(owner, callbackName!, nullableAware, out var reference, out var error))
             {
                 callbackDiagnostic = Diagnostic.Create(Diagnostics.ChangedCallbackInvalid, location, error);
                 return string.Empty;
@@ -463,6 +467,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
     private static bool TryResolveChangedCallback(
         INamedTypeSymbol owner,
         string name,
+        bool nullableAware,
         out string reference,
         out string error)
     {
@@ -473,7 +478,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
                 && AcceptsVisualTarget(method.Parameters[0].Type)
                 && AcceptsChangedArgs(method.Parameters[1].Type))
             {
-                reference = $"{SyntaxHelpers.TypeName(owner)}.{method.Name}";
+                reference = $"{SyntaxHelpers.TypeName(owner, nullableAware)}.{method.Name}";
                 error = string.Empty;
                 return true;
             }
@@ -492,21 +497,39 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
     private static bool AcceptsChangedArgs(ITypeSymbol type)
         => type.ToDisplayString() == "Easel.DependencyPropertyChangedEventArgs";
 
-    private const string Header = "// <auto-generated/>\n#nullable enable\n";
+    // 7.3 不认识可空注解与 null!（C# 8）：生成代码按项目的语言版本决定是否写出它们。
+    private static bool UsesNullableAnnotations(Compilation compilation)
+        => compilation is CSharpCompilation csharp && csharp.LanguageVersion >= LanguageVersion.CSharp8;
+
+    // C# 9 之前的分部方法不许写访问修饰符；隐式 private 与省略修饰符等价。
+    private static string AccessibilityPrefix(IMethodSymbol method)
+        => method.DeclaredAccessibility == Accessibility.Private
+            ? string.Empty
+            : SyntaxHelpers.AccessibilityText(method.DeclaredAccessibility) + " ";
+
+    private static string Header(bool nullableAware)
+        => nullableAware ? "// <auto-generated/>\n#nullable enable\n" : "// <auto-generated/>\n";
 
     private sealed class PropertyModel
     {
-        public PropertyModel(INamedTypeSymbol owner, IPropertySymbol property, string dpName, Location location)
+        public PropertyModel(
+            INamedTypeSymbol owner,
+            IPropertySymbol property,
+            string dpName,
+            bool nullableAware,
+            Location location)
         {
             Owner = owner;
             Property = property;
             DpName = dpName;
+            NullableAware = nullableAware;
             Location = location;
         }
 
         public INamedTypeSymbol Owner { get; }
         public IPropertySymbol Property { get; }
         public string DpName { get; }
+        public bool NullableAware { get; }
         public string DefaultExpression { get; set; } = "null";
         public string MetadataOptions { get; set; } = string.Empty;
         public Location Location { get; }
@@ -517,12 +540,19 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
 
     private sealed class AttachedModel
     {
-        public AttachedModel(INamedTypeSymbol owner, IMethodSymbol method, string propertyName, bool isGetter, Location location)
+        public AttachedModel(
+            INamedTypeSymbol owner,
+            IMethodSymbol method,
+            string propertyName,
+            bool isGetter,
+            bool nullableAware,
+            Location location)
         {
             Owner = owner;
             Method = method;
             PropertyName = propertyName;
             IsGetter = isGetter;
+            NullableAware = nullableAware;
             Location = location;
         }
 
@@ -530,6 +560,7 @@ public sealed class DependencyPropertyGenerator : IIncrementalGenerator
         public IMethodSymbol Method { get; }
         public string PropertyName { get; }
         public bool IsGetter { get; }
+        public bool NullableAware { get; }
         public string? DefaultValue { get; set; }
         public string MetadataOptions { get; set; } = string.Empty;
         public Location Location { get; }

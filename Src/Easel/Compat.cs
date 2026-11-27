@@ -1,4 +1,4 @@
-// 适配器仍要编 netframework4.6.1 / netcoreapp3.0：前者缺 record/init 所需的 IsExternalInit 与
+// 适配器仍要编 net45 / netcoreapp3.0：前者缺 record/init 所需的 IsExternalInit 与
 // UnconditionalSuppressMessageAttribute；两者都缺 Math.Clamp / double.IsFinite / Environment.TickCount64。
 #if NETFRAMEWORK || NETCOREAPP3_0
 namespace System.Runtime.CompilerServices
@@ -55,5 +55,16 @@ namespace Easel
 
         public static long TickCount64
             => (long)(System.Diagnostics.Stopwatch.GetTimestamp() * 1000L / System.Diagnostics.Stopwatch.Frequency);
+    }
+
+    // net45 没有 Array.Empty（4.6 起）；按元素类型缓存，返回空数组的路径不分配。
+    internal static class XamlArray
+    {
+        public static T[] Empty<T>() => Cache<T>.Value;
+
+        private static class Cache<T>
+        {
+            public static readonly T[] Value = new T[0];
+        }
     }
 }

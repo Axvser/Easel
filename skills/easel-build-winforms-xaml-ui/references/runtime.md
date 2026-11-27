@@ -224,7 +224,7 @@ Application.Run(new MainWindow());          // Window : VisualForm
 - `Window.WidthDips`/`HeightDips` are the DIP side of `Width`/`Height`: the XAML initializer writes them, the
   window applies them at handle creation, and setting them on a live window applies immediately.
 - `DpiScale` re-reads the device DPI on a resize and on `OnDpiChangedAfterParent`; that override is not compiled
-  into the `netframework4.6.1` target, so a monitor change there refreshes on the next resize.
+  into the `net45` target, so a monitor change there refreshes on the next resize.
 - Tests and captures pin the scale with `DpiScaleOverride`; `RenderTo` never applies DPI.
 - `NativeElement`/`NativeControlHost` children keep their own DPI behaviour; Easel places their rectangles and hosts nested visual content at the same scale.
 

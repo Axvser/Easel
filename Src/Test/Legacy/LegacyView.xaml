@@ -1,0 +1,24 @@
+<StackPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:LegacyFixture"
+    x:Class="LegacyFixture.LegacyView"
+    x:DataType="local:LegacyModel"
+    x:CompileBindings="True"
+    Orientation="Horizontal"
+    Spacing="4">
+
+  <Border x:Name="frame"
+          Width="80"
+          Height="40"
+          Background="#FF102030"
+          BorderThickness="2"
+          CornerRadius="6" />
+
+  <TextBlock x:Name="title"
+             Text="{Binding Title}"
+             Width="120"
+             Foreground="#FF203040"
+             Wrap="True" />
+
+</StackPanel>

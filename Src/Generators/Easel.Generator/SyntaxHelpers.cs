@@ -80,11 +80,15 @@ internal static class SyntaxHelpers
             SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
             SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
-    public static string TypeName(ITypeSymbol type) => type.ToDisplayString(TypeFormat);
+    // 7.3 项目不认识可空引用类型注解：按项目语言版本切换格式；值类型上的 ?（int?）不受影响。
+    private static readonly SymbolDisplayFormat LegacyTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat;
+
+    public static string TypeName(ITypeSymbol type, bool nullableAware)
+        => type.ToDisplayString(nullableAware ? TypeFormat : LegacyTypeFormat);
 
     /// <summary>The wrapper element the XAML compiler emits for a native control.</summary>
-    public static string NativeElementFor(ITypeSymbol nativeType)
-        => $"global::{VisualControlsNamespace}.NativeElement<{TypeName(nativeType)}>";
+    public static string NativeElementFor(ITypeSymbol nativeType, bool nullableAware)
+        => $"global::{VisualControlsNamespace}.NativeElement<{TypeName(nativeType, nullableAware)}>";
 
     /// <summary>Type name for <c>typeof</c> and other metadata positions, where nullable annotations are invalid.</summary>
     public static string TypeNameForTypeof(ITypeSymbol type) => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -286,13 +290,18 @@ internal static class SyntaxHelpers
 /// <summary>Converts XAML and attribute default-value text into C# expressions.</summary>
 internal static class LiteralFactory
 {
-    public static bool TryCreate(ITypeSymbol type, string? text, out string expression, out string? error)
+    public static bool TryCreate(
+        ITypeSymbol type,
+        string? text,
+        bool nullableAware,
+        out string expression,
+        out string? error)
     {
         error = null;
 
         if (text is null)
         {
-            expression = $"default({SyntaxHelpers.TypeName(type)})";
+            expression = $"default({SyntaxHelpers.TypeName(type, nullableAware)})";
             return true;
         }
 
@@ -303,13 +312,13 @@ internal static class LiteralFactory
 
         if (type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable)
         {
-            if (!TryCreate(nullable.TypeArguments[0], text, out var inner, out error))
+            if (!TryCreate(nullable.TypeArguments[0], text, nullableAware, out var inner, out error))
             {
                 expression = string.Empty;
                 return false;
             }
 
-            expression = $"({SyntaxHelpers.TypeName(type)})({inner})";
+            expression = $"({SyntaxHelpers.TypeName(type, nullableAware)})({inner})";
             return true;
         }
 
@@ -396,7 +405,7 @@ internal static class LiteralFactory
 
         if (type.TypeKind == TypeKind.Enum)
         {
-            return TryCreateEnum((INamedTypeSymbol)type, text, out expression, out error);
+            return TryCreateEnum((INamedTypeSymbol)type, text, nullableAware, out expression, out error);
         }
 
         var metadataName = type.ToDisplayString();
@@ -444,7 +453,12 @@ internal static class LiteralFactory
         return false;
     }
 
-    private static bool TryCreateEnum(INamedTypeSymbol enumType, string text, out string expression, out string? error)
+    private static bool TryCreateEnum(
+        INamedTypeSymbol enumType,
+        string text,
+        bool nullableAware,
+        out string expression,
+        out string? error)
     {
         error = null;
         var pieces = text.Split(',');
@@ -461,7 +475,7 @@ internal static class LiteralFactory
             {
                 if (int.TryParse(name, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
                 {
-                    values.Add($"(({SyntaxHelpers.TypeName(enumType)})({number}))");
+                    values.Add($"(({SyntaxHelpers.TypeName(enumType, nullableAware)})({number}))");
                     continue;
                 }
 
@@ -470,7 +484,7 @@ internal static class LiteralFactory
                 return false;
             }
 
-            values.Add($"{SyntaxHelpers.TypeName(enumType)}.{field.Name}");
+            values.Add($"{SyntaxHelpers.TypeName(enumType, nullableAware)}.{field.Name}");
         }
 
         expression = string.Join(" | ", values);

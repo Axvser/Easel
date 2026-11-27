@@ -19,8 +19,11 @@ internal static class GeneratorProbe
     internal static CSharpParseOptions ParseOptions { get; } = new(LanguageVersion.Preview);
 
     internal static CSharpCompilation Build(string source, string assemblyName)
+        => Build(source, assemblyName, ParseOptions);
+
+    internal static CSharpCompilation Build(string source, string assemblyName, CSharpParseOptions parseOptions)
     {
-        var tree = CSharpSyntaxTree.ParseText(source, ParseOptions);
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions);
         return CSharpCompilation.Create(
             assemblyName,
             [tree],
@@ -33,13 +36,21 @@ internal static class GeneratorProbe
         string source,
         string assemblyName,
         params AdditionalText[] additionalTexts)
+        => Run(generator, source, assemblyName, ParseOptions, additionalTexts);
+
+    internal static GeneratorDriverRunResult Run(
+        IIncrementalGenerator generator,
+        string source,
+        string assemblyName,
+        CSharpParseOptions parseOptions,
+        params AdditionalText[] additionalTexts)
     {
         var driver = CSharpGeneratorDriver.Create(
             [generator.AsSourceGenerator()],
             additionalTexts,
-            ParseOptions);
+            parseOptions);
 
-        return driver.RunGenerators(Build(source, assemblyName)).GetRunResult();
+        return driver.RunGenerators(Build(source, assemblyName, parseOptions)).GetRunResult();
     }
 
     internal static (GeneratorDriverRunResult Run, Compilation Output) RunAndCompile(
@@ -47,14 +58,22 @@ internal static class GeneratorProbe
         string source,
         string assemblyName,
         params AdditionalText[] additionalTexts)
+        => RunAndCompile(generators, source, assemblyName, ParseOptions, additionalTexts);
+
+    internal static (GeneratorDriverRunResult Run, Compilation Output) RunAndCompile(
+        IEnumerable<IIncrementalGenerator> generators,
+        string source,
+        string assemblyName,
+        CSharpParseOptions parseOptions,
+        params AdditionalText[] additionalTexts)
     {
         var driver = CSharpGeneratorDriver.Create(
             generators.Select(static generator => generator.AsSourceGenerator()).ToArray(),
             additionalTexts,
-            ParseOptions);
+            parseOptions);
 
         var updated = driver.RunGeneratorsAndUpdateCompilation(
-            Build(source, assemblyName),
+            Build(source, assemblyName, parseOptions),
             out var output,
             out _);
 

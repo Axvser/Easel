@@ -277,7 +277,7 @@ public class VisualMenuItemContainer : TemplatedControl
         var header = VisualText.Measure(item.Header, font, 0f, wrap: false, RenderDpi);
         if (IsTopLevel)
         {
-            // Math.Ceiling 没有 int 重载；net461 上 int→double 与 int→decimal 都会命中，必须显式转 double。
+            // Math.Ceiling 没有 int 重载；net45 上 int→double 与 int→decimal 都会命中，必须显式转 double。
             return new Size(
                 (int)Math.Ceiling((double)header.Width + 24d),
                 Math.Max(
@@ -616,7 +616,7 @@ public class VisualContextMenu : VisualPopup
             height += VisualMenuItemContainer.RowHeight;
         }
 
-        // width/availableSize 的 int/float 混合在 net461 的 Math.Min/Max 上也要显式统一成 double。
+        // width/availableSize 的 int/float 混合在 net45 的 Math.Min/Max 上也要显式统一成 double。
         return new Size(
             (int)Math.Ceiling(Math.Min((double)width, Math.Max(120d, (double)availableSize.Width))),
             (int)Math.Ceiling(height));

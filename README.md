@@ -264,7 +264,10 @@ dotnet add package WinForms.Easel
 
 | Package | Targets |
 | --- | --- |
-| `WinForms.Easel` | `netframework4.6.1` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
+| `WinForms.Easel` | `net45` · `net5.0-windows` · `netcoreapp3.0` · `net8.0-windows` |
+
+Generated code follows the project's language version: C# 8+ projects get nullable-aware output, and a
+default C# 7.3 .NET Framework project gets plain C# 7.3 output, so no `LangVersion` setting is required.
 
 The runtime and the gallery do not reference VeloxDev. The gallery carries its own minimal
 `ObservableObject` / `RelayCommand` in `Examples/XamlGallery/Demo/Mvvm`; it also opts into WPF for the real

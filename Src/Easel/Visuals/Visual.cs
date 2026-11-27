@@ -768,7 +768,7 @@ public abstract class Visual : WinformsObject
         {
             _width = width;
             _height = height;
-            _transform = transform.IsIdentity ? Array.Empty<float>() : transform.Elements;
+            _transform = transform.IsIdentity ? XamlArray.Empty<float>() : transform.Elements;
             _hasClip = clip is not null;
             _clip = clip ?? RectangleF.Empty;
         }

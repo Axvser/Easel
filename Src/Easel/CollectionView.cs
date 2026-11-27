@@ -493,8 +493,8 @@ public sealed class CollectionView : IEnumerable<object?>, INotifyCollectionChan
         {
             var members = buckets[index];
             groups.Add(depth + 1 < _groupDescriptions.Count
-                ? new CollectionViewGroup(keys[index], Array.Empty<object?>(), BuildGroups(members, depth + 1))
-                : new CollectionViewGroup(keys[index], members, Array.Empty<CollectionViewGroup>()));
+                ? new CollectionViewGroup(keys[index], XamlArray.Empty<object?>(), BuildGroups(members, depth + 1))
+                : new CollectionViewGroup(keys[index], members, XamlArray.Empty<CollectionViewGroup>()));
         }
 
         return groups;

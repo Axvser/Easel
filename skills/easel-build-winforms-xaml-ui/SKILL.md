@@ -38,9 +38,10 @@ dotnet new e-controltemplate -n ControlTemplates --namespace MyApp
 dotnet new e-datatemplate -n ItemTemplates --namespace MyApp
 ```
 
-`WinForms.Easel` targets `netframework4.6.1`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
-`WinForms.Easel.Generator` targets `netstandard2.0` (Roslyn 4.8). A host uses `net8.0-windows` or later for
-`dotnet run` development; the library is compiled for all four Easel targets.
+`WinForms.Easel` targets `net45`, `net5.0-windows`, `netcoreapp3.0` and `net8.0-windows`;
+`WinForms.Easel.Generator` targets `netstandard2.0` (Roslyn 4.8). Generated code follows the project's
+language version — a default C# 7.3 .NET Framework project needs no `LangVersion` setting. A host uses
+`net8.0-windows` or later for `dotnet run` development; the library is compiled for all four Easel targets.
 
 Reference the generator as an analyzer and mark every `.xaml` as an `AdditionalFile`:
 
@@ -185,28 +186,29 @@ before the first window. `Window` and `VisualForm` already set `AutoScaleMode.No
 thread context is not enough. Details in [references/runtime.md](references/runtime.md#dpi).
 
 ⚙ **One HWND for the visual tree.** A WinForms control never joins the visual paint pass; it is always an HWND
-island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElement<Button>`), or assign
-`NativeControlHost.Child` in code-behind. A `TextBox` with `UseNativeEditor=true` adds one private island for
-IME/accessibility; the default field is fully visual.
+island. Write `<native:Button>` in XAML (the generator wraps it in `NativeElement<Button>`), or call
+`element.AddNative(control)` or assign `NativeControlHost.Child` in code-behind. A `TextBox` with
+`UseNativeEditor=true` adds one private island for IME/accessibility; the default field is fully visual.
 
 ⚙ **Native layout is the same layout.** `Margin`, `Width`/`Height`, `Min`/`Max`, alignment, `Grid.Row`,
 `DockPanel.Dock`, `Canvas.Left`, `Panel.ZIndex` and `Visibility` on a `native:` element are routed to the
 wrapper and participate in the normal measure/arrange pass. Every other attribute goes to the native control
-(`Text`, `BackColor`, `Padding`, events). A native CLR property binds through a generated proxy property; `Mode=TwoWay` reports back through `INotifyPropertyChanged` or `XxxChanged`, and a control with neither calls `NativePropertyBinding.NotifyChanged` (no polling); native `Enter`/`Leave` raise the wrapper's logical focus events, so `LostFocus` triggers behave like a visual target.
+(`Text`, `BackColor`, `Padding`, events); a visual-only property the native control lacks is reported. A native CLR property binds through a generated proxy property; `Mode=TwoWay` reports back through `INotifyPropertyChanged` or `XxxChanged`, and a control with neither calls `NativePropertyBinding.NotifyChanged` (no polling); native `Enter`/`Leave` raise the wrapper's logical focus events, so `LostFocus` triggers behave like a visual target.
 
 ⚙ **A native container hosts visual content.** Put a visual panel inside it (`<native:GroupBox>
 <StackPanel>…</StackPanel></native:GroupBox>`); the runtime paints that content through a nested `VisualHost`
 over the native display rectangle. Several native children are also accepted and wrapped in an implicit vertical
 `StackPanel` in document order; nest an explicit panel for another layout.
 
-⚙ **Opacity/transform need snapshot mode.** A live HWND rejects `WS_EX_LAYERED` and affine transforms. Set
-`IsSnapshot="True"` to paint the control as a bitmap in the visual pass: `Opacity`, `Transform` and `Clip` then
-apply. In a Form, an almost invisible (`Opacity=1/255`) input proxy keeps real mouse/keyboard/IME alive; scale
-re-lays the control out at the scaled size and rotation keeps the transformed polygon interactive (whole-control
-hits exact, item positions approximate). Call `RefreshSnapshot()` after changing it. `CornerRadius` rounds the
-live window's region, and popups cut rectangular holes in that region.
+⚙ **Opacity/transform need snapshot mode.** A live HWND rejects `WS_EX_LAYERED` and affine transforms, so
+`Opacity`, `Transform`, `Effect`, an opacity mask or a 3D transform on the island or an ancestor switches it to a
+bitmap snapshot automatically; `IsSnapshot="True"` forces that path, where a visual `Clip` also applies. In a
+Form, an almost invisible (`Opacity=1/255`) input proxy keeps real mouse/keyboard/IME alive; scale re-lays the
+control out at the scaled size and rotation keeps the transformed polygon interactive (whole-control hits exact,
+item positions approximate). Call `RefreshSnapshot()` after changing the control from code that raises no native
+notification. `CornerRadius` rounds the live window's region, and popups cut rectangular holes in that region.
 
-⚙ **A XAML root derives from `VisualElement` or is a standalone `ResourceDictionary`.** The root tag and the
+⚙ **A XAML root is a visual view, a `Window` or a standalone `ResourceDictionary`.** The root tag and the
 `x:Class` base must agree (owner derives from the root type). `x:Class` types must be `partial`.
 
 ⚙ **Static references bind lazily; dynamic references stay live.** A generated `{StaticResource}` on a visual
@@ -242,7 +244,8 @@ replace the style or change a local DP value.
 
 ⚙ **A native island paints above the visual tree.** A live HWND cannot be transformed, alpha-blended or clipped to
 a shape; popups cover it only through the window-region holes. Keep live native islands rectangular and axis-aligned;
-use `IsSnapshot` when composition is required. A nested content surface is still bounded by the same island.
+`Opacity`, `Transform`, `Effect`, an opacity mask or a 3D transform switches the island to the snapshot path
+automatically, and `IsSnapshot="True"` forces it. A nested content surface is still bounded by the same island.
 
 ⚙ **A `UseNativeEditor` TextBox adds one island.** The visual path is the default: templates, DPs, caret,
 selection and undo stay visual. Set `TextBox.UseNativeEditor = true` only when IME composition or the native
@@ -267,6 +270,7 @@ with a clear `NotSupportedException` at the call site.
 | Start an app, host the surface, understand layout/input/DPI | [references/runtime.md](references/runtime.md) |
 | Write XAML, use resources/styles/templates/bindings/events, read compiler diagnostics | [references/xaml.md](references/xaml.md) |
 | Choose a control and its key properties | [references/controls.md](references/controls.md) |
+| See which property drives each built-in template's chrome | [references/default-style-audit.md](references/default-style-audit.md) |
 | Build a layout, scroll, focus chain, keyboard/pointer handling | [references/layout-input.md](references/layout-input.md) |
 | Use brushes, gradients, Visual trees, masks, effects, 3D, shapes | [references/visuals.md](references/visuals.md) |
 | Theme an app, author a custom ResourceDictionary, follow Windows | [references/themes.md](references/themes.md) |

@@ -675,13 +675,22 @@ public static class WindowChrome
                 return;
             }
 
+            // net45 没有泛型 Marshal 重载（4.5.1 起）；装箱版只在 WM_GETMINMAXINFO 这条路径上跑。
+#if NETFRAMEWORK
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+#else
             var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+#endif
             if (!GetMonitorInfo(monitor, ref info))
             {
                 return;
             }
 
+#if NETFRAMEWORK
+            var mmi = (MINMAXINFO)Marshal.PtrToStructure(lParam, typeof(MINMAXINFO));
+#else
             var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+#endif
             mmi.ptMaxPosition.X = info.rcWork.Left - info.rcMonitor.Left;
             mmi.ptMaxPosition.Y = info.rcWork.Top - info.rcMonitor.Top;
             mmi.ptMaxSize.X = info.rcWork.Right - info.rcWork.Left;

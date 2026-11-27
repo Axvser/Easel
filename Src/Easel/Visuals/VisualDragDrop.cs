@@ -144,10 +144,10 @@ public static class VisualDragDrop
     {
         if (data is null || !data.GetDataPresent(DataFormats.FileDrop))
         {
-            return Array.Empty<string>();
+            return XamlArray.Empty<string>();
         }
 
-        return data.GetData(DataFormats.FileDrop) as string[] ?? Array.Empty<string>();
+        return data.GetData(DataFormats.FileDrop) as string[] ?? XamlArray.Empty<string>();
     }
 
     /// <summary>Reads the dropped text; empty when the drag carries no text.</summary>
