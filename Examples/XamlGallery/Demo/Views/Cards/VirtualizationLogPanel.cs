@@ -9,7 +9,7 @@ namespace Demo.Views;
 /// <summary>A custom <see cref="VirtualizingPanel"/> that windows a million-row log.</summary>
 /// <remarks>
 /// <para>
-/// The card uses this subclass instead of <see cref="VirtualList"/> to exercise the generic base contract: the
+/// The card uses this subclass instead of <see cref="VirtualizingListBox"/> to exercise the generic base contract: the
 /// template decides how a row looks, while <see cref="RealizeItem"/>, <see cref="RecycleItem"/> and
 /// <see cref="BindRecycledItem"/> own creation, release and rebinding. The counters below are the evidence the page
 /// shows — after the first window is built, scrolling only rebinds pooled rows.

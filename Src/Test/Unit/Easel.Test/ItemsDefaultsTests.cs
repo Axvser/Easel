@@ -93,12 +93,12 @@ public sealed class ItemsDefaultsTests
     }
 
     [TestMethod]
-    public void VirtualList_DefaultShellPreservesVirtualizationAndContainerSelection()
+    public void VirtualizingListBox_DefaultShellPreservesVirtualizationAndContainerSelection()
     {
         var rows = Enumerable.Range(0, 100).Select(static index => (object)$"Row {index}").ToList();
         using var surface = new VisualHost { Size = new Size(220, 120), DpiScaleOverride = 1f };
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var list = new VC.VirtualList { ItemsSource = rows, ItemHeight = 20 };
+        using var list = new VC.VirtualizingListBox { ItemsSource = rows, ItemHeight = 20 };
         viewer.Content = list;
         surface.Root = viewer;
         Layout(surface, 220, 120);

@@ -4,7 +4,7 @@ using VC = Easel.Visuals.Controls;
 
 namespace Easel.Test;
 
-/// <summary>The visual <see cref="VC.VirtualList"/> only rebuilds the realized rows when the visible range changes.</summary>
+/// <summary>The visual <see cref="VC.VirtualizingListBox"/> only rebuilds the realized rows when the visible range changes.</summary>
 [STATestClass]
 public sealed class VirtualizationTests
 {
@@ -13,7 +13,7 @@ public sealed class VirtualizationTests
     {
         var rows = Enumerable.Range(0, 400).Select(static index => (object)$"Row {index + 1}").ToList();
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var list = new VC.VirtualList { ItemHeight = 28, ItemsSource = rows };
+        using var list = new VC.VirtualizingListBox { ItemHeight = 28, ItemsSource = rows };
         viewer.Content = list;
 
         Layout(viewer, 200, 100);
@@ -36,11 +36,11 @@ public sealed class VirtualizationTests
     }
 
     [TestMethod]
-    public void TheVirtualListReportsTheFullExtentToTheScrollViewer()
+    public void TheVirtualizingListBoxReportsTheFullExtentToTheScrollViewer()
     {
         var rows = Enumerable.Range(0, 100).Select(static index => (object)index).ToList();
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var list = new VC.VirtualList { ItemHeight = 20, ItemsSource = rows };
+        using var list = new VC.VirtualizingListBox { ItemHeight = 20, ItemsSource = rows };
         viewer.Content = list;
 
         Layout(viewer, 200, 100);

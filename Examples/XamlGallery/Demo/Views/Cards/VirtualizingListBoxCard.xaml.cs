@@ -1,11 +1,11 @@
 namespace Demo.Views;
 
 /// <summary>A fixed-row virtual list inside a scroll viewer.</summary>
-public sealed partial class VirtualListCard : ThemedStackPanel
+public sealed partial class VirtualizingListBoxCard : ThemedStackPanel
 {
     /// <summary>Creates the card and points its binding at the shared rows.</summary>
     /// <param name="model">The shared sample data.</param>
-    public VirtualListCard(GalleryModel model)
+    public VirtualizingListBoxCard(GalleryModel model)
     {
         DataContext = model;
         InitializeComponent();

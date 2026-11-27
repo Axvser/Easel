@@ -109,10 +109,10 @@
     </Style.Template>
   </Style>
 
-  <!-- A VirtualList is hosted by an ancestor ScrollViewer, so its shell is only the realization host. -->
-  <Style TargetType="VirtualList">
+  <!-- A VirtualizingListBox is hosted by an ancestor ScrollViewer, so its shell is only the realization host. -->
+  <Style TargetType="VirtualizingListBox">
     <Style.Template>
-      <ControlTemplate TargetType="VirtualList">
+      <ControlTemplate TargetType="VirtualizingListBox">
         <ItemsPresenter x:Name="PART_ItemsPresenter" />
       </ControlTemplate>
     </Style.Template>

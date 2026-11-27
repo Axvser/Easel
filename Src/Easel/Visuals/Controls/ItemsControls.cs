@@ -680,7 +680,7 @@ public class ItemsControl : TemplatedControl
     private void OnSourceCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildItems();
 }
 
-/// <summary>The container a <see cref="ListBox"/> or <see cref="VirtualList"/> puts around one realized item.</summary>
+/// <summary>The container a <see cref="ListBox"/> or <see cref="VirtualizingListBox"/> puts around one realized item.</summary>
 /// <remarks>
 /// <para>
 /// The container paints a row's hover and selection bands from <see cref="IsPointerOver"/> and
@@ -821,7 +821,7 @@ public class ListBoxItem : ContentControl
 /// </para>
 /// <para>
 /// A source larger than the viewport therefore costs the same per update as the visible rows, not the whole source.
-/// For a fixed-row source without a list shell use <see cref="VirtualList"/>.
+/// For a fixed-row source without a list shell use <see cref="VirtualizingListBox"/>.
 /// </para>
 /// </remarks>
 public class ListBox : ItemsControl
@@ -1877,9 +1877,4 @@ public class VirtualizingListBox : VirtualizingStackPanel
             _syncingSelection = false;
         }
     }
-}
-
-/// <summary>Compatibility name for <see cref="VirtualizingListBox"/>.</summary>
-public class VirtualList : VirtualizingListBox
-{
 }

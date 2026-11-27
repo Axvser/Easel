@@ -270,12 +270,12 @@ public sealed class VisualControlSetTests
     }
 
     [TestMethod]
-    public void VirtualList_RealizesOnlyVisibleRowsAndFollowsTheScrollOffset()
+    public void VirtualizingListBox_RealizesOnlyVisibleRowsAndFollowsTheScrollOffset()
     {
         var source = Enumerable.Range(0, 100).Select(index => $"Row {index}").ToList();
         using var surface = CreateSurface(220, 120);
         var view = new VC.ScrollViewer { Width = 200, Height = 100 };
-        var list = new VC.VirtualList { ItemsSource = source, ItemHeight = 20 };
+        var list = new VC.VirtualizingListBox { ItemsSource = source, ItemHeight = 20 };
         view.Content = list;
         surface.Root = view;
         Layout(surface, 220, 120);

@@ -38,12 +38,12 @@ internal static class DataCards
             "<ComboBox IsEditable=\"True\" Placeholder=\"Type or choose…\" />",
             _ => new ComboBoxCard()),
         Card(
-            "data.virtual-list",
+            "data.virtualizing-list-box",
             "Data",
-            "VirtualList",
+            "VirtualizingListBox",
             "Fixed-row virtualization driven by a ScrollViewer.",
-            "<ScrollViewer><VirtualList ItemsSource=\"{Binding VirtualRows}\" ItemHeight=\"26\" /></ScrollViewer>",
-            _ => new VirtualListCard(model)),
+            "<ScrollViewer><VirtualizingListBox ItemsSource=\"{Binding VirtualRows}\" ItemHeight=\"26\" /></ScrollViewer>",
+            _ => new VirtualizingListBoxCard(model)),
         Card(
             "data.tree-view",
             "Data",

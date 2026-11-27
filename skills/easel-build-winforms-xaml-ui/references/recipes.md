@@ -12,18 +12,20 @@ private static void Main()
     ApplicationConfiguration.Initialize();
     Theme.Mode = ThemeMode.Dark;
 
-    Application.Run(new VisualForm
+    var form = new VisualForm
     {
         Text = "My app",
         ClientSize = new Size(1280, 800),
         Root = new ShellView(),
-    });
+    };
+    var surface = form.Surface;
+    Application.Run(form);
 }
 ```
 
 `ShellView` is a XAML `UserControl` with a `DockPanel`: title bar (Top), status bar (Bottom), side panes and a
-fill. `VisualForm` owns the single `VisualHost`; for an existing `Form`, `form.Controls.Add(new ShellView())`
-creates the same host and `form.Controls.Remove(view)` tears it down.
+fill. `VisualForm` owns the single `VisualHost`; for an existing native `Form`, `var shell = new ShellView();
+nativeForm.Controls.Add(shell)` creates the same host and `nativeForm.Controls.Remove(shell)` tears it down.
 
 To keep the window itself in XAML, make a `Window` view and run it directly:
 
@@ -93,8 +95,8 @@ dictionary.
 ```
 
 Code-behind assigns the view model before `InitializeComponent` (or passes it through the constructor). The theme
-keys resolve from `VisualHost.Resources` when the view is parented; the gallery's `Themed*` bases merge a dictionary
-only to add view-local palette overrides and decoration brushes.
+keys resolve from `VisualHost.Resources` when the view is parented; the gallery's `Themed*` bases seed a view-local
+dictionary with a palette copy and its decoration gradients.
 
 ## 3. List + detail
 
@@ -124,7 +126,7 @@ only to add view-local palette overrides and decoration brushes.
 ```
 
 `ListBox` rows are realized from `ItemsSource`; `SelectedItem` is a DP and two-way bindable. For a very long
-fixed-height list use `VirtualList` inside a `ScrollViewer` with `ItemHeight` set.
+fixed-height list use `VirtualizingListBox` inside a `ScrollViewer` with `ItemHeight` set.
 
 ## 4. Menu, popup and context menu
 
@@ -196,7 +198,9 @@ public partial class Card : Border
 ```
 
 Better: make the control's markup a XAML `UserControl` and expose data through DPs/DataContext; use
-`[XamlProperty]` for styleable state.
+`[XamlProperty]` for styleable state. `[XamlProperty]` is a C# 13 partial property, so that project needs
+`LangVersion` 13 or later; `[XamlAttachedProperty]` partial methods compile at the project's default language
+version.
 
 ## 6. Custom theme and dynamic resources
 

@@ -77,7 +77,7 @@ Decorative template parts must set `IsHitTestVisible="False"`; that skips the pa
 | `ItemsControl` | `ItemsSource`, `ItemFactory`, `DisplayMemberPath`, `ItemTemplate`, `ItemTemplateSelector`, `ItemsPanel`, attached `IsItemsHost`, `ItemsRebuilt` | Base for list-like controls. `Items` are visual children unless a template/factory provides them. `RefreshItems()` rebuilds. |
 | `ListBox` | all `ItemsControl` members + `SelectedIndex`, `SelectedItem`, `SelectionChanged` | Selected row uses the theme selection brush. The surface is transparent by default; `Background`/`BorderBrush`/`BorderThickness`/`Padding` are honored when set. |
 | `VirtualizingPanel` | `ItemsSource`, `ItemExtent`, `Orientation`, `ItemTemplate`, `FirstRealizedIndex`, `RealizedCount`, `IScrollInfo` | Base for uniform-extent virtualized hosts: realizes the visible window and recycles items on scroll. Override `RealizeItem` / `RecycleItem` / `BindRecycledItem`; works with a pixel-scrolling `ScrollViewer` or its own `CanContentScroll` scrolling. The Gallery's `data.virtualizing-panel` is a custom subclass at 100k/1M rows; `VirtualizingPanelScenarioTests` covers bounded realization, recycled indices, source replacement and logical-offset clamping. |
-| `VirtualList` | `ItemsSource`, `ItemHeight`, `ItemExtent`, `DisplayMemberPath`, `ItemTemplate`, `SelectedIndex`, `SelectedItem`, `SelectionChanged` | A `VirtualizingPanel` with selection; only visible rows are realized and scrolled rows are recycled. `ItemHeight` is an alias of `ItemExtent`; the extent is fixed. |
+| `VirtualizingListBox` | `ItemsSource`, `ItemHeight`, `ItemExtent`, `DisplayMemberPath`, `ItemTemplate`, `SelectedIndex`, `SelectedItem`, `SelectionChanged` | A `VirtualizingPanel` with selection; only visible rows are realized and scrolled rows are recycled. `ItemHeight` is an alias of `ItemExtent`; the extent is fixed. |
 | `TreeView` | `Items` (`ObservableCollection<TreeViewItem>`), `SelectedItem`, `Indent`, `Font`, `SelectionChanged` | **No `ItemsSource`/hierarchical template**: build `TreeViewItem`s in code or XAML children. `Reveal(item)` expands ancestors and selects. `Background`/`BorderBrush`/`Padding` are honored; the default surface is transparent. |
 | `TreeViewItem` | `Header`, `IsExpanded`, `IsSelected`, `Items`, `ParentItem`, `Depth`, `Font`, `Foreground` | Rows are real visual items; the tree owns their realization. |
 | `ComboBox` | `Items`/`ItemsSource`, `SelectedIndex`, `SelectedItem`, `DisplayMemberPath`, `IsEditable`, `Text`, `IsDropDownOpen`, `MaxDropDownHeight`, `Placeholder`, `Foreground`, `SelectionChanged` | Drop-down opens in the surface overlay (not clipped by ancestors). `IsEditable` uses the text field; `Placeholder` is drawn by that field. `Foreground` and typography reach the projected drop-down rows; inline `ComboBoxItem`s keep their own. Hover paints a neutral `BorderHover` ring; open uses a 1.5px `Focus` ring, keyboard focus 2px, and the ring opacities fade in. |
@@ -141,11 +141,11 @@ have their own DPs (slider/progress track-fill-thumb, scrollbar track/thumb, exp
 selection line). State rows, focus rings, separators and the calendar day palette stay theme-driven. The property
 contract table is in [default-style-audit.md](default-style-audit.md).
 
-A content-only container (`ItemsControl`, `VirtualList`, `HeaderedContentControl`, `ContentControl`, `ScrollViewer`,
+A content-only container (`ItemsControl`, `VirtualizingListBox`, `HeaderedContentControl`, `ContentControl`, `ScrollViewer`,
 `CalendarItem`, `TabControl` content) and the carrying surface of a selectable container (`ListBox`, `TreeView`,
 `Calendar`, `VisualMenu`) are transparent by default. `ListBox`/`TreeView`/`Calendar`/`CalendarItem`/
 `HeaderedContentControl`/`DropZone`/`VisualContextMenu`/`VisualMenu` honor a host-set
-`Background`/`BorderBrush`/`Padding`; `ItemsControl` and `VirtualList` are layout-only and stay transparent.
+`Background`/`BorderBrush`/`Padding`; `ItemsControl` and `VirtualizingListBox` are layout-only and stay transparent.
 State rows, headers, text and focus rings keep their colours. A bare `ItemsControl` has no inner `ScrollViewer`,
 so it never clips content at its own bounds; wrap it to scroll. Input chrome (`Button`, `TextBox`,
 `ComboBox`/`DatePicker`, scrollbars) keeps its default look but yields to the same control properties; the input

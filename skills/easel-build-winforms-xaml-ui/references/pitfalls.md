@@ -144,7 +144,7 @@ place, call the owning element's `InvalidateVisual()` yourself.
 chain grows. Set `DataContext` before `InitializeComponent` for immediate resolution, or accept one retry frame.
 
 **A `TreeView` shows nothing for `ItemsSource`.** `TreeView` has no hierarchical `ItemsSource`; build
-`TreeViewItem` rows in code (or as XAML children). `ListBox`/`ItemsControl`/`VirtualList` do support
+`TreeViewItem` rows in code (or as XAML children). `ListBox`/`ItemsControl`/`VirtualizingListBox` do support
 `ItemsSource`.
 
 **A `ComboBox` drop-down is empty until `Items`/`ItemsSource` resolves.** `Items` is observable, so items added

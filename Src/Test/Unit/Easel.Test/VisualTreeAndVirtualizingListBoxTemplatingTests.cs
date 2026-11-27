@@ -7,11 +7,11 @@ using VC = Easel.Visuals.Controls;
 namespace Easel.Test;
 
 /// <summary>
-/// Cluster C of the full-parity templating pass: <see cref="VC.TreeView"/> and <see cref="VC.VirtualList"/> accept
+/// Cluster C of the full-parity templating pass: <see cref="VC.TreeView"/> and <see cref="VC.VirtualizingListBox"/> accept
 /// WPF-shaped control templates while their no-template paths stay unchanged.
 /// </summary>
 [STATestClass]
-public sealed class VisualTreeAndVirtualListTemplatingTests
+public sealed class VisualTreeAndVirtualizingListBoxTemplatingTests
 {
     [TestMethod]
     public void TreeViewTemplate_HostsNestedRowsAndExposesSelectionAndExpansion()
@@ -155,12 +155,12 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
     }
 
     [TestMethod]
-    public void VirtualListTemplate_HostsVirtualizedRowsScrollingSelectionAndCleanup()
+    public void VirtualizingListBoxTemplate_HostsVirtualizedRowsScrollingSelectionAndCleanup()
     {
         var rows = Enumerable.Range(0, 100).Select(static index => (object)$"Row {index}").ToList();
         using var surface = new VisualHost { Size = new Size(220, 120), DpiScaleOverride = 1f };
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var list = new VC.VirtualList { ItemsSource = rows, ItemHeight = 20 };
+        using var list = new VC.VirtualizingListBox { ItemsSource = rows, ItemHeight = 20 };
         viewer.Content = list;
 
         VC.StackPanel? host = null;
@@ -172,7 +172,7 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
             return host;
         })
         {
-            TargetType = typeof(VC.VirtualList),
+            TargetType = typeof(VC.VirtualizingListBox),
         };
 
         list.Template = template;
@@ -212,17 +212,17 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
     }
 
     [TestMethod]
-    public void VirtualListTemplate_AcceptsAnItemsPanelHost()
+    public void VirtualizingListBoxTemplate_AcceptsAnItemsPanelHost()
     {
         var rows = Enumerable.Range(0, 50).Select(static index => (object)index).ToList();
         using var surface = new VisualHost { Size = new Size(220, 120), DpiScaleOverride = 1f };
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var list = new VC.VirtualList { ItemsSource = rows, ItemHeight = 20 };
+        using var list = new VC.VirtualizingListBox { ItemsSource = rows, ItemHeight = 20 };
         var panel = new VC.StackPanel();
         list.ItemsPanel = new VC.ItemsPanelTemplate(() => panel);
         list.Template = new VisualControlTemplate(_ => new VC.Border())
         {
-            TargetType = typeof(VC.VirtualList),
+            TargetType = typeof(VC.VirtualizingListBox),
         };
         viewer.Content = list;
         surface.Root = viewer;
@@ -234,12 +234,12 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
     }
 
     [TestMethod]
-    public void VirtualListTemplate_WithoutAnItemsHostThrows()
+    public void VirtualizingListBoxTemplate_WithoutAnItemsHostThrows()
     {
-        using var list = new VC.VirtualList { ItemsSource = new[] { "a" } };
+        using var list = new VC.VirtualizingListBox { ItemsSource = new[] { "a" } };
         var template = new VisualControlTemplate(_ => new VC.Border())
         {
-            TargetType = typeof(VC.VirtualList),
+            TargetType = typeof(VC.VirtualizingListBox),
         };
 
         var thrown = Assert.ThrowsExactly<InvalidOperationException>(() => list.Template = template);
@@ -248,7 +248,7 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
     }
 
     [TestMethod]
-    public void TreeAndVirtualList_WithoutTemplatesKeepTheirDirectChildLayout()
+    public void TreeAndVirtualizingListBox_WithoutTemplatesKeepTheirDirectChildLayout()
     {
         using var tree = new VC.TreeView();
         var group = new VC.TreeViewItem { Header = "Group", IsExpanded = true };
@@ -260,7 +260,7 @@ public sealed class VisualTreeAndVirtualListTemplatingTests
         Assert.AreSame(tree, child.ParentElement, "an expanded child stays a flat direct child");
 
         var rows = Enumerable.Range(0, 30).Select(static index => (object)index).ToList();
-        using var list = new VC.VirtualList
+        using var list = new VC.VirtualizingListBox
         {
             ItemsSource = rows,
             ItemHeight = 20,

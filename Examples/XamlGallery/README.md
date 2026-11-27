@@ -129,7 +129,7 @@ shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view m
 | Group | Shows |
 | --- | --- |
 | Input | `Button`/`RepeatButton` (XAML `Click` handlers), toggles, `Slider`, `ProgressBar`, `NativeControlHost`. |
-| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualList` at 5,000 rows with a realized-range readout; a custom `VirtualizingPanel` subclass windowing a 100,000/1,000,000-row event log with created/reused/recycled counters and jump controls; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
+| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualizingListBox` at 5,000 rows with a realized-range readout; a custom `VirtualizingPanel` subclass windowing a 100,000/1,000,000-row event log with created/reused/recycled counters and jump controls; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
 | Graphics | Shapes, `VisualPresenter` with a XAML-declared `ContainerVisual`, opacity and clip, gradient brushes, visual composition, 3D transforms. |
 | Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
 | Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
