@@ -41,7 +41,7 @@ internal static class DataCards
             "data.virtualizing-list-box",
             "Data",
             "VirtualizingListBox",
-            "Fixed-row virtualization driven by a ScrollViewer.",
+            "The concrete selectable list: only visible rows exist, leaving rows are recycled, and selection/hover map back to the source index.",
             "<ScrollViewer><VirtualizingListBox ItemsSource=\"{Binding VirtualRows}\" ItemHeight=\"26\" /></ScrollViewer>",
             _ => new VirtualizingListBoxCard(model)),
         Card(
@@ -68,10 +68,24 @@ internal static class DataCards
         Card(
             "data.virtualizing-panel",
             "Data",
-            "VirtualizingPanel · 100k log",
-            "A custom VirtualizingPanel subclass windows a 100,000-row log and switches to 1,000,000 rows; scrolling rebinds pooled rows instead of creating them.",
+            "VirtualizingStackPanel · 100k log",
+            "A custom VirtualizingStackPanel subclass windows a 100,000-row log and switches to 1,000,000 rows; scrolling rebinds pooled rows instead of creating them.",
             "<local:VirtualLogPanel ItemsSource=\"{Binding Rows}\" ItemExtent=\"28\" />",
             _ => new VirtualizationPanelCard()),
+        Card(
+            "data.virtualizing-stack",
+            "Data",
+            "VirtualizingStackPanel (base use)",
+            "The concrete stack used directly with an ItemTemplate — no subclass. The abstract VirtualizingPanel engine realizes the window and pools the rest.",
+            "<ScrollViewer><VirtualizingStackPanel ItemsSource=\"{Binding Rows}\" ItemExtent=\"28\">…",
+            _ => new VirtualizingStackCard()),
+        Card(
+            "data.virtualizing-wrap",
+            "Data",
+            "VirtualizingWrapPanel",
+            "A two-dimensional wrap layout on the same engine: fixed slots, row-band windowing, recycling and columns derived from the available width.",
+            "<VirtualizingWrapPanel ItemsSource=\"{Binding Tiles}\" ItemWidth=\"96\" ItemHeight=\"66\" />",
+            _ => new VirtualizingWrapCard()),
     ];
 
     private static GalleryCard Card(

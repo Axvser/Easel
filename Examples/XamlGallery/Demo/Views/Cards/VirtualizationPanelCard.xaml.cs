@@ -3,7 +3,7 @@ using Easel.Visuals.Controls;
 
 namespace Demo.Views;
 
-/// <summary>The gallery card for the generic <see cref="VirtualizingPanel"/> base, driven by a million-row log.</summary>
+/// <summary>The gallery card for the <see cref="VirtualizingStackPanel"/> base, driven by a million-row log.</summary>
 public sealed partial class VirtualizationPanelCard : ThemedStackPanel
 {
     private readonly VirtualizationLogViewModel _model = new();

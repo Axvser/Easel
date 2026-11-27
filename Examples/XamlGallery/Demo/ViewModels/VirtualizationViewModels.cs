@@ -5,7 +5,7 @@ using XamlBrush = Easel.Brush;
 
 namespace Demo.ViewModels;
 
-/// <summary>One row of the windowed log shown by the <c>VirtualizingPanel</c> card.</summary>
+/// <summary>One row of the windowed log shown by the <c>VirtualizingStackPanel</c> card.</summary>
 /// <remarks>
 /// The row keeps only its index; every displayed field is computed on read so a million-row source costs one small
 /// object per row instead of five strings. That is what makes the 1,000,000-row preset practical to build in a
@@ -96,7 +96,7 @@ public sealed class VirtualLogRow : ObservableObject
     public XamlBrush RowBrush => IsSelected ? SelectedBrush : RowBrushDefault;
 }
 
-/// <summary>The source behind the <c>VirtualizingPanel</c> card.</summary>
+/// <summary>The source behind the <c>VirtualizingStackPanel</c> card.</summary>
 /// <remarks>Replacing <see cref="Rows"/> swaps the whole source; the panel rebuilds its window from the new count.</remarks>
 public sealed class VirtualizationLogViewModel : ObservableObject
 {

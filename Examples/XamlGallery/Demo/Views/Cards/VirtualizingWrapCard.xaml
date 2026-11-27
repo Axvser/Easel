@@ -1,0 +1,61 @@
+<local:ThemedDockPanel
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo.Views"
+    x:Class="Demo.Views.VirtualizingWrapCard"
+    Background="{StaticResource Surface}"
+    Width="540"
+    LastChildFill="True">
+
+  <Border DockPanel.Dock="Top"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="0,0,0,1"
+          Padding="18,12">
+    <StackPanel Spacing="3">
+      <TextBlock Text="VirtualizingWrapPanel" Foreground="{StaticResource Text}" FontSize="18" FontWeight="SemiBold" />
+      <TextBlock Text="A two-dimensional wrap layout on the same engine: fixed slots, row-band windowing and recycling. Columns follow the available width."
+                 Foreground="{StaticResource Muted}"
+                 FontSize="9"
+                 Wrap="True" />
+    </StackPanel>
+  </Border>
+
+  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="16,10,16,0">
+    <Button Text="Top" Height="28" Click="OnTop" />
+    <Button Text="Middle" Height="28" Click="OnMiddle" />
+    <Button Text="Bottom" Height="28" Click="OnBottom" />
+    <Border Background="{StaticResource Raised}" CornerRadius="7" Padding="9,4" Margin="8,0,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <TextBlock x:Name="firstText" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+        <TextBlock x:Name="realizedText" Foreground="{StaticResource Signal}" FontSize="8" VerticalAlignment="Center" />
+        <TextBlock x:Name="columnsText" Foreground="{StaticResource Muted}" FontSize="8" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+  <ScrollViewer x:Name="viewer" Margin="16,10,16,16" Height="340" HorizontalScrollBarVisibility="Disabled">
+    <VirtualizingWrapPanel x:Name="panel"
+                           ItemsSource="{Binding Tiles}"
+                           ItemWidth="96"
+                           ItemHeight="66"
+                           HorizontalSpacing="8"
+                           VerticalSpacing="8">
+      <VirtualizingWrapPanel.ItemTemplate>
+        <DataTemplate>
+          <Border Background="{StaticResource Raised}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="6" Padding="8,6">
+            <StackPanel Spacing="3">
+              <Grid>
+                <TextBlock Text="{Binding Tag}" Foreground="{StaticResource Text}" FontSize="9" FontWeight="SemiBold" />
+                <Ellipse Width="6" Height="6" Fill="{Binding StateBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+              </Grid>
+              <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" FontSize="7" />
+              <TextBlock Text="{Binding Value}" Foreground="{StaticResource Muted}" FontSize="10" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </VirtualizingWrapPanel.ItemTemplate>
+    </VirtualizingWrapPanel>
+  </ScrollViewer>
+
+</local:ThemedDockPanel>

@@ -129,7 +129,7 @@ shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view m
 | Group | Shows |
 | --- | --- |
 | Input | `Button`/`RepeatButton` (XAML `Click` handlers), toggles, `Slider`, `ProgressBar`, `NativeControlHost`. |
-| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualizingListBox` at 5,000 rows with a realized-range readout; a custom `VirtualizingPanel` subclass windowing a 100,000/1,000,000-row event log with created/reused/recycled counters and jump controls; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
+| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualizingListBox` at 5,000 rows with a realized-range readout; a direct `VirtualizingStackPanel` at 100,000 rows; a custom `VirtualizingStackPanel` subclass with created/reused/recycled counters and jump controls; a `VirtualizingWrapPanel` at 5,000 tiles; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
 | Graphics | Shapes, `VisualPresenter` with a XAML-declared `ContainerVisual`, opacity and clip, gradient brushes, visual composition, 3D transforms. |
 | Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
 | Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
@@ -171,10 +171,13 @@ not a Gallery demonstration; it stays in the runtime and the skill notes.
 - **Native group** — five legacy workspaces replace the snapshot demos: native controls enter the visual layout
   unchanged, and visual content lives inside a native `GroupBox`; property binding and `NativeControlHost`
   remain as the two code paths.
-- **VirtualizingPanel scenario** — a custom `VirtualizingPanel` subclass windows a 100,000/1,000,000-row
-  event log with first/realized/created/reused/recycled readouts and top/middle/bottom/random jumps. The new
-  tests cover bounded realization, pool reuse, source replacement, logical scrolling, pointer selection and a
-  1M-row stopwatch budget; two base-class defects (stale recycle index, unclamped logical offset) are fixed.
+- **Virtualizing engine and layouts** — `VirtualizingPanel` is now an abstract engine fed by a
+  `VirtualizationLayoutContext`; `VirtualizingStackPanel` (with `Spacing`), `VirtualizingListBox`,
+  `VirtualizingWrapPanel` and `VirtualizingUniformGrid` are concrete layouts on it. The Data group shows a
+  direct 100k stack, a selectable list, a custom stack with live counters and a 5k wrap grid. The engine tests
+  cover non-contiguous/2D probe layouts, differential fuzzing, pool reuse, source/template replacement,
+  `VirtualizingListBox` interaction and a 1M-row stopwatch budget; the `VirtualizationSpatialIndex` grid hash is
+  tested against a brute-force cell scan.
 - **DataGrid and native drag** — a row-virtualized two-dimensional table with sortable headers, badge/check/
   progress cells, row numbers, in-place column resize and themed selection. Rows drag out through the Windows
   OLE loop and two grids exchange the same row objects through `Easel.DataGrid.Rows`; `DropZone` accepts files,

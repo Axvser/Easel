@@ -6,7 +6,7 @@ using Easel.Visuals.Controls;
 
 namespace Demo.Views;
 
-/// <summary>A custom <see cref="VirtualizingPanel"/> that windows a million-row log.</summary>
+/// <summary>A custom <see cref="VirtualizingStackPanel"/> that windows a million-row log.</summary>
 /// <remarks>
 /// <para>
 /// The card uses this subclass instead of <see cref="VirtualizingListBox"/> to exercise the generic base contract: the
