@@ -129,7 +129,7 @@ shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view m
 | Group | Shows |
 | --- | --- |
 | Input | `Button`/`RepeatButton` (XAML `Click` handlers), toggles, `Slider`, `ProgressBar`, `NativeControlHost`. |
-| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualList` at 5,000 rows with a realized-range readout; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
+| Data | `DataGrid` at 2,048 rows with sortable headers, badge/progress cells, row numbers and drag in/out; a two-grid drag board; `ListBox` with an item template; `ComboBox`; `VirtualList` at 5,000 rows with a realized-range readout; a custom `VirtualizingPanel` subclass windowing a 100,000/1,000,000-row event log with created/reused/recycled counters and jump controls; a three-level `TreeView`; a scaled `Calendar`; `DatePicker` — all bound through `DataContext = model`. |
 | Graphics | Shapes, `VisualPresenter` with a XAML-declared `ContainerVisual`, opacity and clip, gradient brushes, visual composition, 3D transforms. |
 | Animation | `TransitionAction` and `KeyFrameAnimation` in XAML triggers — property, keyframe, brush and `Transform3D` scenes, each shown next to the markup that produces it. |
 | Binding | One-way/two-way path bindings, inherited `DataContext`, a converter, a bound `Button.Command`, and a generated `[VeloxProperty]`/`[VeloxCommand]` view model. |
@@ -143,8 +143,19 @@ shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view m
 
 ### WinForms native
 
-The four interop cards: native elements in one layout pass, native property binding, snapshot composition and
-`NativeControlHost`.
+Five real hosted-workspace scenarios, not snapshot demos:
+
+| Card | Shows |
+| --- | --- |
+| Legacy workspace | A `DataGridView` over an editable `DataTable`, a `TreeView`, `NumericUpDown`, `DateTimePicker`, `ComboBox`, `ToolStrip` and `StatusStrip` — ordinary WinForms controls measured and arranged by the visual layout, with code-behind only for data and events. |
+| Easel inside a native container | A native `GroupBox` hosts an Easel `StackPanel` with `ProgressBar`s, text and a visual button; a native `ListBox` and the visual readout drive each other. |
+| Property editing | A native `PropertyGrid` edits a CLR settings object; `PropertyValueChanged` updates visual summaries and a visual reset writes the object back. |
+| Native binding | A native `TextBox.Text` two-way binds through the proxy dependency property and repaints the visual preview. |
+| NativeControlHost | A code-created `ListView` assigned to `NativeControlHost.Child`, with visual buttons adding/clearing rows and native selection writing back. |
+
+The native group shows both directions of the seam: legacy controls enter the Easel layout unchanged, and Easel
+visual content can live inside a native container. `IsSnapshot` is an escape hatch for opacity/transform/clip,
+not a Gallery demonstration; it stays in the runtime and the skill notes.
 
 ## New in this revision
 
@@ -156,6 +167,14 @@ The four interop cards: native elements in one layout pass, native property bind
 - **Tear-off panel** — a visual subtree moves from the gallery surface into a second `Window` and back,
   preserving its view model and bindings. The drag threshold hands the held pointer to the new surface with
   `VisualHost.CancelPointerGesture` / `AdoptPointerGesture`, so the window continues moving without a re-press.
+  The floating window creates its handle before `Show`, so the DWM dark frame is applied before the first paint.
+- **Native group** — five legacy workspaces replace the snapshot demos: native controls enter the visual layout
+  unchanged, and visual content lives inside a native `GroupBox`; property binding and `NativeControlHost`
+  remain as the two code paths.
+- **VirtualizingPanel scenario** — a custom `VirtualizingPanel` subclass windows a 100,000/1,000,000-row
+  event log with first/realized/created/reused/recycled readouts and top/middle/bottom/random jumps. The new
+  tests cover bounded realization, pool reuse, source replacement, logical scrolling, pointer selection and a
+  1M-row stopwatch budget; two base-class defects (stale recycle index, unclamped logical offset) are fixed.
 - **DataGrid and native drag** — a row-virtualized two-dimensional table with sortable headers, badge/check/
   progress cells, row numbers, in-place column resize and themed selection. Rows drag out through the Windows
   OLE loop and two grids exchange the same row objects through `Easel.DataGrid.Rows`; `DropZone` accepts files,
