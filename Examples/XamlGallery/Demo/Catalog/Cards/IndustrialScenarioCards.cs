@@ -34,6 +34,12 @@ internal static class IndustrialScenarioCards
                 "A CNC-style operator panel: axis DROs, spindle load, feed override and jog controls that write the position back to the view model.",
                 "<Button Text=\"+X\" Click=\"OnJogXPositive\" />",
                 _ => new MachinePanelView()),
+            Card(
+                "scenario.tear-off",
+                "Tear-off panel",
+                "A line-status panel that lives in the page or in its own Easel window. The same visual subtree moves between two hosts and docks back when dropped on its slot.",
+                "window.Content = panel; // the same subtree, a second host",
+                _ => new TearOffView()),
         ];
     }
 

@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
+using Demo.Views.Industrial;
 using Easel.Visuals;
 
 namespace Demo;
@@ -157,7 +158,7 @@ internal static class GalleryCapture
                             var themed = targets.Count == 1
                                 ? $"{SafeName(id)}-theme{step}-{themeIndex}"
                                 : $"{index:00}-{SafeName(id)}-theme{step}-{themeIndex}";
-                            Capture(form, Path.Combine(directory, themed + ".png"));
+                            Capture(form, form.Surface, Path.Combine(directory, themed + ".png"));
                             if (dump)
                             {
                                 WriteDump(form, Path.Combine(directory, themed + ".txt"));
@@ -168,11 +169,27 @@ internal static class GalleryCapture
                     }
 
                     var name = targets.Count == 1 ? SafeName(id) : $"{index:00}-{SafeName(id)}";
-                    Capture(form, Path.Combine(directory, name + ".png"));
+                    Capture(form, form.Surface, Path.Combine(directory, name + ".png"));
 
                     if (dump)
                     {
                         WriteDump(form, Path.Combine(directory, name + ".txt"));
+                    }
+
+                    if (HasFlag(args, "--detach") && session.PreviewContent is TearOffView tearOff)
+                    {
+                        var anchor = new Point(form.Left + (form.Width / 2), form.Top + 160);
+                        tearOff.DetachForCapture(anchor);
+                        Pump(form, 10);
+                        Capture(form, form.Surface, Path.Combine(directory, name + "-detached-page.png"));
+                        if (tearOff.DetachedWindow is { } detached)
+                        {
+                            Capture(detached, detached.Surface, Path.Combine(directory, name + "-detached.png"));
+                        }
+
+                        tearOff.DockForCapture();
+                        Pump(form, 4);
+                        Capture(form, form.Surface, Path.Combine(directory, name + "-docked-again.png"));
                     }
                 }
             }
@@ -308,7 +325,7 @@ internal static class GalleryCapture
     private static string SafeName(string id)
         => string.Join('-', id.Split(['.', '/', '\\', ' ', ':'], StringSplitOptions.RemoveEmptyEntries));
 
-    private static void Pump(MainForm form, int frames)
+    private static void Pump(Form form, int frames)
     {
         form.Activate();
         for (var frame = 0; frame < frames; frame++)
@@ -318,7 +335,7 @@ internal static class GalleryCapture
         }
     }
 
-    private static void Capture(MainForm form, string path)
+    private static void Capture(Form form, VisualHost surface, string path)
     {
         // PrintWindow 直接让窗口画进内存 DC，不依赖桌面坐标；DPI 缩放下不会截到窗口外。
         var bounds = form.Bounds;
@@ -338,8 +355,8 @@ internal static class GalleryCapture
 
             if (!captured)
             {
-                graphics.Clear(form.Surface.BackColor);
-                form.Surface.RenderTo(graphics, form.Surface.ClientSize);
+                graphics.Clear(surface.BackColor);
+                surface.RenderTo(graphics, surface.ClientSize);
             }
         }
 

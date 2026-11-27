@@ -30,6 +30,9 @@ internal sealed partial class GalleryVisualShell : ThemedDockPanel
     /// <summary>Every card in catalog order.</summary>
     public IReadOnlyList<GalleryCard> Cards => _catalog.Cards;
 
+    /// <summary>The visual currently hosted by the preview pane; the capture runner inspects it.</summary>
+    internal VisualElement? PreviewContent => PreviewHost.Content as VisualElement;
+
     /// <summary>Selects a card and updates the preview and inspector.</summary>
     /// <param name="id">The card id.</param>
     /// <returns><see langword="false"/> when the id is unknown.</returns>

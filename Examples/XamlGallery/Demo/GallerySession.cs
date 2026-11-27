@@ -42,6 +42,9 @@ internal sealed class GallerySession : IDisposable
     /// <summary>Every card in catalog order.</summary>
     public IReadOnlyList<GalleryCard> Cards => _shell?.Cards ?? [];
 
+    /// <summary>The visual currently shown by the preview pane.</summary>
+    internal VisualElement? PreviewContent => _shell?.PreviewContent;
+
     /// <summary>Called by the shell once it resolves this session as its inherited data context.</summary>
     public void AttachShell(GalleryVisualShell shell)
     {

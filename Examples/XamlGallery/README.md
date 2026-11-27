@@ -1,10 +1,11 @@
 # XamlGallery
 
 The living catalogue for the Easel WinForms XAML runtime (`Easel.Visuals`).
-The whole window is built from one `VisualHost` — a single HWND — and a tree of visual elements;
-no card creates a child window. Reactivity is visual: controls derive from `VisualElement`, not from a
-WinForms control. `NativeControlHost` is the one explicit native island; the focused visual `TextBox`
-uses a private one for IME and accessibility.
+The gallery is built from one `VisualHost` — a single HWND — and a tree of visual elements. The tear-off
+card is the one deliberate second host: it moves a line-status panel into its own Easel `Window` and back;
+every other card stays in the gallery surface. Reactivity is visual: controls derive from `VisualElement`,
+not from a WinForms control. `NativeControlHost` is the one explicit native island; the focused visual
+`TextBox` uses a private one for IME and accessibility.
 
 The gallery is **XAML-first**: every demo page and every card is a `.xaml` view with a small code-behind
 that only carries data and view behaviour. The shell itself is `Views/GalleryVisualShell.xaml`, bound to
@@ -61,6 +62,7 @@ catalog order, waits for layout, renders the window into a bitmap with `PrintWin
 each PNG. `--preview-only` hides the title, side panes and status strip for a content-only capture.
 `--light` / `--contrast` start the process in those palettes; `--system` starts in follow-system mode.
 `--group` accepts either a group (`Industrial`, `Data`) or a section (`Scenarios`, `Easel native`).
+`--detach` on `--entry scenario.tear-off` also captures the detached window and the re-docked page.
 
 ## Themes
 
@@ -99,6 +101,7 @@ HMI screen (input, data and graphics first; basics and generated visuals last).
 | Process flow | A tank-and-pipe mimic: vessel levels, pump states, moving flow dots, a recipe step list and reactor values. |
 | Alarm center | Severity counts, filter buttons, an item-templated alarm list where each row owns an `ACK` command, and an event log. |
 | Machine panel | A CNC operator panel: X/Y/Z/A DROs, spindle-load ring, feed override slider, jog commands and an E-stop latch. |
+| Tear-off panel | A line-status panel that moves the same visual subtree into its own Easel `Window` and docks back when dropped on the empty slot. Drag the header or use `DETACH`; the floating window is owned by the gallery and closes with the card. |
 
 Each industrial page binds to a view model and advances its values from a `System.Windows.Forms.Timer`; all
 shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view model and bound from XAML.
@@ -150,6 +153,9 @@ The four interop cards: native elements in one layout pass, native property bind
   above the preview and the status bar names all three levels.
 - **Industrial scenario pages** — production line, process flow, alarm center and machine panel, each driven by
   a timer-backed view model and drawn with bound `Path`/`Polyline`/`Polygon` geometry.
+- **Tear-off panel** — a visual subtree moves from the gallery surface into a second `Window` and back,
+  preserving its view model and bindings; the drop target is the empty slot, and the floating window is owned
+  by the gallery form.
 - **DataGrid and native drag** — a row-virtualized two-dimensional table with sortable headers, badge/check/
   progress cells, row numbers, in-place column resize and themed selection. Rows drag out through the Windows
   OLE loop and two grids exchange the same row objects through `Easel.DataGrid.Rows`; `DropZone` accepts files,
