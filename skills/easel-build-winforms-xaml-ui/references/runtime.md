@@ -121,6 +121,7 @@ merges that dictionary into `EaselApplication.Resources`, so brushes and styles 
 | `FocusElement(element)` | Move logical focus. `null` clears it. |
 | `ClosePopups()` | Close every popup in the overlay. |
 | `ProcessPointerDown/Move/Up/Wheel/HWheel` | Inject pointer input (physical client pixels; converted to logical). |
+| `CancelPointerGesture()` / `AdoptPointerGesture(Point, MouseButtons)` | Hand a held drag to another surface (see below). |
 | `ProcessKeyDown/Up`, `ProcessTextInput` | Inject keyboard/text input. |
 | `LayoutUpdated` | Raised after measure/arrange completes. |
 | `PaintCount` / `LastPaintTimestamp` / `LastPaintWasClockDriven` | Paint diagnostics for animation drivers. |
@@ -129,6 +130,20 @@ merges that dictionary into `EaselApplication.Resources`, so brushes and styles 
 
 A pointer press captures the hit element; moves are delivered to the capture even outside its bounds until
 release. `ProcessPointerDown` returns whether the element handled the event.
+
+### Cross-surface gesture handoff
+
+A gesture cannot keep the source surface's Win32 capture after the captured element moves into another
+window. Move the element, place it under the pointer, then hand the held button over:
+
+```csharp
+source.CancelPointerGesture();              // clears capture; no PointerReleased
+destination.AdoptPointerGesture(screenPoint, MouseButtons.Left);
+```
+
+`AdoptPointerGesture` takes a screen point, hit-tests the destination, raises a fresh press there and starts
+capturing; subsequent moves and the release route to the destination surface. The caller owns window
+placement and the visual-tree move (`Window.Content`).
 
 ## VisualElement layout contract
 

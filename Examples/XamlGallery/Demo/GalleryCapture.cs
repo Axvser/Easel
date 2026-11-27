@@ -187,7 +187,9 @@ internal static class GalleryCapture
 
                         File.WriteAllText(
                             Path.Combine(directory, name + "-drag.txt"),
-                            dragged ? "drag-out ok" : "drag-out failed; used programmatic detach");
+                            dragged
+                                ? $"drag-out ok; handoff={(tearOff.DragHandoffMoved ? "moving" : "static")}"
+                                : "drag-out failed; used programmatic detach");
                         Pump(form, 10);
                         Capture(form, form.Surface, Path.Combine(directory, name + "-detached-page.png"));
                         if (tearOff.DetachedWindow is { } detached)

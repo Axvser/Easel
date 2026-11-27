@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Demo.ViewModels;
 using Easel.Visuals;
@@ -28,9 +27,9 @@ public sealed partial class TearOffView : ThemedDockPanel
     private bool _moved;
     private bool _disposed;
     private PointF _pressPosition;
-    private Point _pagePressScreen;
     private Point _windowPressScreen;
     private Point _windowPressLocation;
+    private bool _handoffMoved;
 
     /// <summary>Creates the page and starts the line simulator.</summary>
     public TearOffView()
@@ -48,8 +47,11 @@ public sealed partial class TearOffView : ThemedDockPanel
     /// <summary>The floating window while the panel is detached, or <see langword="null"/>.</summary>
     internal Window? DetachedWindow => _window;
 
+    /// <summary>Whether the drag capture moved the floating window after the handoff; used by the capture runner.</summary>
+    internal bool DragHandoffMoved => _handoffMoved;
+
     /// <summary>Tears the panel out to <paramref name="screenPoint"/>; used by the capture runner.</summary>
-    internal void DetachForCapture(Point screenPoint) => DetachAt(screenPoint);
+    internal void DetachForCapture(Point screenPoint) => DetachAt(screenPoint, default, adopt: false);
 
     /// <summary>Runs the real header drag gesture; used by the capture runner.</summary>
     internal bool DragOutForCapture()
@@ -70,6 +72,22 @@ public sealed partial class TearOffView : ThemedDockPanel
         surface.ProcessPointerDown(start, MouseButtons.Left);
         surface.ProcessPointerMove(end);
         surface.ProcessPointerUp(end, MouseButtons.Left);
+        _handoffMoved = false;
+        if (_isDetached && _window is { } window && window.Surface is { } adopted)
+        {
+            var before = window.Location;
+            var headerBounds = DragBar.AbsoluteBounds;
+            var headerScale = adopted.DpiScale;
+            var center = new PointF(
+                (headerBounds.X + (headerBounds.Width / 2f)) * headerScale,
+                (headerBounds.Y + (headerBounds.Height / 2f)) * headerScale);
+            adopted.ProcessPointerMove(new PointF(center.X + 24f, center.Y + 8f));
+            _handoffMoved = window.Location != before;
+            adopted.CancelPointerGesture();
+            _pressed = false;
+            _moved = false;
+        }
+
         return _isDetached;
     }
 
@@ -150,10 +168,6 @@ public sealed partial class TearOffView : ThemedDockPanel
             _windowPressScreen = ToScreen(e);
             _windowPressLocation = window.Location;
         }
-        else
-        {
-            _pagePressScreen = ToScreen(e);
-        }
     }
 
     private void OnDragBarMoved(object? sender, VisualPointerEventArgs e)
@@ -179,15 +193,8 @@ public sealed partial class TearOffView : ThemedDockPanel
             return;
         }
 
-        if (DragBar.Surface is { } surface)
-        {
-            var screen = ToScreen(e);
-            var scale = surface.DpiScale;
-            DetachablePanel.Transform = new Matrix(
-                1f, 0f, 0f, 1f,
-                (screen.X - _pagePressScreen.X) / scale,
-                (screen.Y - _pagePressScreen.Y) / scale);
-        }
+        // 越过阈值立即拆出：新窗口放在指针下，再把按住状态交给新宿主；用户不需要先松手。
+        DetachAt(ToScreen(e), DragBar.PointFromSurface(e.Position), adopt: true);
     }
 
     private void OnDragBarReleased(object? sender, VisualPointerEventArgs e)
@@ -201,29 +208,20 @@ public sealed partial class TearOffView : ThemedDockPanel
         var moved = _moved;
         _moved = false;
 
-        if (_isDetached)
+        if (!_isDetached)
         {
-            var screen = ToScreen(e);
-            if (moved && DockSlotScreenBounds().Contains(screen))
-            {
-                DockBack();
-            }
-            else
-            {
-                UpdateDockHint(null);
-            }
-
             return;
         }
 
-        if (moved)
+        var screen = ToScreen(e);
+        if (moved && DockSlotScreenBounds().Contains(screen))
         {
-            DetachablePanel.Transform = new Matrix();
-            DetachAt(ToScreen(e));
-            return;
+            DockBack();
         }
-
-        DetachablePanel.Transform = new Matrix();
+        else
+        {
+            UpdateDockHint(null);
+        }
     }
 
     private void OnDetachClicked(object? sender, EventArgs e)
@@ -234,18 +232,20 @@ public sealed partial class TearOffView : ThemedDockPanel
             return;
         }
 
-        DetachAt(Cursor.Position);
+        DetachAt(Cursor.Position, default, adopt: false);
     }
 
-    // 面板在页里时只记录拖动；松手超过阈值才创建窗口，指针捕获始终留在同一个宿主里。
-    private void DetachAt(Point screenPoint)
+    // 越过拖动阈值时立即拆出：先把窗口放到指针下，再取消旧宿主的捕获、让新宿主接住按住状态。
+    private void DetachAt(Point screenPoint, PointF headerLocal, bool adopt)
     {
         if (_isDetached || _disposed)
         {
             return;
         }
 
-        DetachablePanel.Transform = new Matrix();
+        var oldSurface = DragBar.Surface;
+        _pressed = false;
+        _moved = false;
         DockSlot.Child = null;
         DockPlaceholder.Visibility = XamlVisibility.Visible;
         DetachButton.Text = "DOCK";
@@ -271,6 +271,28 @@ public sealed partial class TearOffView : ThemedDockPanel
         window.Content = DetachablePanel;
         _window = window;
         window.Show();
+
+        if (adopt && DragBar.Surface is { } newSurface)
+        {
+            var bounds = DragBar.AbsoluteBounds;
+            if (bounds.Width > 0f && bounds.Height > 0f)
+            {
+                var scale = newSurface.DpiScale;
+                var current = newSurface.PointToScreen(new Point(
+                    (int)Math.Round(bounds.X * scale),
+                    (int)Math.Round(bounds.Y * scale)));
+                var desired = new Point(
+                    screenPoint.X - (int)Math.Round(headerLocal.X * scale),
+                    screenPoint.Y - (int)Math.Round(headerLocal.Y * scale));
+                window.Location = new Point(
+                    window.Location.X + (desired.X - current.X),
+                    window.Location.Y + (desired.Y - current.Y));
+            }
+
+            oldSurface?.CancelPointerGesture();
+            newSurface.AdoptPointerGesture(screenPoint, MouseButtons.Left);
+        }
+
         window.Activate();
     }
 
@@ -296,15 +318,26 @@ public sealed partial class TearOffView : ThemedDockPanel
         }
 
         DockSlot.Child = DetachablePanel;
-        DetachablePanel.Transform = new Matrix();
         DockPlaceholder.Visibility = XamlVisibility.Collapsed;
         DetachButton.Text = "DETACH";
         UpdateDockHint(null);
 
         if (window is not null)
         {
-            window.Close();
-            window.Dispose();
+            // 回坞发生在该窗口自己的 PointerReleased 里；先隐藏，消息泵下一轮再销毁宿主。
+            window.Hide();
+            try
+            {
+                window.BeginInvoke(new Action(() =>
+                {
+                    window.Close();
+                    window.Dispose();
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+                window.Dispose();
+            }
         }
     }
 

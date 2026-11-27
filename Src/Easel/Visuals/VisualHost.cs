@@ -1188,6 +1188,41 @@ public class VisualHost : System.Windows.Forms.Control
         return args.Handled;
     }
 
+    /// <summary>Continues a pointer gesture that started on another surface.</summary>
+    /// <param name="screenPoint">The pointer position in screen pixels.</param>
+    /// <param name="button">The button that is still held.</param>
+    /// <returns><see langword="true"/> when an element under the pointer accepted the gesture.</returns>
+    /// <remarks>
+    /// A gesture cannot keep the source surface's Win32 capture after its element moves into another window.
+    /// The caller cancels the source gesture, places the receiving element under the pointer, and calls this
+    /// method; the adopted press starts at the current pointer position and subsequent moves route here.
+    /// </remarks>
+    public bool AdoptPointerGesture(Point screenPoint, MouseButtons button = MouseButtons.Left)
+    {
+        if (!IsHandleCreated || IsDisposed)
+        {
+            return false;
+        }
+
+        var client = PointToClient(screenPoint);
+        ProcessPointerDown(new PointF(client.X, client.Y), button);
+        return _capture is not null;
+    }
+
+    /// <summary>Ends the current pointer gesture without raising <see cref="VisualElement.PointerReleased"/>.</summary>
+    /// <remarks>Use on the source surface before moving the captured element to another host.</remarks>
+    public void CancelPointerGesture()
+    {
+        _capture = null;
+        _buttons = MouseButtons.None;
+        if (IsHandleCreated && !IsDisposed)
+        {
+            Capture = false;
+        }
+
+        EndPointerGesture();
+    }
+
     // 手势期间把所有活体岛冻结成位图：绘制期间它们不移动 HWND，松手后按当前排列矩形恢复。
     private void FreezeNativeIslands()
     {

@@ -101,7 +101,7 @@ HMI screen (input, data and graphics first; basics and generated visuals last).
 | Process flow | A tank-and-pipe mimic: vessel levels, pump states, moving flow dots, a recipe step list and reactor values. |
 | Alarm center | Severity counts, filter buttons, an item-templated alarm list where each row owns an `ACK` command, and an event log. |
 | Machine panel | A CNC operator panel: X/Y/Z/A DROs, spindle-load ring, feed override slider, jog commands and an E-stop latch. |
-| Tear-off panel | A line-status panel that moves the same visual subtree into its own Easel `Window` and docks back when dropped on the empty slot. Drag the header or use `DETACH`; the floating window is owned by the gallery and closes with the card. |
+| Tear-off panel | A line-status panel that moves the same visual subtree into its own Easel `Window` and docks back when dropped on the empty slot. Crossing the drag threshold tears it out immediately and the new window keeps the held gesture; `DETACH` remains as a button path. The floating window is owned by the gallery and closes with the card. |
 
 Each industrial page binds to a view model and advances its values from a `System.Windows.Forms.Timer`; all
 shape geometry (`Path`, `Polyline`, `Polygon`, `Line`) is computed in the view model and bound from XAML.
@@ -154,8 +154,8 @@ The four interop cards: native elements in one layout pass, native property bind
 - **Industrial scenario pages** — production line, process flow, alarm center and machine panel, each driven by
   a timer-backed view model and drawn with bound `Path`/`Polyline`/`Polygon` geometry.
 - **Tear-off panel** — a visual subtree moves from the gallery surface into a second `Window` and back,
-  preserving its view model and bindings; the drop target is the empty slot, and the floating window is owned
-  by the gallery form.
+  preserving its view model and bindings. The drag threshold hands the held pointer to the new surface with
+  `VisualHost.CancelPointerGesture` / `AdoptPointerGesture`, so the window continues moving without a re-press.
 - **DataGrid and native drag** — a row-virtualized two-dimensional table with sortable headers, badge/check/
   progress cells, row numbers, in-place column resize and themed selection. Rows drag out through the Windows
   OLE loop and two grids exchange the same row objects through `Easel.DataGrid.Rows`; `DropZone` accepts files,
