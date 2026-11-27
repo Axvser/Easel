@@ -1568,24 +1568,24 @@ public class ListBox : ItemsControl
 /// keyboard works against that window.
 /// </para>
 /// </remarks>
-public class VirtualList : VirtualizingPanel
+public class VirtualizingListBox : VirtualizingStackPanel
 {
     /// <summary>The fixed height of one row, in pixels.</summary>
     public static readonly DependencyProperty ItemHeightProperty =
         DependencyProperty.Register(
-            nameof(ItemHeight), typeof(double), typeof(VirtualList),
+            nameof(ItemHeight), typeof(double), typeof(VirtualizingListBox),
             new PropertyMetadata(24d) { AffectsMeasure = true, AffectsRender = false });
 
     /// <summary>The zero-based index of the selected row, or -1 when nothing is selected.</summary>
     public static readonly DependencyProperty SelectedIndexProperty =
         DependencyProperty.Register(
-            nameof(SelectedIndex), typeof(int), typeof(VirtualList),
+            nameof(SelectedIndex), typeof(int), typeof(VirtualizingListBox),
             new PropertyMetadata(-1) { AffectsRender = true });
 
     /// <summary>The selected source item, or <see langword="null"/> when nothing is selected.</summary>
     public static readonly DependencyProperty SelectedItemProperty =
         DependencyProperty.Register(
-            nameof(SelectedItem), typeof(object), typeof(VirtualList),
+            nameof(SelectedItem), typeof(object), typeof(VirtualizingListBox),
             new PropertyMetadata(null) { AffectsRender = true });
 
     private bool _syncingSelection;
@@ -1593,7 +1593,7 @@ public class VirtualList : VirtualizingPanel
     private int _hoverIndex = -1;
 
     /// <summary>Creates an empty virtualizing list.</summary>
-    public VirtualList()
+    public VirtualizingListBox()
     {
         IsHitTestVisible = true;
         Focusable = true;
@@ -1877,4 +1877,9 @@ public class VirtualList : VirtualizingPanel
             _syncingSelection = false;
         }
     }
+}
+
+/// <summary>Compatibility name for <see cref="VirtualizingListBox"/>.</summary>
+public class VirtualList : VirtualizingListBox
+{
 }

@@ -4,68 +4,249 @@ using XamlThickness = Easel.Controls.Thickness;
 
 namespace Easel.Visuals.Controls;
 
-/// <summary>A panel that realizes only the items intersecting its viewport and recycles them as it scrolls.</summary>
+/// <summary>One item's layout inside a <see cref="VirtualizationLayoutContext"/>.</summary>
+/// <remarks><see cref="Bounds"/> is in document coordinates; <see cref="Order"/> is the host child order.</remarks>
+public readonly struct VirtualizationItemLayout
+{
+    /// <summary>Creates an item layout record.</summary>
+    /// <param name="index">The zero-based source index.</param>
+    /// <param name="bounds">The item rectangle in document coordinates.</param>
+    /// <param name="order">The host child order; defaults to <paramref name="index"/>.</param>
+    public VirtualizationItemLayout(int index, RectangleF bounds, int order = -1)
+    {
+        Index = index;
+        Bounds = bounds;
+        Order = order >= 0 ? order : index;
+    }
+
+    /// <summary>The zero-based source index.</summary>
+    public int Index { get; }
+
+    /// <summary>The item rectangle in document coordinates.</summary>
+    public RectangleF Bounds { get; }
+
+    /// <summary>The host child order, usually the source index.</summary>
+    public int Order { get; }
+}
+
+/// <summary>The per-arrange layout snapshot a <see cref="VirtualizingPanel"/> hands back to its engine.</summary>
+/// <remarks>
+/// The engine only consumes the realized window: it never asks whether the layout is a stack, wrap or grid.
+/// A subclass builds the visible/overscan records, the full extent and the current offsets; the base class
+/// performs the visible/keep/recycle/reuse/create diff.
+/// </remarks>
+public sealed class VirtualizationLayoutContext
+{
+    /// <summary>Creates a layout snapshot.</summary>
+    /// <param name="items">The realized window in host order; duplicates are not allowed.</param>
+    /// <param name="extent">The full document extent.</param>
+    /// <param name="viewport">The visible document rectangle.</param>
+    /// <param name="offsetX">The horizontal scroll offset.</param>
+    /// <param name="offsetY">The vertical scroll offset.</param>
+    /// <param name="itemCount">The source item count.</param>
+    public VirtualizationLayoutContext(
+        IReadOnlyList<VirtualizationItemLayout> items,
+        Size extent,
+        RectangleF viewport,
+        float offsetX,
+        float offsetY,
+        int itemCount)
+    {
+        Items = items ?? throw new ArgumentNullException(nameof(items));
+        Extent = extent;
+        Viewport = viewport;
+        OffsetX = offsetX;
+        OffsetY = offsetY;
+        ItemCount = itemCount;
+    }
+
+    /// <summary>The realized window in host order.</summary>
+    public IReadOnlyList<VirtualizationItemLayout> Items { get; }
+
+    /// <summary>The full document extent.</summary>
+    public Size Extent { get; }
+
+    /// <summary>The visible document rectangle.</summary>
+    public RectangleF Viewport { get; }
+
+    /// <summary>The horizontal scroll offset.</summary>
+    public float OffsetX { get; }
+
+    /// <summary>The vertical scroll offset.</summary>
+    public float OffsetY { get; }
+
+    /// <summary>The source item count.</summary>
+    public int ItemCount { get; }
+}
+
+/// <summary>The inputs a <see cref="VirtualizingPanel"/> gives its layout implementation.</summary>
+public readonly struct VirtualizationLayoutRequest
+{
+    /// <summary>Creates a layout request.</summary>
+    public VirtualizationLayoutRequest(
+        Size finalSize,
+        Size viewport,
+        float offsetX,
+        float offsetY,
+        bool usingOwnScroll,
+        Panel? host,
+        XamlThickness padding)
+    {
+        FinalSize = finalSize;
+        Viewport = viewport;
+        OffsetX = offsetX;
+        OffsetY = offsetY;
+        UsingOwnScroll = usingOwnScroll;
+        Host = host;
+        Padding = padding;
+    }
+
+    /// <summary>The arranged panel size.</summary>
+    public Size FinalSize { get; }
+
+    /// <summary>The scroll viewport size.</summary>
+    public Size Viewport { get; }
+
+    /// <summary>The effective horizontal offset.</summary>
+    public float OffsetX { get; }
+
+    /// <summary>The effective vertical offset.</summary>
+    public float OffsetY { get; }
+
+    /// <summary>Whether the panel positions items itself for <c>ScrollViewer.CanContentScroll</c>.</summary>
+    public bool UsingOwnScroll { get; }
+
+    /// <summary>The items host, or <see langword="null"/> when items sit directly on the panel.</summary>
+    public Panel? Host { get; }
+
+    /// <summary>The panel padding.</summary>
+    public XamlThickness Padding { get; }
+}
+
+/// <summary>A cell hash used by two-dimensional virtualizing layouts to answer viewport queries.</summary>
+/// <remarks>
+/// An item spanning several cells is registered in each of them. The query returns each index once. A fixed
+/// one-dimensional layout should compute its index range arithmetically instead, so a million-row list does not
+/// allocate a million hash entries.
+/// </remarks>
+public sealed class VirtualizationSpatialIndex
+{
+    private readonly Dictionary<(int Column, int Row), List<int>> _cells = [];
+    private readonly HashSet<int> _seen = [];
+    private readonly float _cellWidth;
+    private readonly float _cellHeight;
+
+    /// <summary>Creates a grid hash with the given cell size.</summary>
+    /// <param name="cellWidth">The cell width in document units; values below one are treated as one.</param>
+    /// <param name="cellHeight">The cell height in document units; values below one are treated as one.</param>
+    public VirtualizationSpatialIndex(float cellWidth, float cellHeight)
+    {
+        _cellWidth = Math.Max(1f, cellWidth);
+        _cellHeight = Math.Max(1f, cellHeight);
+    }
+
+    /// <summary>Registers an item rectangle in every cell it overlaps.</summary>
+    public void Add(int index, RectangleF bounds)
+    {
+        var left = (int)Math.Floor(bounds.Left / _cellWidth);
+        var top = (int)Math.Floor(bounds.Top / _cellHeight);
+        var right = (int)Math.Floor((bounds.Right - 0.001f) / _cellWidth);
+        var bottom = (int)Math.Floor((bounds.Bottom - 0.001f) / _cellHeight);
+        for (var column = left; column <= right; column++)
+        {
+            for (var row = top; row <= bottom; row++)
+            {
+                var key = (column, row);
+                if (!_cells.TryGetValue(key, out var list))
+                {
+                    list = [];
+                    _cells[key] = list;
+                }
+
+                list.Add(index);
+            }
+        }
+    }
+
+    /// <summary>Collects the distinct item indices whose bounds touch <paramref name="viewport"/>.</summary>
+    /// <param name="viewport">The query rectangle in document coordinates.</param>
+    /// <param name="results">The destination list; callers should clear it when they need a fresh answer.</param>
+    public void Query(RectangleF viewport, List<int> results)
+    {
+        _seen.Clear();
+        var left = (int)Math.Floor(viewport.Left / _cellWidth);
+        var top = (int)Math.Floor(viewport.Top / _cellHeight);
+        var right = (int)Math.Floor((viewport.Right - 0.001f) / _cellWidth);
+        var bottom = (int)Math.Floor((viewport.Bottom - 0.001f) / _cellHeight);
+        for (var column = left; column <= right; column++)
+        {
+            for (var row = top; row <= bottom; row++)
+            {
+                if (!_cells.TryGetValue((column, row), out var bucket))
+                {
+                    continue;
+                }
+
+                foreach (var index in bucket)
+                {
+                    if (_seen.Add(index))
+                    {
+                        results.Add(index);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Drops every registration.</summary>
+    public void Clear()
+    {
+        _cells.Clear();
+        _seen.Clear();
+    }
+}
+
+/// <summary>The virtualization engine: it realizes the visible window and recycles the rest.</summary>
 /// <remarks>
 /// <para>
-/// Items share one <see cref="ItemExtent"/> along <see cref="Orientation"/>, so the visible index range is plain
-/// division. Moving the viewport by one row recycles the leaving rows and rebinds them to the entering rows; the
-/// rows that stay visible are not rebuilt. Override <see cref="RealizeItem"/> and <see cref="RecycleItem"/> to
-/// customize how a row is created and released.
+/// Layout is delegated to a subclass through <see cref="BuildLayout"/> and <see cref="MeasureLayout"/>. The
+/// subclass returns a <see cref="VirtualizationLayoutContext"/> containing the realized (visible + overscan)
+/// records, the full extent and the current offsets; this class performs the keep/recycle/reuse/create diff.
+/// A stack, wrap grid, uniform grid or arbitrary spatial layout therefore share one realization and pooling path.
 /// </para>
 /// <para>
-/// Inside a <see cref="ScrollViewer"/> the panel reads the viewer's pixel offset and reports its full extent as
-/// its desired size. Setting <see cref="ScrollViewer.CanContentScroll"/> makes the viewer drive this panel's own
-/// <see cref="IScrollInfo"/> implementation instead, and the panel then positions rows relative to the viewport.
+/// Inside a <see cref="ScrollViewer"/> the base class reads pixel offsets by default. Setting
+/// <c>CanContentScroll</c> makes the viewer drive this panel's own <see cref="IScrollInfo"/> implementation;
+/// the layout request then sets <see cref="VirtualizationLayoutRequest.UsingOwnScroll"/> and the engine positions
+/// records relative to the viewport.
 /// </para>
 /// </remarks>
-public class VirtualizingPanel : ItemsControl, IScrollInfo
+public abstract class VirtualizingPanel : ItemsControl, IScrollInfo
 {
-    /// <summary>The fixed size of one item along <see cref="Orientation"/>, in pixels.</summary>
-    public static readonly DependencyProperty ItemExtentProperty =
-        DependencyProperty.Register(
-            nameof(ItemExtent), typeof(double), typeof(VirtualizingPanel),
-            new PropertyMetadata(24d) { AffectsMeasure = true, AffectsRender = false });
-
-    /// <summary>Whether items stack vertically (default) or horizontally.</summary>
-    public static readonly DependencyProperty OrientationProperty =
-        DependencyProperty.Register(
-            nameof(Orientation), typeof(Orientation), typeof(VirtualizingPanel),
-            new PropertyMetadata(Orientation.Vertical) { AffectsMeasure = true, AffectsRender = false });
-
-    private readonly List<VisualElement> _pool = new();
+    private readonly List<VisualElement> _pool = [];
+    private readonly Dictionary<int, VisualElement> _realized = [];
+    private readonly Dictionary<int, int> _orders = [];
     private ScrollViewer? _scrollOwner;
+    private Size _scrollExtent;
     private int _firstRealizedIndex = -1;
     private double _ownVerticalOffset;
     private double _ownHorizontalOffset;
-    private float _lastArrangedOffset;
+    private float _lastPixelOffsetX;
+    private float _lastPixelOffsetY;
     private bool _usingOwnScroll;
 
     /// <summary>Creates an empty virtualizing panel.</summary>
-    public VirtualizingPanel()
+    protected VirtualizingPanel()
     {
         ParentChanged += OnPanelParentChanged;
         HookScrollOwner();
-    }
-
-    /// <summary>The fixed size of one item along <see cref="Orientation"/>, in pixels.</summary>
-    public virtual double ItemExtent
-    {
-        get => (double)GetValue(ItemExtentProperty)!;
-        set => SetValue(ItemExtentProperty, value);
-    }
-
-    /// <summary>Whether items stack vertically (default) or horizontally.</summary>
-    public Orientation Orientation
-    {
-        get => (Orientation)GetValue(OrientationProperty)!;
-        set => SetValue(OrientationProperty, value);
     }
 
     /// <summary>The source index of the first realized item, or -1 before the first arrange.</summary>
     public int FirstRealizedIndex => _firstRealizedIndex;
 
     /// <summary>The number of realized item visuals.</summary>
-    public int RealizedCount => Items.Count;
+    public int RealizedCount => _realized.Count;
 
     /// <summary>Whether horizontal offset changes are honoured by <see cref="IScrollInfo"/>.</summary>
     public bool CanHorizontallyScroll { get; set; }
@@ -77,10 +258,10 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     public ScrollViewer? ScrollOwner { get; set; }
 
     /// <summary>The full scrollable width, in pixels.</summary>
-    public double ExtentWidth => Orientation == Orientation.Horizontal ? TotalExtent : Bounds.Width;
+    public double ExtentWidth => Math.Max(_scrollExtent.Width, Bounds.Width);
 
     /// <summary>The full scrollable height, in pixels.</summary>
-    public double ExtentHeight => Orientation == Orientation.Vertical ? TotalExtent : Bounds.Height;
+    public double ExtentHeight => Math.Max(_scrollExtent.Height, Bounds.Height);
 
     /// <summary>The visible width, in pixels.</summary>
     public double ViewportWidth => ResolveScrollViewport().Width;
@@ -94,123 +275,39 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     /// <summary>The current vertical offset, in pixels.</summary>
     public double VerticalOffset => _ownVerticalOffset;
 
-    /// <summary>Moves one item up.</summary>
-    public void LineUp() => AdjustVertical(-Math.Max(1d, ItemExtent));
+    /// <summary>The vertical step for line input, in pixels.</summary>
+    protected virtual double VerticalLineStep => 24d;
 
-    /// <summary>Moves one item down.</summary>
-    public void LineDown() => AdjustVertical(Math.Max(1d, ItemExtent));
+    /// <summary>The horizontal step for line input, in pixels.</summary>
+    protected virtual double HorizontalLineStep => 24d;
 
-    /// <summary>Moves left by one item.</summary>
-    public void LineLeft() => AdjustHorizontal(-Math.Max(1d, ItemExtent));
+    /// <summary>Measures the full document extent for the given available size.</summary>
+    /// <param name="availableSize">The available panel size.</param>
+    protected abstract Size MeasureLayout(Size availableSize);
 
-    /// <summary>Moves right by one item.</summary>
-    public void LineRight() => AdjustHorizontal(Math.Max(1d, ItemExtent));
+    /// <summary>Builds the realized window and layout records for one arrange pass.</summary>
+    /// <param name="request">The viewport, offsets and host.</param>
+    protected abstract VirtualizationLayoutContext BuildLayout(VirtualizationLayoutRequest request);
 
-    /// <summary>Moves up by one viewport.</summary>
-    public void PageUp() => AdjustVertical(-Math.Max(1d, ViewportHeight));
-
-    /// <summary>Moves down by one viewport.</summary>
-    public void PageDown() => AdjustVertical(Math.Max(1d, ViewportHeight));
-
-    /// <summary>Moves left by one viewport.</summary>
-    public void PageLeft() => AdjustHorizontal(-Math.Max(1d, ViewportWidth));
-
-    /// <summary>Moves right by one viewport.</summary>
-    public void PageRight() => AdjustHorizontal(Math.Max(1d, ViewportWidth));
-
-    /// <summary>Moves up by one wheel notch.</summary>
-    public void MouseWheelUp() => AdjustVertical(-Math.Max(1d, ItemExtent) * 3d);
-
-    /// <summary>Moves down by one wheel notch.</summary>
-    public void MouseWheelDown() => AdjustVertical(Math.Max(1d, ItemExtent) * 3d);
-
-    /// <summary>Moves left by one wheel notch.</summary>
-    public void MouseWheelLeft() => AdjustHorizontal(-Math.Max(1d, ItemExtent) * 3d);
-
-    /// <summary>Moves right by one wheel notch.</summary>
-    public void MouseWheelRight() => AdjustHorizontal(Math.Max(1d, ItemExtent) * 3d);
-
-    /// <summary>Sets the horizontal <see cref="IScrollInfo"/> offset.</summary>
-    /// <param name="offset">The requested offset in pixels.</param>
-    public void SetHorizontalOffset(double offset)
+    /// <summary>Measures and arranges one realized item at its layout record.</summary>
+    /// <param name="element">The item visual.</param>
+    /// <param name="item">The layout record.</param>
+    /// <param name="context">The layout snapshot.</param>
+    /// <param name="usingOwnScroll">Whether the record must be moved by the context offsets.</param>
+    protected virtual void ArrangeItem(
+        VisualElement element,
+        in VirtualizationItemLayout item,
+        VirtualizationLayoutContext context,
+        bool usingOwnScroll)
     {
-        var next = CanHorizontallyScroll ? XamlMath.Clamp(offset, 0d, MaxHorizontalOffset) : 0d;
-        if (Math.Abs(next - _ownHorizontalOffset) < 0.01d)
+        var bounds = item.Bounds;
+        if (usingOwnScroll)
         {
-            return;
+            bounds.Offset(-context.OffsetX, -context.OffsetY);
         }
 
-        _ownHorizontalOffset = next;
-        InvalidateArrange();
-        ScrollOwner?.InvalidateScrollInfo();
-    }
-
-    /// <summary>Sets the vertical <see cref="IScrollInfo"/> offset.</summary>
-    /// <param name="offset">The requested offset in pixels.</param>
-    public void SetVerticalOffset(double offset)
-    {
-        var next = CanVerticallyScroll ? XamlMath.Clamp(offset, 0d, MaxVerticalOffset) : 0d;
-        if (Math.Abs(next - _ownVerticalOffset) < 0.01d)
-        {
-            return;
-        }
-
-        _ownVerticalOffset = next;
-        InvalidateArrange();
-        ScrollOwner?.InvalidateScrollInfo();
-    }
-
-    /// <inheritdoc />
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        if (IsTemplated)
-        {
-            MeasureTemplate(availableSize);
-        }
-
-        var padding = Padding;
-        var extent = Math.Max(1d, ItemExtent) * SourceItems.Count;
-        return Orientation == Orientation.Vertical
-            ? new Size(
-                availableSize.Width >= int.MaxValue / 2 ? 0 : Math.Max(0, availableSize.Width),
-                (int)Math.Ceiling(extent + padding.Vertical))
-            : new Size(
-                (int)Math.Ceiling(extent + padding.Horizontal),
-                availableSize.Height >= int.MaxValue / 2 ? 0 : Math.Max(0, availableSize.Height));
-    }
-
-    /// <inheritdoc />
-    protected override void ArrangeOverride(Size finalSize)
-    {
-        if (IsTemplated)
-        {
-            ArrangeTemplate(finalSize);
-        }
-
-        var host = ResolveRealizationHost();
-        if (host is not null)
-        {
-            ArrangeDetachedHost(host, finalSize, Padding);
-        }
-
-        var extent = (float)Math.Max(1d, ItemExtent);
-        var (offset, viewport) = ResolveViewport(finalSize);
-        var origin = host is not null
-            ? (Orientation == Orientation.Vertical
-                ? ResolveHostLead(host, vertical: true) + host.Padding.Top
-                : ResolveHostLead(host, vertical: false) + host.Padding.Left)
-            : (Orientation == Orientation.Vertical ? Padding.Top : Padding.Left);
-        var (first, last) = ComputeRange(extent, viewport, offset, origin);
-        UpdateRealizedWindow(first, last, host);
-        ArrangeRealized(host, finalSize, extent, offset);
-        _lastArrangedOffset = offset;
-    }
-
-    /// <inheritdoc />
-    protected override void RealizeItems()
-    {
-        ClearRealizedRowsToPool();
-        _firstRealizedIndex = -1;
+        element.Measure(new Size((int)Math.Ceiling(bounds.Width), (int)Math.Ceiling(bounds.Height)));
+        element.Arrange(bounds);
     }
 
     /// <summary>Creates or reuses the visual for <paramref name="index"/>.</summary>
@@ -220,7 +317,7 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     {
         if (_pool.Count > 0)
         {
-            var element = _pool[_pool.Count - 1];
+            var element = _pool[^1];
             _pool.RemoveAt(_pool.Count - 1);
             BindRecycledItem(element, index);
             return element;
@@ -255,13 +352,56 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     /// <summary>Resets the realized window so the next arrange realizes from scratch.</summary>
     protected void InvalidateRealizedWindow()
     {
-        // 先把当前窗口按真实索引退回池：若只把 FirstRealizedIndex 置 -1，下一次 Arrange 已经不知道旧窗口
-        // 从哪开始，RecycleItem 收到的索引会从 -1 起算，和元素实际显示的行对不上。
-        if (_firstRealizedIndex >= 0)
+        ClearRealizedRowsToPool();
+        _firstRealizedIndex = -1;
+    }
+
+    /// <inheritdoc />
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (IsTemplated)
         {
-            ClearRealizedRowsToPool();
+            MeasureTemplate(availableSize);
         }
 
+        _scrollExtent = MeasureLayout(availableSize);
+        return _scrollExtent;
+    }
+
+    /// <inheritdoc />
+    protected override void ArrangeOverride(Size finalSize)
+    {
+        if (IsTemplated)
+        {
+            ArrangeTemplate(finalSize);
+        }
+
+        var host = ResolveRealizationHost();
+        if (host is not null)
+        {
+            ArrangeDetachedHost(host, finalSize, Padding);
+        }
+
+        var (viewport, offsetX, offsetY, usingOwnScroll) = ResolveViewport(finalSize);
+        var context = BuildLayout(new VirtualizationLayoutRequest(
+            finalSize,
+            viewport,
+            offsetX,
+            offsetY,
+            usingOwnScroll,
+            host,
+            Padding));
+        _scrollExtent = context.Extent;
+        _usingOwnScroll = usingOwnScroll;
+        UpdateRealizedWindow(context, host, usingOwnScroll);
+        _lastPixelOffsetX = offsetX;
+        _lastPixelOffsetY = offsetY;
+    }
+
+    /// <inheritdoc />
+    protected override void RealizeItems()
+    {
+        ClearRealizedRowsToPool();
         _firstRealizedIndex = -1;
     }
 
@@ -269,14 +409,6 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-
-        if (ReferenceEquals(e.Property, ItemExtentProperty)
-            || ReferenceEquals(e.Property, OrientationProperty))
-        {
-            InvalidateRealizedWindow();
-            InvalidateMeasure();
-            return;
-        }
 
         // 工厂/模板换了，池里那批元素可能已经是另一种类型，不能再复用。
         if (ReferenceEquals(e.Property, ItemFactoryProperty)
@@ -308,6 +440,74 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
         InvalidateMeasure();
     }
 
+    /// <summary>Sets the horizontal <see cref="IScrollInfo"/> offset.</summary>
+    public void SetHorizontalOffset(double offset)
+    {
+        var next = CanHorizontallyScroll
+            ? XamlMath.Clamp(offset, 0d, MaxHorizontalOffset)
+            : 0d;
+        if (Math.Abs(next - _ownHorizontalOffset) < 0.01d)
+        {
+            return;
+        }
+
+        _ownHorizontalOffset = next;
+        InvalidateArrange();
+        ScrollOwner?.InvalidateScrollInfo();
+    }
+
+    /// <summary>Sets the vertical <see cref="IScrollInfo"/> offset.</summary>
+    public void SetVerticalOffset(double offset)
+    {
+        var next = CanVerticallyScroll
+            ? XamlMath.Clamp(offset, 0d, MaxVerticalOffset)
+            : 0d;
+        if (Math.Abs(next - _ownVerticalOffset) < 0.01d)
+        {
+            return;
+        }
+
+        _ownVerticalOffset = next;
+        InvalidateArrange();
+        ScrollOwner?.InvalidateScrollInfo();
+    }
+
+    /// <summary>Moves one item up.</summary>
+    public void LineUp() => SetVerticalOffset(_ownVerticalOffset - VerticalLineStep);
+
+    /// <summary>Moves one item down.</summary>
+    public void LineDown() => SetVerticalOffset(_ownVerticalOffset + VerticalLineStep);
+
+    /// <summary>Moves left by one item.</summary>
+    public void LineLeft() => SetHorizontalOffset(_ownHorizontalOffset - HorizontalLineStep);
+
+    /// <summary>Moves right by one item.</summary>
+    public void LineRight() => SetHorizontalOffset(_ownHorizontalOffset + HorizontalLineStep);
+
+    /// <summary>Moves up by one viewport.</summary>
+    public void PageUp() => SetVerticalOffset(_ownVerticalOffset - Math.Max(1d, ViewportHeight));
+
+    /// <summary>Moves down by one viewport.</summary>
+    public void PageDown() => SetVerticalOffset(_ownVerticalOffset + Math.Max(1d, ViewportHeight));
+
+    /// <summary>Moves left by one viewport.</summary>
+    public void PageLeft() => SetHorizontalOffset(_ownHorizontalOffset - Math.Max(1d, ViewportWidth));
+
+    /// <summary>Moves right by one viewport.</summary>
+    public void PageRight() => SetHorizontalOffset(_ownHorizontalOffset + Math.Max(1d, ViewportWidth));
+
+    /// <summary>Moves up by one wheel notch.</summary>
+    public void MouseWheelUp() => SetVerticalOffset(_ownVerticalOffset - (VerticalLineStep * 3d));
+
+    /// <summary>Moves down by one wheel notch.</summary>
+    public void MouseWheelDown() => SetVerticalOffset(_ownVerticalOffset + (VerticalLineStep * 3d));
+
+    /// <summary>Moves left by one wheel notch.</summary>
+    public void MouseWheelLeft() => SetHorizontalOffset(_ownHorizontalOffset - (HorizontalLineStep * 3d));
+
+    /// <summary>Moves right by one wheel notch.</summary>
+    public void MouseWheelRight() => SetHorizontalOffset(_ownHorizontalOffset + (HorizontalLineStep * 3d));
+
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
@@ -316,32 +516,57 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
             UnhookScrollOwner();
             ParentChanged -= OnPanelParentChanged;
             DisposePool();
+            _realized.Clear();
+            _orders.Clear();
         }
 
         base.Dispose(disposing);
     }
 
-    private double TotalExtent => Math.Max(1d, ItemExtent) * SourceItems.Count;
+    /// <summary>Resolves the item host used by the base realization engine.</summary>
+    protected Panel? ResolveRealizationHost()
+    {
+        var host = ResolveItemsHost();
+        if (host is not null)
+        {
+            return host;
+        }
+
+        if (!IsTemplated)
+        {
+            return null;
+        }
+
+        var named = GetTemplateChild<Panel>("PART_ItemsPresenter");
+        if (named is not null)
+        {
+            if (named is not ItemsPresenter && !GetIsItemsHost(named))
+            {
+                SetIsItemsHost(named, true);
+            }
+
+            return named;
+        }
+
+        throw new InvalidOperationException(
+            "A virtualizing panel template needs an ItemsPresenter or a panel marked with ItemsControl.IsItemsHost.");
+    }
+
+    /// <summary>Returns the accumulated lead of a host inside this panel.</summary>
+    protected float ResolveHostLead(VisualElement host, bool vertical)
+    {
+        var lead = 0f;
+        for (var current = host; current is not null && !ReferenceEquals(current, this); current = current.ParentElement)
+        {
+            lead += vertical ? current.Bounds.Y : current.Bounds.X;
+        }
+
+        return lead;
+    }
 
     private double MaxVerticalOffset => Math.Max(0d, ExtentHeight - ViewportHeight);
 
     private double MaxHorizontalOffset => Math.Max(0d, ExtentWidth - ViewportWidth);
-
-    private void AdjustVertical(double delta)
-    {
-        if (Orientation == Orientation.Vertical)
-        {
-            SetVerticalOffset(_ownVerticalOffset + delta);
-        }
-    }
-
-    private void AdjustHorizontal(double delta)
-    {
-        if (Orientation == Orientation.Horizontal)
-        {
-            SetHorizontalOffset(_ownHorizontalOffset + delta);
-        }
-    }
 
     private (double Width, double Height) ResolveScrollViewport()
     {
@@ -352,72 +577,166 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
                presenter.ViewportHeight > 0f ? presenter.ViewportHeight : Bounds.Height);
     }
 
-    private void UpdateRealizedWindow(int first, int last, Panel? host)
+    private void UpdateRealizedWindow(VirtualizationLayoutContext context, Panel? host, bool usingOwnScroll)
     {
-        if (first < 0)
+        var requested = context.Items;
+        var first = int.MaxValue;
+        foreach (var item in requested)
         {
-            first = 0;
+            first = Math.Min(first, item.Index);
         }
 
-        if (last < first)
+        _firstRealizedIndex = requested.Count > 0 ? first : 0;
+        var wanted = new HashSet<int>(requested.Count);
+        foreach (var item in requested)
         {
-            last = first;
+            wanted.Add(item.Index);
         }
 
-        if (_firstRealizedIndex < 0)
+        foreach (var pair in _realized.ToArray())
         {
-            ClearRealizedRowsToPool();
-            _firstRealizedIndex = first;
+            if (wanted.Contains(pair.Key))
+            {
+                continue;
+            }
+
+            var position = IndexOfVisual(pair.Value);
+            if (position >= 0)
+            {
+                RemoveRealizedItemAt(position);
+            }
+
+            RecycleItem(pair.Key, pair.Value);
+            if (pair.Value.ParentElement is { } parent)
+            {
+                parent.RemoveChild(pair.Value);
+            }
+
+            _pool.Add(pair.Value);
+            _realized.Remove(pair.Key);
+            _orders.Remove(pair.Key);
         }
 
-        while (_firstRealizedIndex < first && Items.Count > 0)
+        for (var order = 0; order < requested.Count; order++)
         {
-            var leaving = RemoveRealizedItemAt(0);
-            Recycle(_firstRealizedIndex, leaving);
-            _firstRealizedIndex++;
+            var item = requested[order];
+            if (!_realized.TryGetValue(item.Index, out var visual))
+            {
+                visual = RealizeItem(item.Index);
+                _realized[item.Index] = visual;
+                _orders[item.Index] = item.Order;
+                InsertRealizedItem(InsertionIndex(item.Order), visual, host);
+            }
+
+            ArrangeItem(visual, item, context, usingOwnScroll);
         }
 
-        while (Items.Count > 0 && _firstRealizedIndex + Items.Count > last)
+        if (!IsRealizedOrder(context))
         {
-            var leaving = RemoveRealizedItemAt(Items.Count - 1);
-            Recycle(_firstRealizedIndex + Items.Count, leaving);
-        }
-
-        if (Items.Count == 0)
-        {
-            _firstRealizedIndex = first;
-        }
-
-        while (_firstRealizedIndex > first)
-        {
-            _firstRealizedIndex--;
-            InsertRealizedItem(0, RealizeItem(_firstRealizedIndex), host);
-        }
-
-        while (_firstRealizedIndex + Items.Count < last)
-        {
-            var index = _firstRealizedIndex + Items.Count;
-            InsertRealizedItem(Items.Count, RealizeItem(index), host);
+            ReorderRealized(context, host);
         }
     }
 
-    private void Recycle(int index, VisualElement element)
+    private int IndexOfVisual(VisualElement visual)
     {
-        RecycleItem(index, element);
-        if (element.ParentElement is { } parent)
+        for (var index = 0; index < Items.Count; index++)
         {
-            parent.RemoveChild(element);
+            if (ReferenceEquals(Items[index], visual))
+            {
+                return index;
+            }
         }
 
-        _pool.Add(element);
+        return -1;
+    }
+
+    private int InsertionIndex(int order)
+    {
+        // Items are kept in host order; new records enter before the first realized item with a larger order.
+        for (var position = 0; position < Items.Count; position++)
+        {
+            var index = IndexOfVisual(Items[position]);
+            if (index >= 0 && _orders.TryGetValue(index, out var existingOrder) && existingOrder > order)
+            {
+                return position;
+            }
+        }
+
+        return Items.Count;
+    }
+
+    private int OrderOf(VisualElement visual)
+    {
+        foreach (var pair in _realized)
+        {
+            if (ReferenceEquals(pair.Value, visual))
+            {
+                return pair.Key;
+            }
+        }
+
+        return -1;
+    }
+
+    private bool IsRealizedOrder(VirtualizationLayoutContext context)
+    {
+        if (Items.Count != context.Items.Count)
+        {
+            return false;
+        }
+
+        for (var position = 0; position < Items.Count; position++)
+        {
+            var item = context.Items[position];
+            if (!_realized.TryGetValue(item.Index, out var visual)
+                || !ReferenceEquals(Items[position], visual)
+                || !_orders.TryGetValue(item.Index, out var order)
+                || order != item.Order)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void ReorderRealized(VirtualizationLayoutContext context, Panel? host)
+    {
+        // Kept visuals are detached and reinserted in the new order; layout order changes are rare (column count).
+        var visuals = context.Items
+            .Select(item => _realized.TryGetValue(item.Index, out var visual) ? visual : null)
+            .Where(visual => visual is not null)
+            .ToArray();
+        for (var position = Items.Count - 1; position >= 0; position--)
+        {
+            RemoveRealizedItemAt(position);
+        }
+
+        for (var position = 0; position < visuals.Length; position++)
+        {
+            InsertRealizedItem(position, visuals[position]!, host);
+        }
+
+        for (var position = 0; position < context.Items.Count; position++)
+        {
+            _orders[context.Items[position].Index] = context.Items[position].Order;
+        }
     }
 
     private void ClearRealizedRowsToPool()
     {
         while (Items.Count > 0)
         {
-            var element = RemoveRealizedItemAt(Items.Count - 1);
-            Recycle(_firstRealizedIndex + Items.Count, element);
+            var index = OrderOf(Items[0]);
+            var visual = RemoveRealizedItemAt(0);
+            if (index >= 0)
+            {
+                RecycleItem(index, visual);
+                _realized.Remove(index);
+                _orders.Remove(index);
+            }
+
+            _pool.Add(visual);
         }
     }
 
@@ -431,147 +750,6 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
         _pool.Clear();
     }
 
-    private void ArrangeRealized(Panel? host, Size finalSize, float extent, float offset)
-    {
-        var hostPadding = host?.Padding ?? XamlThickness.Empty;
-        var vertical = Orientation == Orientation.Vertical;
-        var width = host is not null
-            ? Math.Max(0f, host.Bounds.Width - hostPadding.Horizontal)
-            : Math.Max(0f, finalSize.Width - Padding.Horizontal);
-        var height = host is not null
-            ? Math.Max(0f, host.Bounds.Height - hostPadding.Vertical)
-            : Math.Max(0f, finalSize.Height - Padding.Vertical);
-        if (vertical && width <= 0f)
-        {
-            width = Math.Max(0f, finalSize.Width - Padding.Horizontal - hostPadding.Horizontal);
-        }
-
-        for (var index = 0; index < Items.Count; index++)
-        {
-            var sourceIndex = _firstRealizedIndex + index;
-            var element = Items[index];
-            var lead = (host is not null ? (vertical ? hostPadding.Top : hostPadding.Left) : (vertical ? Padding.Top : Padding.Left))
-                       + (sourceIndex * extent);
-            if (_usingOwnScroll)
-            {
-                lead -= offset;
-            }
-
-            if (vertical)
-            {
-                element.Measure(new Size((int)Math.Ceiling(width), (int)Math.Ceiling(extent)));
-                element.Arrange(new RectangleF(
-                    host is not null ? hostPadding.Left : Padding.Left,
-                    lead,
-                    width,
-                    extent));
-            }
-            else
-            {
-                element.Measure(new Size((int)Math.Ceiling(extent), (int)Math.Ceiling(height)));
-                element.Arrange(new RectangleF(
-                    lead,
-                    host is not null ? hostPadding.Top : Padding.Top,
-                    extent,
-                    height));
-            }
-        }
-    }
-
-    private (int First, int Last) ComputeRange(float extent, float viewport, float offset, float origin)
-    {
-        var count = SourceItems.Count;
-        if (count == 0)
-        {
-            return (0, 0);
-        }
-
-        var visible = Math.Max(extent, viewport);
-        var start = Math.Max(0f, offset - origin);
-        var first = (int)Math.Floor(start / extent);
-        var last = (int)Math.Ceiling((start + visible) / extent);
-        first = XamlMath.Clamp(first, 0, count);
-        last = XamlMath.Clamp(last, first, count);
-        return (first, last);
-    }
-
-    // 优先用内容自己的 IScrollInfo（CanContentScroll）；否则按滚动祖先的像素偏移虚拟化。
-    private (float Offset, float Viewport) ResolveViewport(Size finalSize)
-    {
-        var vertical = Orientation == Orientation.Vertical;
-        var scroll = FindScrollOwner();
-        if (scroll is not null)
-        {
-            if (scroll.CanContentScroll && scroll.ContentPresenter is { } presenter)
-            {
-                _usingOwnScroll = true;
-                var viewport = vertical ? presenter.ViewportHeight : presenter.ViewportWidth;
-                var fallback = vertical ? scroll.Bounds.Height : scroll.Bounds.Width;
-                var effectiveViewport = viewport > 0f ? viewport : fallback;
-
-                // 源变短 / ItemExtent 变大后，逻辑偏移可能已经落到新范围之外。ScrollViewer 在逻辑滚动模式下
-                // 只把偏移转发给内容，不会替它夹取；这里不夹取就会算出 first == last == count，窗口全空。
-                var maxOffset = Math.Max(0d, TotalExtent - effectiveViewport);
-                if (vertical)
-                {
-                    if (_ownVerticalOffset > maxOffset + 0.01d)
-                    {
-                        _ownVerticalOffset = maxOffset;
-                    }
-                }
-                else if (_ownHorizontalOffset > maxOffset + 0.01d)
-                {
-                    _ownHorizontalOffset = maxOffset;
-                }
-
-                return ((float)(vertical ? _ownVerticalOffset : _ownHorizontalOffset), effectiveViewport);
-            }
-
-            _usingOwnScroll = false;
-            var pixelViewport = vertical ? scroll.ViewportHeight : scroll.ViewportWidth;
-            var pixelFallback = vertical ? scroll.Bounds.Height : scroll.Bounds.Width;
-            var pixelOffset = vertical ? scroll.VerticalOffset : scroll.HorizontalOffset;
-            return (pixelOffset, pixelViewport > 0f
-                ? pixelViewport
-                : pixelFallback > 0f
-                    ? pixelFallback
-                    : (vertical ? finalSize.Height : finalSize.Width));
-        }
-
-        _usingOwnScroll = false;
-        return (0f, vertical ? finalSize.Height : finalSize.Width);
-    }
-
-    private Panel? ResolveRealizationHost()
-    {
-        var host = ResolveItemsHost();
-        if (host is not null)
-        {
-            return host;
-        }
-
-        if (!IsTemplated)
-        {
-            return null;
-        }
-
-        // 命名的 PART_ItemsPresenter 即使没有 IsItemsHost 也接受。
-        var named = GetTemplateChild<Panel>("PART_ItemsPresenter");
-        if (named is not null)
-        {
-            if (named is not ItemsPresenter && !ItemsControl.GetIsItemsHost(named))
-            {
-                ItemsControl.SetIsItemsHost(named, true);
-            }
-
-            return named;
-        }
-
-        throw new InvalidOperationException(
-            "A virtualizing panel template needs an ItemsPresenter or a panel marked with ItemsControl.IsItemsHost.");
-    }
-
-    // 模板根里的宿主已由模板排好；ItemsPanel 宿主是控件的直接子项，需要在这里测量并摆放。
     private void ArrangeDetachedHost(Panel host, Size finalSize, XamlThickness padding)
     {
         if (IsInsideTemplateRoot(host))
@@ -609,17 +787,6 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
         }
 
         return false;
-    }
-
-    private float ResolveHostLead(VisualElement host, bool vertical)
-    {
-        var lead = 0f;
-        for (var current = host; current is not null && !ReferenceEquals(current, this); current = current.ParentElement)
-        {
-            lead += vertical ? current.Bounds.Y : current.Bounds.X;
-        }
-
-        return lead;
     }
 
     private void OnPanelParentChanged(object? sender, EventArgs e) => HookScrollOwner();
@@ -667,7 +834,43 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
         return null;
     }
 
-    // 偏移是像素滚动祖先在动的，内容尺寸没变时 Arrange 会被跳过；这里显式让虚拟化窗口跟着偏移重算。
+    private (Size Viewport, float OffsetX, float OffsetY, bool UsingOwnScroll) ResolveViewport(Size finalSize)
+    {
+        var scroll = FindScrollOwner();
+        if (scroll is not null && scroll.CanContentScroll && scroll.ContentPresenter is { } presenter)
+        {
+            var viewportWidth = presenter.ViewportWidth > 0f ? presenter.ViewportWidth : scroll.Bounds.Width;
+            var viewportHeight = presenter.ViewportHeight > 0f ? presenter.ViewportHeight : scroll.Bounds.Height;
+            var viewport = new Size((int)Math.Ceiling(viewportWidth), (int)Math.Ceiling(viewportHeight));
+            var maxX = Math.Max(0d, _scrollExtent.Width - viewport.Width);
+            var maxY = Math.Max(0d, _scrollExtent.Height - viewport.Height);
+            _ownHorizontalOffset = XamlMath.Clamp(_ownHorizontalOffset, 0d, maxX);
+            _ownVerticalOffset = XamlMath.Clamp(_ownVerticalOffset, 0d, maxY);
+            return (viewport, (float)_ownHorizontalOffset, (float)_ownVerticalOffset, true);
+        }
+
+        if (scroll is not null)
+        {
+            var viewportWidth = scroll.ViewportWidth > 0f ? scroll.ViewportWidth : scroll.Bounds.Width;
+            var viewportHeight = scroll.ViewportHeight > 0f ? scroll.ViewportHeight : scroll.Bounds.Height;
+            var viewport = new Size((int)Math.Ceiling(viewportWidth), (int)Math.Ceiling(viewportHeight));
+            if (viewport.Width <= 0f)
+            {
+                viewport = new Size(finalSize.Width, viewport.Height);
+            }
+
+            if (viewport.Height <= 0f)
+            {
+                viewport = new Size(viewport.Width, finalSize.Height);
+            }
+
+            return (viewport, scroll.HorizontalOffset, scroll.VerticalOffset, false);
+        }
+
+        return (finalSize, 0f, 0f, false);
+    }
+
+    // 像素滚动祖先在移动内容；内容尺寸不变时 Arrange 会被跳过，这里让虚拟化窗口跟着偏移重算。
     private void OnScrollOwnerChanged(object? sender, ScrollChangedEventArgs e)
     {
         if (_usingOwnScroll)
@@ -675,8 +878,8 @@ public class VirtualizingPanel : ItemsControl, IScrollInfo
             return;
         }
 
-        var offset = Orientation == Orientation.Vertical ? e.VerticalOffset : e.HorizontalOffset;
-        if (Math.Abs(offset - _lastArrangedOffset) >= 0.01f)
+        if (Math.Abs(e.HorizontalOffset - _lastPixelOffsetX) >= 0.01f
+            || Math.Abs(e.VerticalOffset - _lastPixelOffsetY) >= 0.01f)
         {
             InvalidateArrange();
         }

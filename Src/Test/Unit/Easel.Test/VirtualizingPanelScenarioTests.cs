@@ -8,7 +8,7 @@ using VC = Easel.Visuals.Controls;
 namespace Easel.Test;
 
 /// <summary>
-/// Scenario coverage for the generic <see cref="VC.VirtualizingPanel"/>: window sizing at 100k/1M rows, recycling,
+/// Scenario coverage for the generic <see cref="VC.VirtualizingStackPanel"/>: window sizing at 100k/1M rows, recycling,
 /// source replacement, content scrolling, both orientations, pointer input and a coarse performance budget.
 /// </summary>
 [STATestClass]
@@ -25,7 +25,7 @@ public sealed class VirtualizingPanelScenarioTests
     public void LargeSourcesKeepTheRealizedWindowBounded()
     {
         using var viewer = new VC.ScrollViewer { Width = ViewportWidth, Height = ViewportHeight };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = Rows(100_000) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = Rows(100_000) };
         viewer.Content = panel;
 
         Layout(viewer);
@@ -148,7 +148,7 @@ public sealed class VirtualizingPanelScenarioTests
     public void SourceReplacementThroughEmptyAndTinySourcesStaysConsistent()
     {
         using var viewer = new VC.ScrollViewer { Width = ViewportWidth, Height = ViewportHeight };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = Rows(5_000) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = Rows(5_000) };
         viewer.Content = panel;
         Layout(viewer);
 
@@ -189,7 +189,7 @@ public sealed class VirtualizingPanelScenarioTests
             CanContentScroll = true,
             VerticalScrollBarVisibility = VC.ScrollBarVisibility.Auto,
         };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = Rows(100_000) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = Rows(100_000) };
         viewer.Content = panel;
 
         Layout(viewer);
@@ -222,7 +222,7 @@ public sealed class VirtualizingPanelScenarioTests
             CanContentScroll = true,
             VerticalScrollBarVisibility = VC.ScrollBarVisibility.Auto,
         };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = Rows(5_000) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = Rows(5_000) };
         viewer.Content = panel;
         Layout(viewer);
 
@@ -243,7 +243,7 @@ public sealed class VirtualizingPanelScenarioTests
     public void HorizontalOrientationWindowsAColumnRange()
     {
         using var viewer = new VC.ScrollViewer { Width = ViewportWidth, Height = ViewportHeight };
-        using var panel = new VC.VirtualizingPanel
+        using var panel = new VC.VirtualizingStackPanel
         {
             Orientation = Orientation.Horizontal,
             ItemExtent = Extent,
@@ -273,7 +273,7 @@ public sealed class VirtualizingPanelScenarioTests
     public void SmallViewportAndOverscrollStayInsideTheSource()
     {
         using var viewer = new VC.ScrollViewer { Width = 120, Height = 10 };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = 40d, ItemsSource = Rows(100) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = 40d, ItemsSource = Rows(100) };
         viewer.Content = panel;
         Layout(viewer, 120, 10);
 
@@ -301,7 +301,7 @@ public sealed class VirtualizingPanelScenarioTests
             Height = ViewportHeight,
             VerticalScrollBarVisibility = VC.ScrollBarVisibility.Auto,
         };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = Rows(50_000) };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = Rows(50_000) };
         viewer.Content = panel;
         surface.Root = viewer;
         Layout(surface, 440, 284);
@@ -375,7 +375,7 @@ public sealed class VirtualizingPanelScenarioTests
         build.Stop();
 
         using var viewer = new VC.ScrollViewer { Width = ViewportWidth, Height = ViewportHeight };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = Extent, ItemsSource = rows };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = Extent, ItemsSource = rows };
         viewer.Content = panel;
 
         var firstLayout = Stopwatch.StartNew();
@@ -442,7 +442,7 @@ public sealed class VirtualizingPanelScenarioTests
         surface.RenderTo(graphics, new Size(width, height));
     }
 
-    private sealed class ProbePanel : VC.VirtualizingPanel
+    private sealed class ProbePanel : VC.VirtualizingStackPanel
     {
         public int Created { get; private set; }
 

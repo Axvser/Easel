@@ -20,7 +20,7 @@ namespace Demo.Views;
 /// the right state as soon as it is rebound.
 /// </para>
 /// </remarks>
-public sealed class VirtualLogPanel : VirtualizingPanel
+public sealed class VirtualLogPanel : VirtualizingStackPanel
 {
     private int _selectedIndex = -1;
 

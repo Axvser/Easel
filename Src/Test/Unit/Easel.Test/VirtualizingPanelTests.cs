@@ -38,7 +38,7 @@ public sealed class VirtualizingPanelTests
     {
         var rows = Enumerable.Range(0, 5000).Select(static index => (object)index).ToList();
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100 };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = 16d, ItemsSource = rows };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = 16d, ItemsSource = rows };
         viewer.Content = panel;
 
         Layout(viewer, 200, 100);
@@ -52,7 +52,7 @@ public sealed class VirtualizingPanelTests
     {
         var rows = Enumerable.Range(0, 1000).Select(static index => (object)index).ToList();
         using var viewer = new VC.ScrollViewer { Width = 200, Height = 100, CanContentScroll = true };
-        using var panel = new VC.VirtualizingPanel { ItemExtent = 20d, ItemsSource = rows };
+        using var panel = new VC.VirtualizingStackPanel { ItemExtent = 20d, ItemsSource = rows };
         viewer.Content = panel;
 
         Layout(viewer, 200, 100);
@@ -61,7 +61,7 @@ public sealed class VirtualizingPanelTests
         Assert.AreEqual(100f, viewer.ViewportHeight, 0.1f);
 
         viewer.VerticalOffset = 100f;
-        Assert.IsTrue(viewer.ContentPresenter?.PresentedContent is VC.VirtualizingPanel, "the presenter hosts the panel");
+        Assert.IsTrue(viewer.ContentPresenter?.PresentedContent is VC.VirtualizingStackPanel, "the presenter hosts the panel");
         Assert.IsTrue(viewer.ContentPresenter?.PresentedContent is VC.IScrollInfo, "the panel is a scroll info");
         Assert.AreEqual(100d, panel.VerticalOffset, 0.1d, "the viewer routed the offset to the panel scroll info");
         Layout(viewer, 200, 100);
@@ -76,7 +76,7 @@ public sealed class VirtualizingPanelTests
     {
         var items = Enumerable.Range(0, 100).Select(static index => (object)index).ToList();
         using var viewer = new VC.ScrollViewer { Width = 100, Height = 100 };
-        using var panel = new VC.VirtualizingPanel
+        using var panel = new VC.VirtualizingStackPanel
         {
             Orientation = System.Windows.Forms.Orientation.Horizontal,
             ItemExtent = 20d,
@@ -95,7 +95,7 @@ public sealed class VirtualizingPanelTests
         Assert.AreEqual(40f, panel.Items[0].Bounds.X, 0.1f, "column two sits at its document position");
     }
 
-    private sealed class CountingPanel : VC.VirtualizingPanel
+    private sealed class CountingPanel : VC.VirtualizingStackPanel
     {
         public int Created { get; private set; }
 
