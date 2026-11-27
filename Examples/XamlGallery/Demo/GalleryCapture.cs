@@ -1,24 +1,32 @@
-using System.IO;
-﻿using System.Drawing;
+using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Text;
 using System.Windows.Forms;
 using Easel.Visuals;
 
 namespace Demo;
 
-// 开发用截图/启动选项：--capture 按目录条目逐张抓图，--entry/--group/--scroll 也用于交互启动。
+// 开发用截图/启动选项：--capture 抓图后自行关闭，--smoke 显示一次后关闭，其余选项在窗口显示后应用。
 internal static class GalleryCapture
 {
-    /// <summary>Applies interactive selection, scroll and chrome switches after the window is shown.</summary>
-    public static void ApplyStartup(Form form, string[] args)
+    /// <summary>Schedules the startup automation selected by the command line.</summary>
+    public static void Configure(MainForm form, string[] args)
     {
-        if (HasFlag(args, "--capture") || form is not GalleryForm gallery)
+        if (ConfigureCapture(form, args))
         {
             return;
         }
 
-        var id = ReadEntryId(gallery, args);
+        ConfigureSmoke(form, args);
+        ConfigureSelection(form, args);
+    }
+
+    // --entry / --group / --scroll / --preview-only / --toggle-theme 用于交互启动。
+    private static void ConfigureSelection(MainForm form, string[] args)
+    {
+        var session = form.Session;
+        var id = ReadEntryId(session, args);
         var scroll = ReadInt(args, "--scroll", 0);
         var previewOnly = HasFlag(args, "--preview-only");
         if (id is null && scroll <= 0 && !previewOnly)
@@ -35,30 +43,51 @@ internal static class GalleryCapture
 
             if (previewOnly)
             {
-                gallery.SetChromeVisible(false);
+                session.SetChromeVisible(false);
             }
 
             if (HasFlag(args, "--toggle-theme"))
             {
-                gallery.ToggleThemeForCapture();
+                session.ToggleTheme();
             }
 
             if (id is not null)
             {
-                gallery.SelectEntry(id);
+                session.SelectEntry(id);
             }
 
             if (scroll > 0)
             {
-                gallery.SetScrollOffset(scroll);
+                session.SetScrollOffset(scroll);
             }
 
-            gallery.Surface.InvalidateSurface();
+            form.Surface.InvalidateSurface();
         });
     }
 
-    /// <summary>Runs capture mode when <c>--capture</c> is present.</summary>
-    public static bool TryRun(Form form, string[] args)
+    // 冒烟模式：窗口真正显示一次，1.2 秒后自己关掉，运行完不留窗口。
+    private static void ConfigureSmoke(MainForm form, string[] args)
+    {
+        if (!HasFlag(args, "--smoke"))
+        {
+            return;
+        }
+
+        form.Shown += (_, _) =>
+        {
+            var timer = new System.Windows.Forms.Timer { Interval = 1200 };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                form.Close();
+            };
+            timer.Start();
+        };
+    }
+
+    // 截图模式：窗口显示后逐条抓图，抓完自己关掉。
+    private static bool ConfigureCapture(MainForm form, string[] args)
     {
         var start = Array.FindIndex(args, a => string.Equals(a, "--capture", StringComparison.OrdinalIgnoreCase));
         if (start < 0)
@@ -71,17 +100,11 @@ internal static class GalleryCapture
             : Path.Combine(AppContext.BaseDirectory, "captures");
         Directory.CreateDirectory(directory);
 
-        if (form is not GalleryForm gallery)
-        {
-            throw new InvalidOperationException("The capture mode needs a GalleryForm.");
-        }
-
-        var targets = ResolveTargets(gallery, args);
+        var session = form.Session;
+        var targets = ResolveTargets(session, args);
         var scroll = ReadInt(args, "--scroll", 0);
         var dump = HasFlag(args, "--dump");
         var previewOnly = HasFlag(args, "--preview-only");
-        var includeGroups = HasFlag(args, "--include-groups");
-        _ = includeGroups;
         var themeCycle = ReadIntList(args, "--theme-cycle");
 
         PlaceOnCaptureScreen(form);
@@ -93,19 +116,19 @@ internal static class GalleryCapture
             {
                 if (previewOnly)
                 {
-                    gallery.SetChromeVisible(false);
+                    session.SetChromeVisible(false);
                 }
 
                 if (HasFlag(args, "--toggle-theme"))
                 {
-                    gallery.ToggleThemeForCapture();
+                    session.ToggleTheme();
                     Pump(form, 4);
                 }
 
                 for (var index = 0; index < targets.Count; index++)
                 {
                     var id = targets[index];
-                    if (!gallery.SelectEntry(id))
+                    if (!session.SelectEntry(id))
                     {
                         File.WriteAllText(
                             Path.Combine(directory, $"capture-error-{SafeName(id)}.txt"),
@@ -118,7 +141,7 @@ internal static class GalleryCapture
                     // 先让新卡完成布局，尺寸算出后偏移才有可夹取的范围。
                     if (scroll > 0 && targets.Count == 1)
                     {
-                        gallery.SetScrollOffset(scroll);
+                        session.SetScrollOffset(scroll);
                         Pump(form, 4);
                     }
 
@@ -128,7 +151,7 @@ internal static class GalleryCapture
                         for (var step = 0; step < themeCycle.Count; step++)
                         {
                             var themeIndex = themeCycle[step];
-                            gallery.SelectThemeForCapture(themeIndex);
+                            session.SelectTheme(themeIndex);
                             Pump(form, 8);
 
                             var themed = targets.Count == 1
@@ -137,7 +160,7 @@ internal static class GalleryCapture
                             Capture(form, Path.Combine(directory, themed + ".png"));
                             if (dump)
                             {
-                                WriteDump(gallery, form, Path.Combine(directory, themed + ".txt"));
+                                WriteDump(form, Path.Combine(directory, themed + ".txt"));
                             }
                         }
 
@@ -149,7 +172,7 @@ internal static class GalleryCapture
 
                     if (dump)
                     {
-                        WriteDump(gallery, form, Path.Combine(directory, name + ".txt"));
+                        WriteDump(form, Path.Combine(directory, name + ".txt"));
                     }
                 }
             }
@@ -166,9 +189,9 @@ internal static class GalleryCapture
         return true;
     }
 
-    private static List<string> ResolveTargets(GalleryForm gallery, string[] args)
+    private static List<string> ResolveTargets(GallerySession session, string[] args)
     {
-        var cards = gallery.Shell.Cards;
+        var cards = session.Cards;
         if (HasFlag(args, "--all"))
         {
             return cards.Select(static card => card.Id).ToList();
@@ -192,7 +215,7 @@ internal static class GalleryCapture
         return cards.Count > 0 ? [cards[0].Id] : [];
     }
 
-    private static string? ReadEntryId(GalleryForm gallery, string[] args)
+    private static string? ReadEntryId(GallerySession session, string[] args)
     {
         var entry = ReadOption(args, "--entry");
         if (entry is not null)
@@ -206,7 +229,7 @@ internal static class GalleryCapture
             return null;
         }
 
-        return gallery.Shell.Cards
+        return session.Cards
             .FirstOrDefault(card => string.Equals(card.Group, group, StringComparison.OrdinalIgnoreCase))
             ?.Id;
     }
@@ -240,11 +263,11 @@ internal static class GalleryCapture
             .ToList();
     }
 
-    private static void WriteDump(GalleryForm gallery, Form form, string path)
+    private static void WriteDump(MainForm form, string path)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"window {form.Bounds}");
-        if (gallery.Surface.Root is VisualElement root)
+        if (form.Surface.Root is VisualElement root)
         {
             Dump(root, builder, 0);
         }
@@ -255,12 +278,15 @@ internal static class GalleryCapture
     private static bool HasFlag(string[] args, string name)
         => Array.Exists(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
 
-    private static void PlaceOnCaptureScreen(Form form)
+    private static void PlaceOnCaptureScreen(MainForm form)
     {
         var screen = Screen.AllScreens.FirstOrDefault(static candidate => !candidate.Primary)
                      ?? Screen.PrimaryScreen
                      ?? Screen.AllScreens[0];
         var area = screen.WorkingArea;
+
+        // 句柄创建时 Window 才套用 DIP 尺寸；先建句柄，后面按抓图屏裁出的物理矩形才不会被覆盖。
+        _ = form.Handle;
 
         // 窗口尺寸按主屏算，抓图屏可能更小；不裁到目标屏就会截到未绘制的窗框区域。
         var width = Math.Min(form.Width, Math.Max(900, area.Width - 24));
@@ -277,7 +303,7 @@ internal static class GalleryCapture
     private static string SafeName(string id)
         => string.Join('-', id.Split(['.', '/', '\\', ' ', ':'], StringSplitOptions.RemoveEmptyEntries));
 
-    private static void Pump(Form form, int frames)
+    private static void Pump(MainForm form, int frames)
     {
         form.Activate();
         for (var frame = 0; frame < frames; frame++)
@@ -287,7 +313,7 @@ internal static class GalleryCapture
         }
     }
 
-    private static void Capture(Form form, string path)
+    private static void Capture(MainForm form, string path)
     {
         // PrintWindow 直接让窗口画进内存 DC，不依赖桌面坐标；DPI 缩放下不会截到窗口外。
         var bounds = form.Bounds;
@@ -305,10 +331,10 @@ internal static class GalleryCapture
                 graphics.ReleaseHdc(hdc);
             }
 
-            if (!captured && form is GalleryForm gallery)
+            if (!captured)
             {
-                graphics.Clear(gallery.Surface.BackColor);
-                gallery.Surface.RenderTo(graphics, gallery.Surface.ClientSize);
+                graphics.Clear(form.Surface.BackColor);
+                form.Surface.RenderTo(graphics, form.Surface.ClientSize);
             }
         }
 

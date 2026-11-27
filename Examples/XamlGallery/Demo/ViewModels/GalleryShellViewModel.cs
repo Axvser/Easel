@@ -25,10 +25,9 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         get => _filterText;
         set
         {
-            var oldValue = _filterText;
             if (SetProperty(ref _filterText, value))
             {
-                OnFilterTextChanged(oldValue, value);
+                OnFilterTextChanged();
             }
         }
     }
@@ -39,10 +38,9 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         get => _selectedCard;
         set
         {
-            var oldValue = _selectedCard;
             if (SetProperty(ref _selectedCard, value))
             {
-                OnSelectedCardChanged(oldValue, value);
+                OnSelectedCardChanged(value);
             }
         }
     }
@@ -53,45 +51,23 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         get => _themeIndex;
         set
         {
-            var oldValue = _themeIndex;
             if (SetProperty(ref _themeIndex, value))
             {
-                OnThemeIndexChanged(oldValue, value);
+                OnThemeIndexChanged(value);
             }
         }
     }
 
-    /// <summary>Creates the shell state and selects the initial card without raising events for a not-yet-created view.</summary>
+    /// <summary>Creates the shell state and selects the first visible card.</summary>
     /// <param name="cards">The catalog metadata, in catalog order.</param>
     /// <param name="theme">The palette service.</param>
-    /// <param name="initialId">The card to select, or <see langword="null"/> for the first visible card.</param>
-    /// <param name="filter">The initial filter text.</param>
-    public GalleryShellViewModel(
-        IReadOnlyList<GalleryCardInfo> cards,
-        IThemeService theme,
-        string? initialId = null,
-        string? filter = null)
+    public GalleryShellViewModel(IReadOnlyList<GalleryCardInfo> cards, IThemeService theme)
     {
         _cards = cards;
         _theme = theme;
         _themeIndex = theme.SelectedIndex;
-        _filterText = filter ?? string.Empty;
         ApplyFilterCore();
-
-        if (!string.IsNullOrEmpty(initialId)
-            && _cards.FirstOrDefault(card => string.Equals(card.Id, initialId, StringComparison.Ordinal)) is { } initial)
-        {
-            // 和旧的 SelectEntry 一样：目标被筛选隐藏时先清掉筛选，再选它。
-            if (!_visible.Any(card => card.Id == initial.Id))
-            {
-                _filterText = string.Empty;
-                ApplyFilterCore();
-            }
-
-            _selectedCard = initial;
-        }
-
-        _selectedCard ??= _visible.FirstOrDefault() ?? _cards.FirstOrDefault();
+        _selectedCard = _visible.FirstOrDefault() ?? _cards.FirstOrDefault();
         _hadMatches = HasMatches;
         _theme.Changed += OnThemeChanged;
     }
@@ -102,14 +78,8 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the preview should show a card, or clear itself for <see langword="null"/>.</summary>
     public event EventHandler<GalleryCardInfo?>? PreviewChanged;
 
-    /// <summary>Every card's metadata in catalog order.</summary>
-    public IReadOnlyList<GalleryCardInfo> Cards => _cards;
-
     /// <summary>The groups that match the current filter, in first-appearance order.</summary>
     public IReadOnlyList<GalleryCardGroup> VisibleGroups => _groups;
-
-    /// <summary>Every card that matches the current filter, in catalog order.</summary>
-    public IReadOnlyList<GalleryCardInfo> VisibleCards => _visible;
 
     /// <summary>Whether anything matches the filter.</summary>
     public bool HasMatches => _visible.Count > 0;
@@ -163,10 +133,10 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
     /// <inheritdoc />
     public void Dispose() => _theme.Changed -= OnThemeChanged;
 
-    private void OnThemeIndexChanged(int oldValue, int newValue)
-        => _theme.SelectIndex(newValue);
+    private void OnThemeIndexChanged(int value)
+        => _theme.SelectIndex(value);
 
-    private void OnFilterTextChanged(string oldValue, string newValue)
+    private void OnFilterTextChanged()
     {
         ApplyFilterCore();
         RaiseComputed();
@@ -191,7 +161,7 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         CatalogChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnSelectedCardChanged(GalleryCardInfo? oldValue, GalleryCardInfo? newValue)
+    private void OnSelectedCardChanged(GalleryCardInfo? newValue)
     {
         RaiseComputed();
         PreviewChanged?.Invoke(this, newValue);
@@ -233,7 +203,6 @@ internal sealed class GalleryShellViewModel : ObservableObject, IDisposable
         }
 
         OnPropertyChanged(nameof(VisibleGroups));
-        OnPropertyChanged(nameof(VisibleCards));
         OnPropertyChanged(nameof(HasMatches));
     }
 

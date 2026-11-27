@@ -1,7 +1,0 @@
-<Window
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    x:Class="Demo.GalleryForm"
-    Title="Easel Demos">
-  <!-- The shell needs the gallery services, so Content is assigned in code-behind. -->
-</Window>

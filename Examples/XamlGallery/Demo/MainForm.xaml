@@ -1,0 +1,12 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Demo"
+    x:Class="Demo.MainForm"
+    Title="Easel Demos">
+  <!-- DataContext is emitted before the content, so the shell inherits the session as it attaches. -->
+  <Window.DataContext>
+    <local:GallerySession />
+  </Window.DataContext>
+  <local:GalleryVisualShell />
+</Window>
