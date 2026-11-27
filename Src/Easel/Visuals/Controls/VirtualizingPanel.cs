@@ -317,7 +317,7 @@ public abstract class VirtualizingPanel : ItemsControl, IScrollInfo
     {
         if (_pool.Count > 0)
         {
-            var element = _pool[^1];
+            var element = _pool[_pool.Count - 1];
             _pool.RemoveAt(_pool.Count - 1);
             BindRecycledItem(element, index);
             return element;
@@ -607,7 +607,7 @@ public abstract class VirtualizingPanel : ItemsControl, IScrollInfo
         }
 
         _firstRealizedIndex = requested.Count > 0 ? first : 0;
-        var wanted = new HashSet<int>(requested.Count);
+        var wanted = new HashSet<int>();
         foreach (var item in requested)
         {
             wanted.Add(item.Index);
