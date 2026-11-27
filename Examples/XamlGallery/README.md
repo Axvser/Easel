@@ -173,7 +173,9 @@ not a Gallery demonstration; it stays in the runtime and the skill notes.
   remain as the two code paths.
 - **Virtualizing engine and layouts** — `VirtualizingPanel` is now an abstract engine fed by a
   `VirtualizationLayoutContext`; `VirtualizingStackPanel` (with `Spacing`), `VirtualizingListBox`,
-  `VirtualizingWrapPanel` and `VirtualizingUniformGrid` are concrete layouts on it. The Data group shows a
+  `VirtualizingWrapPanel` and `VirtualizingUniformGrid` are concrete layouts on it. A custom placement rule can
+  be plugged into `VirtualizingLayoutPanel` as an `IVirtualizingLayout` / `DelegateVirtualizingLayout` — no
+  panel subclass and no `BuildLayout` override. The Data group shows a
   direct 100k stack, a selectable list, a custom stack with live counters and a 5k wrap grid. The engine tests
   cover non-contiguous/2D probe layouts, differential fuzzing, pool reuse, source/template replacement,
   `VirtualizingListBox` interaction and a 1M-row stopwatch budget; the `VirtualizationSpatialIndex` grid hash is
